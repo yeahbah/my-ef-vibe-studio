@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "name": "Sample workspace",
+  "projects": [],
+  "connections": [
+    {
+      "id": "sample-connection",
+      "name": "Sample connection",
+      "efProject": "",
+      "startupProject": "",
+      "context": "",
+      "dbLog": true
+    }
+  ]
+}
