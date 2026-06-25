@@ -127,6 +127,20 @@ pub fn daemon_request(
 }
 
 #[tauri::command]
+pub fn git_status(directory: String) -> crate::git::GitStatusResult {
+    crate::git::git_status(directory)
+}
+
+#[tauri::command]
+pub fn git_commit_files(
+    directory: String,
+    message: String,
+    files: Vec<String>,
+) -> Result<crate::git::GitCommitResult, String> {
+    crate::git::git_commit_files(directory, message, files)
+}
+
+#[tauri::command]
 pub fn open_in_ide(
     file: String,
     line: u32,

@@ -1,5 +1,6 @@
 mod commands;
 mod daemon;
+mod git;
 mod tool;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -17,6 +18,8 @@ pub fn run() {
             commands::daemon_request,
             commands::open_in_ide,
             commands::start_repl,
+            commands::git_status,
+            commands::git_commit_files,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

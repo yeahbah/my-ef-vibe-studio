@@ -83,6 +83,16 @@ export function SettingsPanel({
               />
             </label>
           )}
+          <label>
+            Team sync directory
+            <input
+              value={settings.teamSyncDirectory}
+              onChange={(event) =>
+                onSettingsChange({ ...settings, teamSyncDirectory: event.target.value })
+              }
+              placeholder="Shared folder for team query packs (optional)"
+            />
+          </label>
         </section>
 
         <section>

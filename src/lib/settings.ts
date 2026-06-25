@@ -17,7 +17,8 @@ export type SidebarTab =
   | "history"
   | "scan"
   | "library"
-  | "snippets";
+  | "snippets"
+  | "team";
 
 export interface StudioSession {
   workspacePath: string;
@@ -40,6 +41,7 @@ export interface StudioSession {
   userSnippets?: SnippetDefinition[];
   queryLibrary?: QueryLibraryState;
   compareBaseline?: EvaluationHistoryEntry;
+  installedPackIds?: string[];
 }
 
 export async function loadAppSettings(): Promise<AppSettings> {

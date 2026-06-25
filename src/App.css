@@ -994,6 +994,79 @@ th {
   justify-content: flex-end;
 }
 
+.team-panel h4 {
+  margin: 0 0 8px;
+  font-size: 11px;
+  text-transform: uppercase;
+  color: #8b949e;
+}
+
+.team-section {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid #30363d;
+}
+
+.team-section:first-of-type {
+  border-top: none;
+  padding-top: 0;
+}
+
+.team-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.team-panel input[type="text"] {
+  width: 100%;
+  margin: 8px 0;
+  background: #0d1117;
+  color: #e6edf3;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+  padding: 6px 8px;
+  font-size: 12px;
+}
+
+.git-file-list {
+  list-style: none;
+  margin: 0 0 8px;
+  padding: 0;
+  max-height: 140px;
+  overflow: auto;
+}
+
+.git-file-list label {
+  display: flex;
+  gap: 6px;
+  font-size: 11px;
+  margin-bottom: 4px;
+  word-break: break-all;
+}
+
+.pack-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.pack-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 10px;
+  padding: 8px;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+  background: #161b22;
+}
+
+.pack-card span {
+  font-size: 11px;
+  color: #8b949e;
+}
+
 @media (max-width: 900px) {
   .workspace {
     grid-template-columns: 1fr;

@@ -125,6 +125,7 @@ function App() {
   const [sqlToLinqOpen, setSqlToLinqOpen] = useState(false);
   const [sqlToLinqInitial, setSqlToLinqInitial] = useState("");
   const [benchmarking, setBenchmarking] = useState(false);
+  const [installedPackIds, setInstalledPackIds] = useState<string[]>([]);
 
   const activeQueryTab = useMemo(
     () => queryTabs.find((tab) => tab.id === activeQueryTabId),
@@ -254,6 +255,9 @@ function App() {
         if (savedSession.compareBaseline) {
           setCompareBaseline(savedSession.compareBaseline);
         }
+        if (savedSession.installedPackIds) {
+          setInstalledPackIds(savedSession.installedPackIds);
+        }
       } else {
         const connection = createSampleConnection();
         const tab = createQueryTab(connection.id);
@@ -310,6 +314,7 @@ function App() {
       userSnippets,
       queryLibrary,
       compareBaseline,
+      installedPackIds,
     });
   }, [
     sessionLoaded,
@@ -332,6 +337,7 @@ function App() {
     userSnippets,
     queryLibrary,
     compareBaseline,
+    installedPackIds,
   ]);
 
   useEffect(() => {
@@ -818,6 +824,36 @@ function App() {
     setSqlToLinqOpen(true);
   }
 
+  function handleImportPack(
+    snippets: SnippetDefinition[],
+    queries: Array<{ name: string; expression: string; connectionId: string }>,
+    folderNames: string[],
+  ) {
+    setUserSnippets((current) => [...current, ...snippets]);
+
+    if (folderNames.length > 0) {
+      setQueryLibrary((library) => ({
+        ...library,
+        folders: [
+          ...library.folders,
+          ...folderNames
+            .filter((name) => !library.folders.some((folder) => folder.name === name))
+            .map((name) => createQueryFolder(name)),
+        ],
+      }));
+    }
+
+    for (const query of queries) {
+      handleOpenLibraryQuery(query.expression, query.connectionId, query.name);
+    }
+  }
+
+  function handleInstallPackId(packId: string) {
+    setInstalledPackIds((current) =>
+      current.includes(packId) ? current : [...current, packId],
+    );
+  }
+
   const editingConnection =
     document && editingConnectionId
       ? document.workspace.connections.find((connection) => connection.id === editingConnectionId)
@@ -917,6 +953,7 @@ function App() {
       <div className="workspace">
         <StudioSidebar
           documentPath={document.path}
+          workspaceDirectory={workspaceDirectory}
           workspaceName={document.workspace.name}
           sidebarTab={sidebarTab}
           connections={document.workspace.connections}
@@ -927,6 +964,9 @@ function App() {
           queryTabs={queryTabs}
           queryLibrary={queryLibrary}
           userSnippets={userSnippets}
+          teamSyncDirectory={settings.teamSyncDirectory}
+          preferredEditor={settings.preferredEditor}
+          installedPackIds={installedPackIds}
           onSidebarTabChange={setSidebarTab}
           onSelectConnection={(connectionId) => {
             setActiveConnectionId(connectionId);
@@ -994,6 +1034,9 @@ function App() {
           onInsertSnippet={handleInsertSnippet}
           onAddSnippet={handleAddSnippet}
           onRemoveSnippet={handleRemoveSnippet}
+          onImportPack={handleImportPack}
+          onInstallPackId={handleInstallPackId}
+          onTeamStatus={setStatus}
         />
 
         <div className="main-stack">

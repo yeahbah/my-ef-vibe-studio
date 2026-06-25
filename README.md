@@ -4,7 +4,15 @@ Standalone desktop app for EF Core LINQ exploration — a LINQPad-style scratchp
 
 Built with **Tauri 2** + **React** + **Monaco**. The [efvibe](https://github.com/yeahbah/my-ef-vibe) CLI remains the evaluation engine; Studio is orchestration and UX.
 
-## Phase 2 (current)
+## Phase 3 (current)
+
+- **Team panel** — git status and commit for `.efvibe-workspace` / `.efvibe-query` / `.efvibe-notebook` files
+- **Team packs** — export/import `.efvibe-pack` (queries, snippets, folders)
+- **Sync folder** — push/pull favorite queries to a shared directory (local team sync)
+- **Snippet packs** — built-in marketplace packs (EF Core basics, performance probes)
+- **Open in IDE** — scan findings open in VS Code, Rider, or Visual Studio (configured in Settings)
+
+## Phase 2
 
 - **Result explorer** — Dump-style nested object tree (Explorer tab) with grid/tree toggle
 - **Live SQL pane** — debounced `ToQueryString()` preview beside the editor
@@ -102,6 +110,7 @@ An example file lives at `examples/sample.efvibe-workspace`.
 | `.efvibe-workspace` | Projects and connections |
 | `.efvibe-query` | Single query tab (expression + connection) |
 | `.efvibe-notebook` | Multi-cell notebook |
+| `.efvibe-pack` | Team pack (queries + snippets + folders) |
 
 ## License
 

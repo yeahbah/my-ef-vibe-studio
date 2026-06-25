@@ -16,6 +16,7 @@ export interface AppSettings {
   defaultWorkspaceRoot: string;
   preferredEditor: PreferredEditor;
   customEditorCommand: string;
+  teamSyncDirectory: string;
 }
 
 export const DEFAULT_APP_SETTINGS: AppSettings = {
@@ -23,6 +24,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   defaultWorkspaceRoot: "",
   preferredEditor: "code",
   customEditorCommand: "",
+  teamSyncDirectory: "",
 };
 
 export interface ToolInvocation {

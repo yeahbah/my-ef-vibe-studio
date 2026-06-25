@@ -5,8 +5,9 @@ import { QueryLibraryPanel } from "./QueryLibraryPanel";
 import { ScanPanel } from "./ScanPanel";
 import { SchemaExplorer } from "./SchemaExplorer";
 import { SnippetsPanel } from "./SnippetsPanel";
+import { TeamPanel } from "./TeamPanel";
 import type { EvaluationHistoryEntry } from "../lib/history";
-import type { ConnectionSettings } from "../types/connection";
+import type { ConnectionSettings, PreferredEditor } from "../types/connection";
 import type { QueryLibraryState } from "../types/queryLibrary";
 import type { QueryTab } from "../types/query";
 import type { SnippetDefinition } from "../types/snippets";
@@ -14,6 +15,7 @@ import type { WorkspaceConnection } from "../types/workspace";
 
 interface StudioSidebarProps {
   documentPath: string;
+  workspaceDirectory: string;
   workspaceName: string;
   sidebarTab: SidebarTab;
   connections: WorkspaceConnection[];
@@ -40,6 +42,16 @@ interface StudioSidebarProps {
   onInsertSnippet: (expression: string) => void;
   onAddSnippet: (title: string, expression: string) => void;
   onRemoveSnippet: (id: string) => void;
+  teamSyncDirectory: string;
+  preferredEditor: PreferredEditor;
+  installedPackIds: string[];
+  onImportPack: (
+    snippets: import("../types/snippets").SnippetDefinition[],
+    queries: Array<{ name: string; expression: string; connectionId: string }>,
+    folderNames: string[],
+  ) => void;
+  onInstallPackId: (packId: string) => void;
+  onTeamStatus: (message: string) => void;
 }
 
 const TABS: Array<{ id: SidebarTab; label: string }> = [
@@ -49,10 +61,12 @@ const TABS: Array<{ id: SidebarTab; label: string }> = [
   { id: "snippets", label: "Snips" },
   { id: "history", label: "History" },
   { id: "scan", label: "Scan" },
+  { id: "team", label: "Team" },
 ];
 
 export function StudioSidebar({
   documentPath,
+  workspaceDirectory,
   workspaceName,
   sidebarTab,
   connections,
@@ -79,6 +93,12 @@ export function StudioSidebar({
   onInsertSnippet,
   onAddSnippet,
   onRemoveSnippet,
+  teamSyncDirectory,
+  preferredEditor,
+  installedPackIds,
+  onImportPack,
+  onInstallPackId,
+  onTeamStatus,
 }: StudioSidebarProps) {
   return (
     <aside className="sidebar">
@@ -148,7 +168,23 @@ export function StudioSidebar({
         <ScanPanel
           connectionSettings={connectionSettings}
           searchDirectory={searchDirectory}
+          preferredEditor={preferredEditor}
           onGoToSource={onGoToSource}
+        />
+      )}
+      {sidebarTab === "team" && (
+        <TeamPanel
+          workspaceDirectory={workspaceDirectory}
+          workspacePath={documentPath}
+          queryTabs={queryTabs}
+          userSnippets={userSnippets}
+          queryLibrary={queryLibrary}
+          teamSyncDirectory={teamSyncDirectory}
+          preferredEditor={preferredEditor}
+          installedPackIds={installedPackIds}
+          onImportPack={onImportPack}
+          onInstallPackId={onInstallPackId}
+          onStatus={onTeamStatus}
         />
       )}
     </aside>

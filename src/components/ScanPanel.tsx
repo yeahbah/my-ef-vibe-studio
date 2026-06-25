@@ -1,18 +1,27 @@
 import { useState } from "react";
 import { findingsToReviewItems, formatFindingSummary } from "../lib/scan";
 import { runScanJson } from "../lib/schema";
-import type { ConnectionSettings } from "../types/connection";
+import type { ConnectionSettings, PreferredEditor } from "../types/connection";
 import type { ScanMode, ScanReviewItem } from "../types/scan";
 
 interface ScanPanelProps {
   connectionSettings: ConnectionSettings | undefined;
   searchDirectory: string;
+  preferredEditor: PreferredEditor;
   onGoToSource: (file: string, line: number) => void;
 }
+
+const EDITOR_LABELS: Record<PreferredEditor, string> = {
+  code: "VS Code",
+  rider: "Rider",
+  devenv: "Visual Studio",
+  custom: "IDE",
+};
 
 export function ScanPanel({
   connectionSettings,
   searchDirectory,
+  preferredEditor,
   onGoToSource,
 }: ScanPanelProps) {
   const [items, setItems] = useState<ScanReviewItem[]>([]);
@@ -100,7 +109,7 @@ export function ScanPanel({
             type="button"
             onClick={() => onGoToSource(current.finding.filePath, current.finding.line)}
           >
-            Open in IDE
+            Open in {EDITOR_LABELS[preferredEditor]}
           </button>
         </div>
       )}
