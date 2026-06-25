@@ -1,6 +1,6 @@
 import type { EvaluationJsonPayload } from "./evaluation";
 
-export type ResultsTab = "result" | "sql" | "plan" | "messages";
+export type ResultsTab = "result" | "explorer" | "sql" | "plan" | "messages";
 
 export interface QueryTab {
   id: string;
@@ -8,6 +8,8 @@ export interface QueryTab {
   connectionId: string;
   expression: string;
   filePath: string;
+  favorite?: boolean;
+  folderId?: string;
   activeResultsTab: ResultsTab;
   lastPayload?: EvaluationJsonPayload;
 }

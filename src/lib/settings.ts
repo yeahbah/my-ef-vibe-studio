@@ -8,8 +8,16 @@ const store = new LazyStore("settings.json");
 import type { EvaluationHistoryEntry } from "./history";
 import type { QueryTab } from "../types/query";
 import type { NotebookCell } from "../types/notebook";
+import type { SnippetDefinition } from "../types/snippets";
+import type { QueryLibraryState } from "../types/queryLibrary";
 
-export type SidebarTab = "connections" | "schema" | "history" | "scan";
+export type SidebarTab =
+  | "connections"
+  | "schema"
+  | "history"
+  | "scan"
+  | "library"
+  | "snippets";
 
 export interface StudioSession {
   workspacePath: string;
@@ -25,6 +33,13 @@ export interface StudioSession {
   notebookPath?: string;
   notebookConnectionId?: string;
   notebookCells?: NotebookCell[];
+  liveSqlEnabled?: boolean;
+  sqlPaneOpen?: boolean;
+  sqlPaneWidth?: number;
+  lambdaMode?: boolean;
+  userSnippets?: SnippetDefinition[];
+  queryLibrary?: QueryLibraryState;
+  compareBaseline?: EvaluationHistoryEntry;
 }
 
 export async function loadAppSettings(): Promise<AppSettings> {

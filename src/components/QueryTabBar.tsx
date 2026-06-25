@@ -8,6 +8,7 @@ interface QueryTabBarProps {
   onClose: (tabId: string) => void;
   onOpen: () => void;
   onSave: () => void;
+  onToggleFavorite: (tabId: string) => void;
 }
 
 export function QueryTabBar({
@@ -18,6 +19,7 @@ export function QueryTabBar({
   onClose,
   onOpen,
   onSave,
+  onToggleFavorite,
 }: QueryTabBarProps) {
   return (
     <div className="query-tab-bar">
@@ -28,8 +30,17 @@ export function QueryTabBar({
             className={tab.id === activeTabId ? "query-tab active" : "query-tab"}
           >
             <button type="button" className="query-tab-label" onClick={() => onSelect(tab.id)}>
+              {tab.favorite ? "★ " : ""}
               {tab.name}
               {tab.filePath ? "" : " *"}
+            </button>
+            <button
+              type="button"
+              className={tab.favorite ? "query-tab-fav active" : "query-tab-fav"}
+              aria-label={tab.favorite ? "Unfavorite" : "Favorite"}
+              onClick={() => onToggleFavorite(tab.id)}
+            >
+              ★
             </button>
             {tabs.length > 1 && (
               <button

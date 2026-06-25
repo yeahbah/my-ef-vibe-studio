@@ -1,10 +1,15 @@
 import type { SidebarTab } from "../lib/settings";
 import { ConnectionsPanel } from "./ConnectionsPanel";
 import { HistoryPanel } from "./HistoryPanel";
+import { QueryLibraryPanel } from "./QueryLibraryPanel";
 import { ScanPanel } from "./ScanPanel";
 import { SchemaExplorer } from "./SchemaExplorer";
+import { SnippetsPanel } from "./SnippetsPanel";
 import type { EvaluationHistoryEntry } from "../lib/history";
 import type { ConnectionSettings } from "../types/connection";
+import type { QueryLibraryState } from "../types/queryLibrary";
+import type { QueryTab } from "../types/query";
+import type { SnippetDefinition } from "../types/snippets";
 import type { WorkspaceConnection } from "../types/workspace";
 
 interface StudioSidebarProps {
@@ -16,6 +21,9 @@ interface StudioSidebarProps {
   connectionSettings: ConnectionSettings | undefined;
   searchDirectory: string;
   history: EvaluationHistoryEntry[];
+  queryTabs: QueryTab[];
+  queryLibrary: QueryLibraryState;
+  userSnippets: SnippetDefinition[];
   onSidebarTabChange: (tab: SidebarTab) => void;
   onSelectConnection: (connectionId: string) => void;
   onAddConnection: () => void;
@@ -25,11 +33,20 @@ interface StudioSidebarProps {
   onRunExpression: (expression: string) => void;
   onHistorySelect: (expression: string) => void;
   onGoToSource: (file: string, line: number) => void;
+  onOpenLibraryQuery: (expression: string, connectionId: string, name?: string) => void;
+  onToggleFavorite: (tabId: string) => void;
+  onAddFolder: (name: string) => void;
+  onAssignFolder: (tabId: string, folderId?: string) => void;
+  onInsertSnippet: (expression: string) => void;
+  onAddSnippet: (title: string, expression: string) => void;
+  onRemoveSnippet: (id: string) => void;
 }
 
 const TABS: Array<{ id: SidebarTab; label: string }> = [
-  { id: "connections", label: "Connections" },
+  { id: "connections", label: "Conn" },
   { id: "schema", label: "Schema" },
+  { id: "library", label: "Library" },
+  { id: "snippets", label: "Snips" },
   { id: "history", label: "History" },
   { id: "scan", label: "Scan" },
 ];
@@ -43,6 +60,9 @@ export function StudioSidebar({
   connectionSettings,
   searchDirectory,
   history,
+  queryTabs,
+  queryLibrary,
+  userSnippets,
   onSidebarTabChange,
   onSelectConnection,
   onAddConnection,
@@ -52,6 +72,13 @@ export function StudioSidebar({
   onRunExpression,
   onHistorySelect,
   onGoToSource,
+  onOpenLibraryQuery,
+  onToggleFavorite,
+  onAddFolder,
+  onAssignFolder,
+  onInsertSnippet,
+  onAddSnippet,
+  onRemoveSnippet,
 }: StudioSidebarProps) {
   return (
     <aside className="sidebar">
@@ -65,7 +92,7 @@ export function StudioSidebar({
         )}
       </section>
 
-      <div className="sidebar-tabs">
+      <div className="sidebar-tabs sidebar-tabs-3">
         {TABS.map((tab) => (
           <button
             key={tab.id}
@@ -94,6 +121,24 @@ export function StudioSidebar({
           connectionSettings={connectionSettings}
           searchDirectory={searchDirectory}
           onRunExpression={onRunExpression}
+        />
+      )}
+      {sidebarTab === "library" && (
+        <QueryLibraryPanel
+          library={queryLibrary}
+          queryTabs={queryTabs}
+          onOpenQuery={onOpenLibraryQuery}
+          onToggleFavorite={onToggleFavorite}
+          onAddFolder={onAddFolder}
+          onAssignFolder={onAssignFolder}
+        />
+      )}
+      {sidebarTab === "snippets" && (
+        <SnippetsPanel
+          userSnippets={userSnippets}
+          onInsert={onInsertSnippet}
+          onAddSnippet={onAddSnippet}
+          onRemoveSnippet={onRemoveSnippet}
         />
       )}
       {sidebarTab === "history" && (

@@ -3,6 +3,9 @@ import { homeDir } from "@tauri-apps/api/path";
 import { save } from "@tauri-apps/plugin-dialog";
 import { writeTextFile } from "@tauri-apps/plugin-fs";
 import { ConnectionPicker } from "./components/ConnectionPicker";
+import { ChartsPanel } from "./components/ChartsPanel";
+import { EditorWorkspace } from "./components/EditorWorkspace";
+import { LiveSqlPane } from "./components/LiveSqlPane";
 import { MonacoEditor } from "./components/MonacoEditor";
 import { NotebookPanel } from "./components/NotebookPanel";
 import { PrerequisitesBanner } from "./components/PrerequisitesBanner";
@@ -10,7 +13,9 @@ import { QueryTabBar } from "./components/QueryTabBar";
 import { ResizableResultsDock, DEFAULT_RESULTS_DOCK_HEIGHT } from "./components/ResizableResultsDock";
 import { ResultsTabs } from "./components/ResultsTabs";
 import { SettingsPanel } from "./components/SettingsPanel";
+import { SqlToLinqDialog } from "./components/SqlToLinqDialog";
 import { StudioSidebar } from "./components/StudioSidebar";
+import { runBenchmark, type BenchmarkResult } from "./lib/benchmark";
 import {
   checkPrerequisites,
   invalidateEfvibeDaemon,
@@ -41,6 +46,12 @@ import type { AppSettings, PrerequisiteCheckResult } from "./types/connection";
 import { emptyEvaluationPayload, type EvaluationJsonPayload } from "./types/evaluation";
 import { createDefaultNotebook, type NotebookCell } from "./types/notebook";
 import { createQueryTab, type QueryTab, type ResultsTab } from "./types/query";
+import { createUserSnippet, type SnippetDefinition } from "./types/snippets";
+import {
+  createEmptyQueryLibrary,
+  createQueryFolder,
+  type QueryLibraryState,
+} from "./types/queryLibrary";
 import {
   createSampleConnection,
   duplicateConnection,
@@ -51,6 +62,19 @@ import {
   type WorkspaceConnection,
 } from "./types/workspace";
 import "./App.css";
+
+function normalizeExpression(expression: string, lambdaMode: boolean): string {
+  const trimmed = expression.trim();
+  if (!trimmed) {
+    return trimmed;
+  }
+
+  if (lambdaMode) {
+    return trimmed.replace(/;+\s*$/u, "");
+  }
+
+  return trimmed.endsWith(";") ? trimmed : `${trimmed};`;
+}
 
 function connectionForTab(
   workspace: EfvibeWorkspace,
@@ -89,6 +113,18 @@ function App() {
   const [notebookConnectionId, setNotebookConnectionId] = useState("");
   const [notebookCells, setNotebookCells] = useState<NotebookCell[]>([]);
   const [notebookRunning, setNotebookRunning] = useState(false);
+  const [liveSqlEnabled, setLiveSqlEnabled] = useState(true);
+  const [sqlPaneOpen, setSqlPaneOpen] = useState(true);
+  const [sqlPaneWidth, setSqlPaneWidth] = useState(360);
+  const [lambdaMode, setLambdaMode] = useState(false);
+  const [userSnippets, setUserSnippets] = useState<SnippetDefinition[]>([]);
+  const [queryLibrary, setQueryLibrary] = useState<QueryLibraryState>(createEmptyQueryLibrary());
+  const [compareBaseline, setCompareBaseline] = useState<EvaluationHistoryEntry | undefined>();
+  const [chartsOpen, setChartsOpen] = useState(false);
+  const [benchmarkResult, setBenchmarkResult] = useState<BenchmarkResult | undefined>();
+  const [sqlToLinqOpen, setSqlToLinqOpen] = useState(false);
+  const [sqlToLinqInitial, setSqlToLinqInitial] = useState("");
+  const [benchmarking, setBenchmarking] = useState(false);
 
   const activeQueryTab = useMemo(
     () => queryTabs.find((tab) => tab.id === activeQueryTabId),
@@ -197,6 +233,27 @@ function App() {
           setNotebookConnectionId(savedSession.notebookConnectionId ?? connectionId);
           setNotebookCells(savedSession.notebookCells ?? createDefaultNotebook(connectionId));
         }
+        if (savedSession.liveSqlEnabled !== undefined) {
+          setLiveSqlEnabled(savedSession.liveSqlEnabled);
+        }
+        if (savedSession.sqlPaneOpen !== undefined) {
+          setSqlPaneOpen(savedSession.sqlPaneOpen);
+        }
+        if (savedSession.sqlPaneWidth) {
+          setSqlPaneWidth(savedSession.sqlPaneWidth);
+        }
+        if (savedSession.lambdaMode) {
+          setLambdaMode(savedSession.lambdaMode);
+        }
+        if (savedSession.userSnippets) {
+          setUserSnippets(savedSession.userSnippets);
+        }
+        if (savedSession.queryLibrary) {
+          setQueryLibrary(savedSession.queryLibrary);
+        }
+        if (savedSession.compareBaseline) {
+          setCompareBaseline(savedSession.compareBaseline);
+        }
       } else {
         const connection = createSampleConnection();
         const tab = createQueryTab(connection.id);
@@ -246,6 +303,13 @@ function App() {
       notebookPath,
       notebookConnectionId,
       notebookCells,
+      liveSqlEnabled,
+      sqlPaneOpen,
+      sqlPaneWidth,
+      lambdaMode,
+      userSnippets,
+      queryLibrary,
+      compareBaseline,
     });
   }, [
     sessionLoaded,
@@ -261,6 +325,13 @@ function App() {
     notebookPath,
     notebookConnectionId,
     notebookCells,
+    liveSqlEnabled,
+    sqlPaneOpen,
+    sqlPaneWidth,
+    lambdaMode,
+    userSnippets,
+    queryLibrary,
+    compareBaseline,
   ]);
 
   useEffect(() => {
@@ -290,7 +361,10 @@ function App() {
         return;
       }
 
-      const runExpression = expressionOverride ?? activeQueryTab.expression;
+      const runExpression = normalizeExpression(
+        expressionOverride ?? activeQueryTab.expression,
+        lambdaMode,
+      );
 
       if (!searchDirectory) {
         const errorPayload: EvaluationJsonPayload = {
@@ -324,9 +398,9 @@ function App() {
         if (result.payload) {
           const nextTab: ResultsTab = withPlan
             ? "plan"
-            : result.payload.rows?.length
-              ? "result"
-              : "sql";
+            : result.payload.success
+              ? "explorer"
+              : "result";
 
           updateQueryTab(activeQueryTab.id, {
             expression: runExpression,
@@ -390,6 +464,7 @@ function App() {
       searchDirectory,
       activeConnection?.name,
       updateQueryTab,
+      lambdaMode,
     ],
   );
 
@@ -644,6 +719,105 @@ function App() {
     }
   }
 
+  async function handleBenchmark(iterations = 5) {
+    if (!connectionSettings || !searchDirectory || !activeQueryTab) {
+      setStatus("Configure a connection before benchmarking.");
+      return;
+    }
+
+    setBenchmarking(true);
+    setStatus(`Benchmarking (${iterations} runs)…`);
+    try {
+      const result = await runBenchmark(
+        connectionSettings,
+        searchDirectory,
+        normalizeExpression(activeQueryTab.expression, lambdaMode),
+        iterations,
+      );
+      setBenchmarkResult(result);
+      setChartsOpen(true);
+      setStatus(`Benchmark avg ${result.averageMs} ms`);
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : String(error));
+    } finally {
+      setBenchmarking(false);
+    }
+  }
+
+  function handleSetCompareBaseline() {
+    const latest = history[0];
+    if (!latest) {
+      setStatus("Run a query before setting a compare baseline.");
+      return;
+    }
+
+    setCompareBaseline(latest);
+    setStatus("Compare baseline set.");
+  }
+
+  function handleToggleFavorite(tabId: string) {
+    setQueryTabs((tabs) =>
+      tabs.map((tab) =>
+        tab.id === tabId ? { ...tab, favorite: !tab.favorite } : tab,
+      ),
+    );
+  }
+
+  function handleAddFolder(name: string) {
+    setQueryLibrary((library) => ({
+      ...library,
+      folders: [...library.folders, createQueryFolder(name)],
+    }));
+  }
+
+  function handleAssignFolder(tabId: string, folderId?: string) {
+    setQueryTabs((tabs) =>
+      tabs.map((tab) => (tab.id === tabId ? { ...tab, folderId } : tab)),
+    );
+  }
+
+  function handleOpenLibraryQuery(expression: string, connectionId: string, name?: string) {
+    if (!document) {
+      return;
+    }
+
+    const existing = queryTabs.find(
+      (tab) => tab.expression === expression && tab.connectionId === connectionId,
+    );
+    if (existing) {
+      setActiveQueryTabId(existing.id);
+      setActiveConnectionId(existing.connectionId);
+      return;
+    }
+
+    const tab = createQueryTab(connectionId, { expression, name });
+    setQueryTabs((tabs) => [...tabs, tab]);
+    setActiveQueryTabId(tab.id);
+    setActiveConnectionId(connectionId);
+  }
+
+  function handleInsertSnippet(expression: string) {
+    if (!activeQueryTab) {
+      return;
+    }
+
+    updateQueryTab(activeQueryTab.id, { expression });
+    setSidebarTab("connections");
+  }
+
+  function handleAddSnippet(title: string, expression: string) {
+    setUserSnippets((snippets) => [...snippets, createUserSnippet(title, expression)]);
+  }
+
+  function handleRemoveSnippet(id: string) {
+    setUserSnippets((snippets) => snippets.filter((snippet) => snippet.id !== id));
+  }
+
+  function openSqlToLinq(sql = "") {
+    setSqlToLinqInitial(sql);
+    setSqlToLinqOpen(true);
+  }
+
   const editingConnection =
     document && editingConnectionId
       ? document.workspace.connections.find((connection) => connection.id === editingConnectionId)
@@ -690,11 +864,47 @@ function App() {
           </button>
         </div>
         <div className="runbar">
+          <label className="toggle-inline" title="Lambda scratchpad mode (semicolon optional)">
+            <input
+              type="checkbox"
+              checked={lambdaMode}
+              onChange={(event) => setLambdaMode(event.target.checked)}
+            />
+            Lambda
+          </label>
+          <label className="toggle-inline" title="Show live SQL preview pane">
+            <input
+              type="checkbox"
+              checked={sqlPaneOpen}
+              onChange={(event) => setSqlPaneOpen(event.target.checked)}
+            />
+            SQL pane
+          </label>
+          <label className="toggle-inline" title="Debounce ToQueryString while typing">
+            <input
+              type="checkbox"
+              checked={liveSqlEnabled}
+              onChange={(event) => setLiveSqlEnabled(event.target.checked)}
+            />
+            Live SQL
+          </label>
           <button type="button" disabled={running} onClick={() => void handleRun(false)}>
             Run
           </button>
           <button type="button" disabled={running} onClick={() => void handleRun(true)}>
             Run Plan
+          </button>
+          <button type="button" disabled={benchmarking || running} onClick={() => void handleBenchmark(5)}>
+            Benchmark
+          </button>
+          <button type="button" onClick={handleSetCompareBaseline}>
+            Set baseline
+          </button>
+          <button type="button" onClick={() => setChartsOpen(true)}>
+            Charts
+          </button>
+          <button type="button" onClick={() => openSqlToLinq()}>
+            SQL → LINQ
           </button>
         </div>
         <div className="status-inline" title={status}>
@@ -714,6 +924,9 @@ function App() {
           connectionSettings={connectionSettings}
           searchDirectory={searchDirectory}
           history={history}
+          queryTabs={queryTabs}
+          queryLibrary={queryLibrary}
+          userSnippets={userSnippets}
           onSidebarTabChange={setSidebarTab}
           onSelectConnection={(connectionId) => {
             setActiveConnectionId(connectionId);
@@ -774,6 +987,13 @@ function App() {
             updateQueryTab(activeQueryTab.id, { expression: nextExpression });
           }}
           onGoToSource={(file, line) => void handleGoToSource(file, line)}
+          onOpenLibraryQuery={handleOpenLibraryQuery}
+          onToggleFavorite={handleToggleFavorite}
+          onAddFolder={handleAddFolder}
+          onAssignFolder={handleAssignFolder}
+          onInsertSnippet={handleInsertSnippet}
+          onAddSnippet={handleAddSnippet}
+          onRemoveSnippet={handleRemoveSnippet}
         />
 
         <div className="main-stack">
@@ -785,15 +1005,32 @@ function App() {
             onClose={closeQueryTab}
             onOpen={() => void handleOpenQuery()}
             onSave={() => void handleSaveQuery()}
+            onToggleFavorite={handleToggleFavorite}
           />
 
           <ResizableResultsDock
             height={resultsDockHeight}
             onHeightChange={setResultsDockHeight}
             editor={
-              <MonacoEditor
-                value={expression}
-                onChange={(value) => updateQueryTab(activeQueryTab.id, { expression: value })}
+              <EditorWorkspace
+                sqlPaneOpen={sqlPaneOpen}
+                sqlPaneWidth={sqlPaneWidth}
+                onSqlPaneWidthChange={setSqlPaneWidth}
+                editor={
+                  <MonacoEditor
+                    value={expression}
+                    onChange={(value) => updateQueryTab(activeQueryTab.id, { expression: value })}
+                  />
+                }
+                sqlPane={
+                  <LiveSqlPane
+                    expression={expression}
+                    connectionSettings={connectionSettings}
+                    searchDirectory={searchDirectory}
+                    enabled={liveSqlEnabled}
+                    onConvertSql={(sql) => openSqlToLinq(sql)}
+                  />
+                }
               />
             }
             results={
@@ -846,6 +1083,26 @@ function App() {
         onOpen={() => void handleOpenNotebook()}
         onSave={() => void handleSaveNotebook()}
         onRunAll={() => void handleRunNotebook()}
+      />
+
+      <ChartsPanel
+        open={chartsOpen}
+        history={history}
+        baseline={compareBaseline}
+        latest={history[0]}
+        benchmark={benchmarkResult}
+        onClose={() => setChartsOpen(false)}
+      />
+
+      <SqlToLinqDialog
+        open={sqlToLinqOpen}
+        initialSql={sqlToLinqInitial}
+        onClose={() => setSqlToLinqOpen(false)}
+        onInsert={(linq) => {
+          updateQueryTab(activeQueryTab.id, { expression: linq });
+          setSqlToLinqOpen(false);
+          setStatus("Inserted SQL → LINQ draft.");
+        }}
       />
     </main>
   );

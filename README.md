@@ -4,7 +4,18 @@ Standalone desktop app for EF Core LINQ exploration — a LINQPad-style scratchp
 
 Built with **Tauri 2** + **React** + **Monaco**. The [efvibe](https://github.com/yeahbah/my-ef-vibe) CLI remains the evaluation engine; Studio is orchestration and UX.
 
-## Phase 1 (current)
+## Phase 2 (current)
+
+- **Result explorer** — Dump-style nested object tree (Explorer tab) with grid/tree toggle
+- **Live SQL pane** — debounced `ToQueryString()` preview beside the editor
+- **SQL → LINQ draft** — rule-based converter dialog for simple SELECT queries
+- **Query library** — favorites, folders, and search across open tabs
+- **Snippets** — built-in EF snippets plus user-defined snippets
+- **Lambda mode** — optional expression scratchpad (semicolon not required)
+- **Benchmark** — repeat last query N times with timing chart
+- **Compare baseline** — set baseline and diff against latest run in Charts panel
+
+## Phase 1
 
 - **Query tabs** — multiple `.efvibe-query` tabs with per-tab connection binding
 - **Connection manager** — add, edit, duplicate connections in the sidebar

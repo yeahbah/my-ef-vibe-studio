@@ -1,7 +1,8 @@
 import type { EvaluationJsonPayload } from "../types/evaluation";
+import { ResultExplorer } from "./ResultExplorer";
 import { canExportPayload, escapeHtml, formatMetrics } from "../lib/resultFormat";
 
-type ResultsTab = "result" | "sql" | "plan" | "messages";
+type ResultsTab = "result" | "explorer" | "sql" | "plan" | "messages";
 
 interface ResultsTabsProps {
   payload: EvaluationJsonPayload;
@@ -22,14 +23,22 @@ export function ResultsTabs({
     <section className="results-panel">
       <div className="results-toolbar">
         <div className="tab-list">
-          {(["result", "sql", "plan", "messages"] as ResultsTab[]).map((tab) => (
+          {(["result", "explorer", "sql", "plan", "messages"] as ResultsTab[]).map((tab) => (
             <button
               key={tab}
               type="button"
               className={activeTab === tab ? "tab active" : "tab"}
               onClick={() => onTabChange(tab)}
             >
-              {tab === "result" ? "Result" : tab === "sql" ? "SQL" : tab === "plan" ? "Plan" : "Messages"}
+              {tab === "result"
+                ? "Result"
+                : tab === "explorer"
+                  ? "Explorer"
+                  : tab === "sql"
+                    ? "SQL"
+                    : tab === "plan"
+                      ? "Plan"
+                      : "Messages"}
             </button>
           ))}
         </div>
@@ -47,6 +56,7 @@ export function ResultsTabs({
 
       <div className="results-body">
         {activeTab === "result" && <ResultBody payload={payload} />}
+        {activeTab === "explorer" && <ResultExplorer payload={payload} />}
         {activeTab === "sql" && <SqlBody payload={payload} />}
         {activeTab === "plan" && <PlanBody payload={payload} />}
         {activeTab === "messages" && <MessagesBody payload={payload} />}

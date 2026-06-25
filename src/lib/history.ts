@@ -1,6 +1,7 @@
 import type { EvaluationJsonPayload } from "../types/evaluation";
 
 export interface EvaluationHistoryEntry {
+  id: string;
   expression: string;
   totalMs: number;
   databaseMs?: number;
@@ -20,6 +21,7 @@ export function recordHistoryEntry(
   connectionName: string,
 ): EvaluationHistoryEntry[] {
   const entry: EvaluationHistoryEntry = {
+    id: crypto.randomUUID(),
     expression,
     totalMs: payload.metrics.totalMs,
     databaseMs: payload.metrics.databaseMs,
