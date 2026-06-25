@@ -67,6 +67,14 @@ export async function checkPrerequisites(
   });
 }
 
+export async function startRepl(
+  settings: ConnectionSettings,
+  searchDirectory: string,
+  cwd: string,
+): Promise<void> {
+  await invoke("start_repl", { settings, searchDirectory, cwd });
+}
+
 export async function openInIde(
   file: string,
   line: number,

@@ -151,8 +151,8 @@ fn resolve_existing_cli_path(value: &str, base_directory: Option<&Path>) -> Stri
     String::new()
 }
 
-pub fn build_serve_args(settings: &ConnectionSettings, base_directory: Option<&Path>) -> Vec<String> {
-    let mut args = vec!["serve".to_string()];
+pub fn build_efvibe_args(settings: &ConnectionSettings, base_directory: Option<&Path>) -> Vec<String> {
+    let mut args = Vec::new();
 
     let workspace_root = resolve_cli_path(&settings.workspace_root, base_directory);
     if !workspace_root.is_empty() {
@@ -191,6 +191,12 @@ pub fn build_serve_args(settings: &ConnectionSettings, base_directory: Option<&P
         args.push(settings.dotnet_framework.trim().to_string());
     }
 
+    args
+}
+
+pub fn build_serve_args(settings: &ConnectionSettings, base_directory: Option<&Path>) -> Vec<String> {
+    let mut args = vec!["serve".to_string()];
+    args.extend(build_efvibe_args(settings, base_directory));
     args
 }
 

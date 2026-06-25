@@ -2,20 +2,34 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { homeDir } from "@tauri-apps/api/path";
 import { save } from "@tauri-apps/plugin-dialog";
 import { writeTextFile } from "@tauri-apps/plugin-fs";
+import { ConnectionPicker } from "./components/ConnectionPicker";
 import { MonacoEditor } from "./components/MonacoEditor";
-import { ResizableResultsDock, DEFAULT_RESULTS_DOCK_HEIGHT } from "./components/ResizableResultsDock";
+import { NotebookPanel } from "./components/NotebookPanel";
 import { PrerequisitesBanner } from "./components/PrerequisitesBanner";
+import { QueryTabBar } from "./components/QueryTabBar";
+import { ResizableResultsDock, DEFAULT_RESULTS_DOCK_HEIGHT } from "./components/ResizableResultsDock";
 import { ResultsTabs } from "./components/ResultsTabs";
 import { SettingsPanel } from "./components/SettingsPanel";
-import { getActiveConnection, WorkspaceSidebar } from "./components/WorkspaceSidebar";
+import { StudioSidebar } from "./components/StudioSidebar";
 import {
   checkPrerequisites,
   invalidateEfvibeDaemon,
   openInIde,
   runExpressionViaDaemon,
+  startRepl,
 } from "./lib/daemonClient";
-import { getDefaultWorkspaceRoot, loadAppSettings, loadStudioSession, saveAppSettings, saveStudioSession } from "./lib/settings";
+import { recordHistoryEntry, type EvaluationHistoryEntry } from "./lib/history";
+import { openNotebookFile, saveNotebookFile } from "./lib/notebook";
+import { openQueryFile, saveQueryFile } from "./lib/queryFile";
 import { buildExportContent } from "./lib/resultFormat";
+import {
+  getDefaultWorkspaceRoot,
+  loadAppSettings,
+  loadStudioSession,
+  saveAppSettings,
+  saveStudioSession,
+  type SidebarTab,
+} from "./lib/settings";
 import {
   createNewWorkspace,
   openWorkspaceFile,
@@ -25,32 +39,61 @@ import {
 } from "./lib/workspace";
 import type { AppSettings, PrerequisiteCheckResult } from "./types/connection";
 import { emptyEvaluationPayload, type EvaluationJsonPayload } from "./types/evaluation";
+import { createDefaultNotebook, type NotebookCell } from "./types/notebook";
+import { createQueryTab, type QueryTab, type ResultsTab } from "./types/query";
 import {
   createSampleConnection,
+  duplicateConnection,
+  getActiveConnection,
   resolveSearchDirectory,
   workspaceConnectionToSettings,
   type EfvibeWorkspace,
+  type WorkspaceConnection,
 } from "./types/workspace";
 import "./App.css";
 
-type ResultsTab = "result" | "sql" | "plan" | "messages";
+function connectionForTab(
+  workspace: EfvibeWorkspace,
+  tab: QueryTab | undefined,
+  fallbackConnectionId: string,
+): WorkspaceConnection | undefined {
+  if (!tab) {
+    return getActiveConnection(workspace, fallbackConnectionId);
+  }
 
-const DEFAULT_EXPRESSION = "db.Products.Take(5).ToList();";
+  return (
+    workspace.connections.find((connection) => connection.id === tab.connectionId) ??
+    getActiveConnection(workspace, fallbackConnectionId)
+  );
+}
 
 function App() {
   const [document, setDocument] = useState<WorkspaceDocument | undefined>();
+  const [queryTabs, setQueryTabs] = useState<QueryTab[]>([]);
+  const [activeQueryTabId, setActiveQueryTabId] = useState("");
   const [activeConnectionId, setActiveConnectionId] = useState("");
-  const [expression, setExpression] = useState(DEFAULT_EXPRESSION);
-  const [payload, setPayload] = useState<EvaluationJsonPayload>(() => emptyEvaluationPayload());
-  const [activeTab, setActiveTab] = useState<ResultsTab>("result");
   const [settings, setSettings] = useState<AppSettings | undefined>();
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [editingConnectionId, setEditingConnectionId] = useState<string | undefined>();
   const [prerequisites, setPrerequisites] = useState<PrerequisiteCheckResult>();
   const [prerequisitesLoading, setPrerequisitesLoading] = useState(true);
   const [status, setStatus] = useState("Ready");
   const [running, setRunning] = useState(false);
   const [sessionLoaded, setSessionLoaded] = useState(false);
   const [resultsDockHeight, setResultsDockHeight] = useState(DEFAULT_RESULTS_DOCK_HEIGHT);
+  const [sidebarTab, setSidebarTab] = useState<SidebarTab>("connections");
+  const [history, setHistory] = useState<EvaluationHistoryEntry[]>([]);
+  const [notebookOpen, setNotebookOpen] = useState(false);
+  const [notebookName, setNotebookName] = useState("Notebook");
+  const [notebookPath, setNotebookPath] = useState("");
+  const [notebookConnectionId, setNotebookConnectionId] = useState("");
+  const [notebookCells, setNotebookCells] = useState<NotebookCell[]>([]);
+  const [notebookRunning, setNotebookRunning] = useState(false);
+
+  const activeQueryTab = useMemo(
+    () => queryTabs.find((tab) => tab.id === activeQueryTabId),
+    [queryTabs, activeQueryTabId],
+  );
 
   const workspaceDirectory = useMemo(
     () => (document?.path ? workspaceDirectoryFromPath(document.path) : "."),
@@ -62,8 +105,8 @@ function App() {
       return undefined;
     }
 
-    return getActiveConnection(document.workspace, activeConnectionId);
-  }, [document, activeConnectionId]);
+    return connectionForTab(document.workspace, activeQueryTab, activeConnectionId);
+  }, [document, activeQueryTab, activeConnectionId]);
 
   const connectionSettings = useMemo(() => {
     if (!activeConnection || !settings) {
@@ -90,6 +133,18 @@ function App() {
     );
   }, [activeConnection, connectionSettings, workspaceDirectory]);
 
+  const payload = activeQueryTab?.lastPayload ?? emptyEvaluationPayload();
+  const activeTab = activeQueryTab?.activeResultsTab ?? "result";
+  const expression = activeQueryTab?.expression ?? "";
+
+  const updateQueryTab = useCallback((tabId: string, patch: Partial<QueryTab>) => {
+    setQueryTabs((tabs) => tabs.map((tab) => (tab.id === tabId ? { ...tab, ...patch } : tab)));
+  }, []);
+
+  const updateWorkspace = useCallback((workspace: EfvibeWorkspace) => {
+    setDocument((current) => (current ? { ...current, workspace } : current));
+  }, []);
+
   useEffect(() => {
     void (async () => {
       const loaded = await loadAppSettings();
@@ -104,19 +159,47 @@ function App() {
           path: savedSession.workspacePath,
           workspace: savedSession.workspace,
         });
-        setActiveConnectionId(
-          savedSession.workspace.connections.some(
+        const connectionId =
+          savedSession.workspace.connections.find(
             (connection) => connection.id === savedSession.activeConnectionId,
-          )
-            ? savedSession.activeConnectionId
-            : savedSession.workspace.connections[0].id,
-        );
-        setExpression(savedSession.expression || DEFAULT_EXPRESSION);
+          )?.id ?? savedSession.workspace.connections[0].id;
+
+        setActiveConnectionId(connectionId);
+
+        if (savedSession.queryTabs?.length) {
+          setQueryTabs(savedSession.queryTabs);
+          setActiveQueryTabId(
+            savedSession.queryTabs.some((tab) => tab.id === savedSession.activeQueryTabId)
+              ? savedSession.activeQueryTabId
+              : savedSession.queryTabs[0].id,
+          );
+        } else {
+          const tab = createQueryTab(connectionId, {
+            expression: (savedSession as { expression?: string }).expression,
+          });
+          setQueryTabs([tab]);
+          setActiveQueryTabId(tab.id);
+        }
+
         if (savedSession.resultsDockHeight) {
           setResultsDockHeight(savedSession.resultsDockHeight);
         }
+        if (savedSession.sidebarTab) {
+          setSidebarTab(savedSession.sidebarTab);
+        }
+        if (savedSession.history) {
+          setHistory(savedSession.history);
+        }
+        if (savedSession.notebookOpen) {
+          setNotebookOpen(true);
+          setNotebookName(savedSession.notebookName ?? "Notebook");
+          setNotebookPath(savedSession.notebookPath ?? "");
+          setNotebookConnectionId(savedSession.notebookConnectionId ?? connectionId);
+          setNotebookCells(savedSession.notebookCells ?? createDefaultNotebook(connectionId));
+        }
       } else {
         const connection = createSampleConnection();
+        const tab = createQueryTab(connection.id);
         setDocument({
           path: "",
           workspace: {
@@ -127,6 +210,8 @@ function App() {
           },
         });
         setActiveConnectionId(connection.id);
+        setQueryTabs([tab]);
+        setActiveQueryTabId(tab.id);
       }
 
       setSettings(loaded);
@@ -151,10 +236,32 @@ function App() {
       workspacePath: document.path,
       workspace: document.workspace,
       activeConnectionId,
-      expression,
+      queryTabs,
+      activeQueryTabId,
       resultsDockHeight,
+      sidebarTab,
+      history,
+      notebookOpen,
+      notebookName,
+      notebookPath,
+      notebookConnectionId,
+      notebookCells,
     });
-  }, [sessionLoaded, document, activeConnectionId, expression, resultsDockHeight]);
+  }, [
+    sessionLoaded,
+    document,
+    activeConnectionId,
+    queryTabs,
+    activeQueryTabId,
+    resultsDockHeight,
+    sidebarTab,
+    history,
+    notebookOpen,
+    notebookName,
+    notebookPath,
+    notebookConnectionId,
+    notebookCells,
+  ]);
 
   useEffect(() => {
     if (!settings) {
@@ -176,27 +283,28 @@ function App() {
     })();
   }, [settings, searchDirectory, activeConnection?.dotnetFramework]);
 
-  const updateWorkspace = useCallback((workspace: EfvibeWorkspace) => {
-    setDocument((current) => (current ? { ...current, workspace } : current));
-  }, []);
-
   const handleRun = useCallback(
-    async (withPlan = false) => {
-      if (!connectionSettings || !settings || !document) {
+    async (withPlan = false, expressionOverride?: string) => {
+      if (!connectionSettings || !settings || !document || !activeQueryTab) {
         setStatus("Configure a connection before running.");
         return;
       }
 
+      const runExpression = expressionOverride ?? activeQueryTab.expression;
+
       if (!searchDirectory) {
-        setPayload({
+        const errorPayload: EvaluationJsonPayload = {
           success: false,
           sql: [],
           metrics: { totalMs: 0, sqlCommandCount: 0, resultKind: "error" },
           warnings: [],
           error:
             "Set a search directory or EF project in Settings so efvibe can discover your .csproj.",
+        };
+        updateQueryTab(activeQueryTab.id, {
+          lastPayload: errorPayload,
+          activeResultsTab: "result",
         });
-        setActiveTab("result");
         setStatus("Set a search directory or EF project in Settings.");
         return;
       }
@@ -209,45 +317,80 @@ function App() {
           connectionSettings,
           searchDirectory,
           searchDirectory,
-          expression,
+          runExpression,
           withPlan,
         );
 
         if (result.payload) {
-          setPayload(result.payload);
-          setActiveTab(withPlan ? "plan" : result.payload.rows?.length ? "result" : "sql");
+          const nextTab: ResultsTab = withPlan
+            ? "plan"
+            : result.payload.rows?.length
+              ? "result"
+              : "sql";
+
+          updateQueryTab(activeQueryTab.id, {
+            expression: runExpression,
+            lastPayload: result.payload,
+            activeResultsTab: nextTab,
+          });
+
+          if (result.payload.success) {
+            setHistory((current) =>
+              recordHistoryEntry(
+                current,
+                runExpression,
+                result.payload!,
+                activeConnection?.name ?? "Connection",
+              ),
+            );
+          }
+
           setStatus(
             result.payload.success
               ? `Done · ${result.payload.metrics.totalMs} ms`
               : result.payload.error ?? "Evaluation failed.",
           );
         } else {
-          setPayload({
-            success: false,
-            sql: [],
-            metrics: { totalMs: 0, sqlCommandCount: 0, resultKind: "error" },
-            warnings: [],
-            error: result.stdout || "No evaluation payload returned.",
+          updateQueryTab(activeQueryTab.id, {
+            expression: runExpression,
+            lastPayload: {
+              success: false,
+              sql: [],
+              metrics: { totalMs: 0, sqlCommandCount: 0, resultKind: "error" },
+              warnings: [],
+              error: result.stdout || "No evaluation payload returned.",
+            },
+            activeResultsTab: "messages",
           });
-          setActiveTab("messages");
           setStatus("Evaluation failed.");
         }
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        setPayload({
-          success: false,
-          sql: [],
-          metrics: { totalMs: 0, sqlCommandCount: 0, resultKind: "error" },
-          warnings: [],
-          error: message,
+        updateQueryTab(activeQueryTab.id, {
+          expression: runExpression,
+          lastPayload: {
+            success: false,
+            sql: [],
+            metrics: { totalMs: 0, sqlCommandCount: 0, resultKind: "error" },
+            warnings: [],
+            error: message,
+          },
+          activeResultsTab: "messages",
         });
-        setActiveTab("messages");
         setStatus(message);
       } finally {
         setRunning(false);
       }
     },
-    [connectionSettings, settings, document, searchDirectory, expression],
+    [
+      connectionSettings,
+      settings,
+      document,
+      activeQueryTab,
+      searchDirectory,
+      activeConnection?.name,
+      updateQueryTab,
+    ],
   );
 
   useEffect(() => {
@@ -259,6 +402,81 @@ function App() {
     return () => window.removeEventListener("efvibe-run-query", listener);
   }, [handleRun]);
 
+  function selectQueryTab(tabId: string) {
+    setActiveQueryTabId(tabId);
+    const tab = queryTabs.find((entry) => entry.id === tabId);
+    if (tab) {
+      setActiveConnectionId(tab.connectionId);
+    }
+  }
+
+  function addQueryTab() {
+    if (!document) {
+      return;
+    }
+
+    const tab = createQueryTab(activeConnectionId, {
+      name: `Query ${queryTabs.length + 1}`,
+    });
+    setQueryTabs((tabs) => [...tabs, tab]);
+    setActiveQueryTabId(tab.id);
+  }
+
+  function closeQueryTab(tabId: string) {
+    if (queryTabs.length <= 1) {
+      return;
+    }
+
+    const nextTabs = queryTabs.filter((tab) => tab.id !== tabId);
+    setQueryTabs(nextTabs);
+    if (activeQueryTabId === tabId) {
+      const nextTab = nextTabs[0];
+      setActiveQueryTabId(nextTab.id);
+      setActiveConnectionId(nextTab.connectionId);
+    }
+  }
+
+  async function handleOpenQuery() {
+    try {
+      const opened = await openQueryFile();
+      if (!opened || !document) {
+        return;
+      }
+
+      if (
+        !document.workspace.connections.some(
+          (connection) => connection.id === opened.connectionId,
+        )
+      ) {
+        opened.connectionId = activeConnectionId;
+      }
+
+      setQueryTabs((tabs) => [...tabs, opened]);
+      setActiveQueryTabId(opened.id);
+      setActiveConnectionId(opened.connectionId);
+      setStatus(`Opened ${opened.name}`);
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : String(error));
+    }
+  }
+
+  async function handleSaveQuery() {
+    if (!activeQueryTab) {
+      return;
+    }
+
+    try {
+      const saved = await saveQueryFile(activeQueryTab, activeConnectionId);
+      updateQueryTab(activeQueryTab.id, saved);
+      setStatus(`Saved ${saved.filePath}`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (message !== "Save cancelled.") {
+        setStatus(`Save failed: ${message}`);
+      }
+    }
+  }
+
   async function handleOpenWorkspace() {
     try {
       const opened = await openWorkspaceFile();
@@ -267,7 +485,11 @@ function App() {
       }
 
       setDocument(opened);
-      setActiveConnectionId(opened.workspace.connections[0]?.id ?? "");
+      const connectionId = opened.workspace.connections[0]?.id ?? "";
+      setActiveConnectionId(connectionId);
+      const tab = createQueryTab(connectionId);
+      setQueryTabs([tab]);
+      setActiveQueryTabId(tab.id);
       await invalidateEfvibeDaemon();
       setStatus(`Opened ${opened.workspace.name}`);
     } catch (error) {
@@ -295,8 +517,12 @@ function App() {
   async function handleNewWorkspace() {
     const created = await createNewWorkspace();
     created.workspace.connections = [createSampleConnection()];
+    const connection = created.workspace.connections[0];
+    const tab = createQueryTab(connection.id);
     setDocument(created);
-    setActiveConnectionId(created.workspace.connections[0].id);
+    setActiveConnectionId(connection.id);
+    setQueryTabs([tab]);
+    setActiveQueryTabId(tab.id);
     await invalidateEfvibeDaemon();
     setStatus("New workspace");
   }
@@ -321,26 +547,109 @@ function App() {
     setStatus(`Exported to ${target}`);
   }
 
-  async function handleOpenSampleSource() {
-    if (!settings || !connectionSettings?.project) {
-      setStatus("Set an EF project path first.");
+  async function handleStartRepl() {
+    if (!connectionSettings || !searchDirectory) {
+      setStatus("Configure a connection before starting REPL.");
       return;
     }
 
     try {
-      await openInIde(
-        connectionSettings.project,
-        1,
-        settings.preferredEditor,
-        settings.customEditorCommand,
-      );
-      setStatus(`Opened ${connectionSettings.project}`);
+      await startRepl(connectionSettings, searchDirectory, searchDirectory);
+      setStatus("Started efvibe REPL in terminal.");
     } catch (error) {
       setStatus(error instanceof Error ? error.message : String(error));
     }
   }
 
-  if (!settings || !activeConnection || !document) {
+  async function handleGoToSource(file: string, line: number) {
+    if (!settings) {
+      return;
+    }
+
+    try {
+      await openInIde(file, line, settings.preferredEditor, settings.customEditorCommand);
+      setStatus(`Opened ${file}:${line}`);
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : String(error));
+    }
+  }
+
+  function updateConnection(connection: WorkspaceConnection) {
+    if (!document) {
+      return;
+    }
+
+    updateWorkspace({
+      ...document.workspace,
+      connections: document.workspace.connections.map((entry) =>
+        entry.id === connection.id ? connection : entry,
+      ),
+    });
+    void invalidateEfvibeDaemon();
+  }
+
+  function openNotebook() {
+    setNotebookOpen(true);
+    if (notebookCells.length === 0) {
+      setNotebookCells(createDefaultNotebook(activeConnectionId));
+      setNotebookConnectionId(activeConnectionId);
+    }
+  }
+
+  async function handleOpenNotebook() {
+    const opened = await openNotebookFile(activeConnectionId);
+    if (!opened) {
+      return;
+    }
+
+    setNotebookOpen(true);
+    setNotebookName(opened.name);
+    setNotebookPath(opened.path);
+    setNotebookConnectionId(opened.connectionId);
+    setNotebookCells(opened.cells);
+    setStatus(`Opened notebook ${opened.name}`);
+  }
+
+  async function handleSaveNotebook() {
+    try {
+      const savedPath = await saveNotebookFile(
+        notebookName,
+        notebookPath,
+        notebookConnectionId,
+        notebookCells,
+      );
+      setNotebookPath(savedPath);
+      setStatus(`Saved notebook ${savedPath}`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (message !== "Save cancelled.") {
+        setStatus(`Notebook save failed: ${message}`);
+      }
+    }
+  }
+
+  async function handleRunNotebook() {
+    setNotebookRunning(true);
+    try {
+      for (const cell of notebookCells) {
+        if (cell.kind !== "code" || !cell.value.trim()) {
+          continue;
+        }
+
+        await handleRun(false, cell.value);
+      }
+      setStatus("Notebook run complete.");
+    } finally {
+      setNotebookRunning(false);
+    }
+  }
+
+  const editingConnection =
+    document && editingConnectionId
+      ? document.workspace.connections.find((connection) => connection.id === editingConnectionId)
+      : activeConnection;
+
+  if (!settings || !activeConnection || !document || !activeQueryTab) {
     return <main className="app loading">Loading efvibe Studio…</main>;
   }
 
@@ -351,6 +660,15 @@ function App() {
           <strong>efvibe Studio</strong>
           <span>{activeConnection.name}</span>
         </div>
+        <ConnectionPicker
+          connections={document.workspace.connections}
+          activeConnectionId={activeConnectionId}
+          onChange={(connectionId) => {
+            setActiveConnectionId(connectionId);
+            updateQueryTab(activeQueryTab.id, { connectionId });
+            void invalidateEfvibeDaemon();
+          }}
+        />
         <div className="menu">
           <button type="button" onClick={() => void handleNewWorkspace()}>
             New
@@ -364,8 +682,11 @@ function App() {
           <button type="button" onClick={() => setSettingsOpen(true)}>
             Settings
           </button>
-          <button type="button" onClick={() => void handleOpenSampleSource()}>
-            Open in IDE
+          <button type="button" onClick={openNotebook}>
+            Notebook
+          </button>
+          <button type="button" onClick={() => void handleStartRepl()}>
+            REPL
           </button>
         </div>
         <div className="runbar">
@@ -384,54 +705,147 @@ function App() {
       <PrerequisitesBanner result={prerequisites} loading={prerequisitesLoading} />
 
       <div className="workspace">
-        <WorkspaceSidebar
+        <StudioSidebar
           documentPath={document.path}
-          workspace={document.workspace}
+          workspaceName={document.workspace.name}
+          sidebarTab={sidebarTab}
+          connections={document.workspace.connections}
           activeConnectionId={activeConnectionId}
+          connectionSettings={connectionSettings}
+          searchDirectory={searchDirectory}
+          history={history}
+          onSidebarTabChange={setSidebarTab}
           onSelectConnection={(connectionId) => {
             setActiveConnectionId(connectionId);
+            updateQueryTab(activeQueryTab.id, { connectionId });
             void invalidateEfvibeDaemon();
           }}
           onAddConnection={() => {
-            const connection = createSampleConnection();
+            const connection = createSampleConnection(
+              `Connection ${document.workspace.connections.length + 1}`,
+            );
             updateWorkspace({
               ...document.workspace,
               connections: [...document.workspace.connections, connection],
             });
             setActiveConnectionId(connection.id);
           }}
+          onDuplicateConnection={(connectionId) => {
+            const source = document.workspace.connections.find(
+              (connection) => connection.id === connectionId,
+            );
+            if (!source) {
+              return;
+            }
+
+            const copy = duplicateConnection(source);
+            updateWorkspace({
+              ...document.workspace,
+              connections: [...document.workspace.connections, copy],
+            });
+            setActiveConnectionId(copy.id);
+          }}
+          onDeleteConnection={(connectionId) => {
+            const remaining = document.workspace.connections.filter(
+              (connection) => connection.id !== connectionId,
+            );
+            if (remaining.length === 0) {
+              return;
+            }
+
+            updateWorkspace({ ...document.workspace, connections: remaining });
+            const nextId = remaining[0].id;
+            setActiveConnectionId(nextId);
+            setQueryTabs((tabs) =>
+              tabs.map((tab) =>
+                tab.connectionId === connectionId ? { ...tab, connectionId: nextId } : tab,
+              ),
+            );
+          }}
+          onEditConnection={(connectionId) => {
+            setEditingConnectionId(connectionId);
+            setSettingsOpen(true);
+          }}
+          onRunExpression={(nextExpression) => {
+            updateQueryTab(activeQueryTab.id, { expression: nextExpression });
+            void handleRun(false, nextExpression);
+          }}
+          onHistorySelect={(nextExpression) => {
+            updateQueryTab(activeQueryTab.id, { expression: nextExpression });
+          }}
+          onGoToSource={(file, line) => void handleGoToSource(file, line)}
         />
 
-        <ResizableResultsDock
-          height={resultsDockHeight}
-          onHeightChange={setResultsDockHeight}
-          editor={<MonacoEditor value={expression} onChange={setExpression} />}
-          results={
-            <ResultsTabs
-              payload={payload}
-              activeTab={activeTab}
-              onTabChange={setActiveTab}
-              onExport={(format) => void handleExport(format)}
-            />
-          }
-        />
+        <div className="main-stack">
+          <QueryTabBar
+            tabs={queryTabs}
+            activeTabId={activeQueryTabId}
+            onSelect={selectQueryTab}
+            onAdd={addQueryTab}
+            onClose={closeQueryTab}
+            onOpen={() => void handleOpenQuery()}
+            onSave={() => void handleSaveQuery()}
+          />
+
+          <ResizableResultsDock
+            height={resultsDockHeight}
+            onHeightChange={setResultsDockHeight}
+            editor={
+              <MonacoEditor
+                value={expression}
+                onChange={(value) => updateQueryTab(activeQueryTab.id, { expression: value })}
+              />
+            }
+            results={
+              <ResultsTabs
+                payload={payload}
+                activeTab={activeTab}
+                onTabChange={(tab) =>
+                  updateQueryTab(activeQueryTab.id, { activeResultsTab: tab })
+                }
+                onExport={(format) => void handleExport(format)}
+              />
+            }
+          />
+        </div>
       </div>
 
       <SettingsPanel
         open={settingsOpen}
         settings={settings}
-        connection={activeConnection}
-        onClose={() => setSettingsOpen(false)}
-        onSettingsChange={setSettings}
-        onConnectionChange={(connection) => {
-          updateWorkspace({
-            ...document.workspace,
-            connections: document.workspace.connections.map((entry) =>
-              entry.id === connection.id ? connection : entry,
-            ),
-          });
-          void invalidateEfvibeDaemon();
+        connection={editingConnection ?? activeConnection}
+        onClose={() => {
+          setSettingsOpen(false);
+          setEditingConnectionId(undefined);
         }}
+        onSettingsChange={setSettings}
+        onConnectionChange={updateConnection}
+      />
+
+      <NotebookPanel
+        open={notebookOpen}
+        name={notebookName}
+        cells={notebookCells}
+        running={notebookRunning}
+        onClose={() => setNotebookOpen(false)}
+        onNameChange={setNotebookName}
+        onCellChange={(cellId, value) =>
+          setNotebookCells((cells) =>
+            cells.map((cell) => (cell.id === cellId ? { ...cell, value } : cell)),
+          )
+        }
+        onAddCell={() =>
+          setNotebookCells((cells) => [
+            ...cells,
+            { id: crypto.randomUUID(), kind: "code", value: "" },
+          ])
+        }
+        onRemoveCell={(cellId) =>
+          setNotebookCells((cells) => cells.filter((cell) => cell.id !== cellId))
+        }
+        onOpen={() => void handleOpenNotebook()}
+        onSave={() => void handleSaveNotebook()}
+        onRunAll={() => void handleRunNotebook()}
       />
     </main>
   );

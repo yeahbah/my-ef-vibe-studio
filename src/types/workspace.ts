@@ -31,15 +31,30 @@ export function createEmptyWorkspace(name = "Untitled workspace"): EfvibeWorkspa
   };
 }
 
-export function createSampleConnection(): WorkspaceConnection {
+export function createSampleConnection(name?: string): WorkspaceConnection {
   return {
     id: crypto.randomUUID(),
-    name: "Default connection",
+    name: name ?? "Default connection",
     efProject: "",
     startupProject: "",
     context: "",
     dbLog: true,
   };
+}
+
+export function duplicateConnection(connection: WorkspaceConnection): WorkspaceConnection {
+  return {
+    ...connection,
+    id: crypto.randomUUID(),
+    name: `${connection.name} (copy)`,
+  };
+}
+
+export function getActiveConnection(
+  workspace: EfvibeWorkspace,
+  activeConnectionId: string,
+): WorkspaceConnection | undefined {
+  return workspace.connections.find((connection) => connection.id === activeConnectionId);
 }
 
 export function resolveSearchDirectory(

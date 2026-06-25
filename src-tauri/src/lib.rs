@@ -16,6 +16,7 @@ pub fn run() {
             commands::daemon_eval,
             commands::daemon_request,
             commands::open_in_ide,
+            commands::start_repl,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

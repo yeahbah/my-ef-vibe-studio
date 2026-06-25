@@ -5,12 +5,26 @@ import type { EfvibeWorkspace } from "../types/workspace";
 
 const store = new LazyStore("settings.json");
 
+import type { EvaluationHistoryEntry } from "./history";
+import type { QueryTab } from "../types/query";
+import type { NotebookCell } from "../types/notebook";
+
+export type SidebarTab = "connections" | "schema" | "history" | "scan";
+
 export interface StudioSession {
   workspacePath: string;
   workspace: EfvibeWorkspace;
   activeConnectionId: string;
-  expression: string;
+  queryTabs: QueryTab[];
+  activeQueryTabId: string;
   resultsDockHeight?: number;
+  sidebarTab?: SidebarTab;
+  history?: EvaluationHistoryEntry[];
+  notebookOpen?: boolean;
+  notebookName?: string;
+  notebookPath?: string;
+  notebookConnectionId?: string;
+  notebookCells?: NotebookCell[];
 }
 
 export async function loadAppSettings(): Promise<AppSettings> {
