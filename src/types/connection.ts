@@ -1,3 +1,5 @@
+import type { AppTheme } from "./theme";
+
 export interface ConnectionSettings {
   workspaceRoot: string;
   project: string;
@@ -17,6 +19,7 @@ export interface AppSettings {
   preferredEditor: PreferredEditor;
   customEditorCommand: string;
   teamSyncDirectory: string;
+  theme?: AppTheme;
 }
 
 export const DEFAULT_APP_SETTINGS: AppSettings = {

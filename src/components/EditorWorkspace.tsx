@@ -4,6 +4,7 @@ interface EditorWorkspaceProps {
   editor: ReactNode;
   sqlPane: ReactNode;
   sqlPaneOpen: boolean;
+  onSqlPaneOpenChange: (open: boolean) => void;
   sqlPaneWidth: number;
   onSqlPaneWidthChange: (width: number) => void;
 }
@@ -15,6 +16,7 @@ export function EditorWorkspace({
   editor,
   sqlPane,
   sqlPaneOpen,
+  onSqlPaneOpenChange,
   sqlPaneWidth,
   onSqlPaneWidthChange,
 }: EditorWorkspaceProps) {
@@ -62,7 +64,20 @@ export function EditorWorkspace({
 
   return (
     <div className={`editor-workspace${dragging ? " resizing" : ""}`} ref={containerRef}>
-      <section className="editor-main">{editor}</section>
+      <div className="editor-column">
+        <section className="editor-main">{editor}</section>
+        <aside className="editor-rail" role="toolbar" aria-label="Editor tools">
+          <button
+            type="button"
+            className={`editor-rail-btn${sqlPaneOpen ? " active" : ""}`}
+            title="Toggle LINQ/SQL preview pane"
+            aria-pressed={sqlPaneOpen}
+            onClick={() => onSqlPaneOpenChange(!sqlPaneOpen)}
+          >
+            <span className="editor-rail-label">Linq/Sql</span>
+          </button>
+        </aside>
+      </div>
       {sqlPaneOpen ? (
         <>
           <div

@@ -3,6 +3,9 @@ mod daemon;
 mod git;
 mod tool;
 
+#[cfg(target_os = "linux")]
+mod linux_window;
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -11,6 +14,14 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_store::Builder::default().build())
+        .setup(|app| {
+            #[cfg(target_os = "linux")]
+            if let Err(error) = linux_window::use_system_window_decorations(app) {
+                eprintln!("efvibe Studio: could not enable system window decorations: {error}");
+            }
+
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             commands::check_prerequisites,
             commands::invalidate_efvibe_daemon,

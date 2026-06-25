@@ -1,8 +1,15 @@
 import type { EvaluationJsonPayload } from "../types/evaluation";
-import { ResultExplorer } from "./ResultExplorer";
+import { ResultRowsView, ResultValueView } from "./ResultExplorer";
 import { canExportPayload, escapeHtml, formatMetrics } from "../lib/resultFormat";
+import type { ResultsTab } from "../types/query";
+import { normalizeResultsTab } from "../types/query";
 
-type ResultsTab = "result" | "explorer" | "sql" | "plan" | "messages";
+const RESULTS_TABS: Array<{ id: ResultsTab; label: string }> = [
+  { id: "result", label: "Result" },
+  { id: "sql", label: "SQL" },
+  { id: "plan", label: "Plan" },
+  { id: "messages", label: "Messages" },
+];
 
 interface ResultsTabsProps {
   payload: EvaluationJsonPayload;
@@ -18,48 +25,52 @@ export function ResultsTabs({
   onExport,
 }: ResultsTabsProps) {
   const exportEnabled = canExportPayload(payload);
+  const messageCount = payload.warnings.length;
+  const resolvedTab = normalizeResultsTab(activeTab);
 
   return (
     <section className="results-panel">
-      <div className="results-toolbar">
-        <div className="tab-list">
-          {(["result", "explorer", "sql", "plan", "messages"] as ResultsTab[]).map((tab) => (
+      <header className="results-tab-bar">
+        <div className="results-tabs" role="tablist" aria-label="Results">
+          {RESULTS_TABS.map((tab) => (
             <button
-              key={tab}
+              key={tab.id}
               type="button"
-              className={activeTab === tab ? "tab active" : "tab"}
-              onClick={() => onTabChange(tab)}
+              role="tab"
+              id={`results-tab-${tab.id}`}
+              aria-selected={resolvedTab === tab.id}
+              aria-controls={`results-panel-${tab.id}`}
+              className={resolvedTab === tab.id ? "results-tab active" : "results-tab"}
+              onClick={() => onTabChange(tab.id)}
             >
-              {tab === "result"
-                ? "Result"
-                : tab === "explorer"
-                  ? "Explorer"
-                  : tab === "sql"
-                    ? "SQL"
-                    : tab === "plan"
-                      ? "Plan"
-                      : "Messages"}
+              {tab.label}
+              {tab.id === "messages" && messageCount > 0 ? (
+                <span className="results-tab-badge">{messageCount}</span>
+              ) : null}
             </button>
           ))}
         </div>
-        <div className="results-actions">
+        <div className="results-tab-actions">
+          <span className="results-metrics">{formatMetrics(payload)}</span>
           <button type="button" disabled={!exportEnabled} onClick={() => onExport("csv")}>
-            Export CSV
+            CSV
           </button>
           <button type="button" disabled={!exportEnabled} onClick={() => onExport("json")}>
-            Export JSON
+            JSON
           </button>
         </div>
-      </div>
+      </header>
 
-      <p className="metrics">{formatMetrics(payload)}</p>
-
-      <div className="results-body">
-        {activeTab === "result" && <ResultBody payload={payload} />}
-        {activeTab === "explorer" && <ResultExplorer payload={payload} />}
-        {activeTab === "sql" && <SqlBody payload={payload} />}
-        {activeTab === "plan" && <PlanBody payload={payload} />}
-        {activeTab === "messages" && <MessagesBody payload={payload} />}
+      <div
+        className="results-body"
+        role="tabpanel"
+        id={`results-panel-${resolvedTab}`}
+        aria-labelledby={`results-tab-${resolvedTab}`}
+      >
+        {resolvedTab === "result" && <ResultBody payload={payload} />}
+        {resolvedTab === "sql" && <SqlBody payload={payload} />}
+        {resolvedTab === "plan" && <PlanBody payload={payload} />}
+        {resolvedTab === "messages" && <MessagesBody payload={payload} />}
       </div>
     </section>
   );
@@ -79,33 +90,14 @@ function ResultBody({ payload }: { payload: EvaluationJsonPayload }) {
   }
 
   if (payload.rows && payload.rows.length > 0) {
-    const columns = [...new Set(payload.rows.flatMap((row) => Object.keys(row)))];
-
-    return (
-      <div className="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              {columns.map((column) => (
-                <th key={column}>{column}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {payload.rows.map((row, index) => (
-              <tr key={index}>
-                {columns.map((column) => (
-                  <td key={column}>{row[column] ?? ""}</td>
-                ))}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    );
+    return <ResultRowsView rows={payload.rows} />;
   }
 
-  return <pre className="value-block">{payload.value ?? "(null)"}</pre>;
+  if (payload.value) {
+    return <ResultValueView value={payload.value} />;
+  }
+
+  return <pre className="value-block">(null)</pre>;
 }
 
 function SqlBody({ payload }: { payload: EvaluationJsonPayload }) {

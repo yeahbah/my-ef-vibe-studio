@@ -2010,6 +2010,8 @@ dependencies = [
 name = "my-ef-vibe-studio"
 version = "0.1.0"
 dependencies = [
+ "gdk",
+ "gtk",
  "serde",
  "serde_json",
  "tauri",

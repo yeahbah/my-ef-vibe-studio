@@ -1,6 +1,7 @@
 import { LazyStore } from "@tauri-apps/plugin-store";
 import type { AppSettings } from "../types/connection";
 import { DEFAULT_APP_SETTINGS } from "../types/connection";
+import { DEFAULT_APP_THEME } from "../types/theme";
 import type { EfvibeWorkspace } from "../types/workspace";
 
 const store = new LazyStore("settings.json");
@@ -27,7 +28,9 @@ export interface StudioSession {
   queryTabs: QueryTab[];
   activeQueryTabId: string;
   resultsDockHeight?: number;
+  /** @deprecated Use explorerExpandedNodes */
   sidebarTab?: SidebarTab;
+  explorerExpandedNodes?: string[];
   history?: EvaluationHistoryEntry[];
   notebookOpen?: boolean;
   notebookName?: string;
@@ -49,6 +52,7 @@ export async function loadAppSettings(): Promise<AppSettings> {
   return {
     ...DEFAULT_APP_SETTINGS,
     ...(saved ?? {}),
+    theme: saved?.theme ?? DEFAULT_APP_THEME,
   };
 }
 

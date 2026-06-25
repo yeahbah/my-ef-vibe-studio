@@ -50,7 +50,19 @@ fn run_version(command: &str, args: &[String]) -> Result<String, String> {
 }
 
 #[tauri::command]
-pub fn check_prerequisites(
+pub async fn check_prerequisites(
+    search_directory: String,
+    tool_path: String,
+    dotnet_framework: String,
+) -> Result<PrerequisiteCheckResult, String> {
+    Ok(tauri::async_runtime::spawn_blocking(move || {
+        check_prerequisites_sync(search_directory, tool_path, dotnet_framework)
+    })
+    .await
+    .map_err(|error| error.to_string())?)
+}
+
+fn check_prerequisites_sync(
     search_directory: String,
     tool_path: String,
     dotnet_framework: String,
@@ -105,25 +117,33 @@ pub fn invalidate_efvibe_daemon() {
 }
 
 #[tauri::command]
-pub fn daemon_eval(
+pub async fn daemon_eval(
     settings: ConnectionSettings,
     search_directory: String,
     cwd: String,
     expression: String,
     with_plan: bool,
 ) -> Result<String, String> {
-    run_expression(settings, search_directory, cwd, expression, with_plan)
+    tauri::async_runtime::spawn_blocking(move || {
+        run_expression(settings, search_directory, cwd, expression, with_plan)
+    })
+    .await
+    .map_err(|error| error.to_string())?
 }
 
 #[tauri::command]
-pub fn daemon_request(
+pub async fn daemon_request(
     settings: ConnectionSettings,
     search_directory: String,
     cwd: String,
     request: serde_json::Value,
     timeout_ms: Option<u64>,
 ) -> Result<String, String> {
-    run_daemon_json(settings, search_directory, cwd, request, timeout_ms)
+    tauri::async_runtime::spawn_blocking(move || {
+        run_daemon_json(settings, search_directory, cwd, request, timeout_ms)
+    })
+    .await
+    .map_err(|error| error.to_string())?
 }
 
 #[tauri::command]

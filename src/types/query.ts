@@ -1,6 +1,16 @@
 import type { EvaluationJsonPayload } from "./evaluation";
 
-export type ResultsTab = "result" | "explorer" | "sql" | "plan" | "messages";
+export type ResultsTab = "result" | "sql" | "plan" | "messages";
+
+export type LegacyResultsTab = ResultsTab | "explorer";
+
+export function normalizeResultsTab(tab: LegacyResultsTab | undefined): ResultsTab {
+  if (!tab || tab === "explorer") {
+    return "result";
+  }
+
+  return tab;
+}
 
 export interface QueryTab {
   id: string;
@@ -21,7 +31,7 @@ export interface EfvibeQueryFile {
   expression: string;
 }
 
-export const DEFAULT_QUERY_EXPRESSION = "db.Products.Take(5).ToList();";
+export const DEFAULT_QUERY_EXPRESSION = "";
 
 export function createQueryTab(
   connectionId: string,

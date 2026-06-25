@@ -1,5 +1,6 @@
 import { runExpressionViaDaemon } from "./daemonClient";
 import type { ConnectionSettings } from "../types/connection";
+import { looksLikeRawSql } from "./sqlDetect";
 
 const TERMINAL_SUFFIXES = [
   ".ToListAsync()",
@@ -37,6 +38,10 @@ export function buildSqlProbeExpression(expression: string): string | undefined 
     return undefined;
   }
 
+  if (looksLikeRawSql(trimmed)) {
+    return undefined;
+  }
+
   if (/\.ToQueryString\(\)\s*$/iu.test(trimmed)) {
     return trimmed.endsWith(";") ? trimmed : `${trimmed};`;
   }
@@ -56,6 +61,11 @@ export async function fetchLiveSqlPreview(
   searchDirectory: string,
   expression: string,
 ): Promise<{ sql?: string; error?: string }> {
+  const trimmed = expression.trim();
+  if (looksLikeRawSql(trimmed)) {
+    return { sql: trimmed };
+  }
+
   const probe = buildSqlProbeExpression(expression);
   if (!probe) {
     return {};

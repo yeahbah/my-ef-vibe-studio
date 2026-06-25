@@ -39,7 +39,7 @@ export function parseEvaluationJson(stdout: string): EvaluationJsonPayload | und
 }
 
 export function emptyEvaluationPayload(
-  message = "Write a LINQ expression and press Run (Ctrl+Enter). Results, SQL, and query plans appear here.",
+  message = "Write LINQ or SQL in the editor. Run the current statement with Ctrl+Enter (selection runs exactly what you highlight). Results, SQL, and query plans appear here.",
 ): EvaluationJsonPayload {
   return {
     success: true,
