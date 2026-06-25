@@ -11,6 +11,9 @@ Built with **Tauri 2** + **React** + **Monaco**. The [efvibe](https://github.com
 - **Sync folder** — push/pull favorite queries to a shared directory (local team sync)
 - **Snippet packs** — built-in marketplace packs (EF Core basics, performance probes)
 - **Open in IDE** — scan findings open in VS Code, Rider, or Visual Studio (configured in Settings)
+- **Engine SQL → LINQ** — `sqlToLinq` via daemon with ToQueryString validation (requires efvibe 0.6.13+)
+
+See [INSTALL.md](INSTALL.md) for release build instructions.
 
 ## Phase 2
 

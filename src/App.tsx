@@ -1140,6 +1140,8 @@ function App() {
       <SqlToLinqDialog
         open={sqlToLinqOpen}
         initialSql={sqlToLinqInitial}
+        connectionSettings={connectionSettings}
+        searchDirectory={searchDirectory}
         onClose={() => setSqlToLinqOpen(false)}
         onInsert={(linq) => {
           updateQueryTab(activeQueryTab.id, { expression: linq });
