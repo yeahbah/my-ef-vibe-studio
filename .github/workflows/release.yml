@@ -1,0 +1,152 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Semver to publish (e.g. 0.2.1). Required for manual runs without a tag.'
+        required: false
+        type: string
+      draft:
+        description: 'Create the GitHub release as a draft'
+        required: false
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  resolve-version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
+      draft: ${{ steps.version.outputs.draft }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Resolve version
+        id: version
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+          INPUT_DRAFT: ${{ inputs.draft }}
+        run: |
+          if [[ -n "$INPUT_VERSION" ]]; then
+            VERSION="$INPUT_VERSION"
+          elif [[ "${{ github.ref_type }}" == "tag" ]]; then
+            VERSION="${GITHUB_REF_NAME#v}"
+          else
+            VERSION="$(jq -r '.version' package.json)"
+          fi
+
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "Invalid version: $VERSION"
+            exit 1
+          fi
+
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            DRAFT="$INPUT_DRAFT"
+          else
+            DRAFT="false"
+          fi
+
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=v${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "draft=$DRAFT" >> "$GITHUB_OUTPUT"
+          echo "Publishing efvibe Studio ${VERSION} (draft=${DRAFT})"
+
+  build-tauri:
+    needs: resolve-version
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macos-latest
+            args: '--target universal-apple-darwin'
+            rust_targets: aarch64-apple-darwin,x86_64-apple-darwin
+          - platform: ubuntu-22.04
+            args: ''
+            rust_targets: ''
+          - platform: windows-latest
+            args: ''
+            rust_targets: ''
+
+    runs-on: ${{ matrix.platform }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Sync app version
+        env:
+          VERSION: ${{ needs.resolve-version.outputs.version }}
+        run: |
+          chmod +x .github/scripts/sync-version.sh
+          .github/scripts/sync-version.sh "$VERSION"
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.rust_targets }}
+
+      - name: Cache Rust
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Install Linux dependencies
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            patchelf \
+            rpm \
+            libssl-dev \
+            libxdo-dev
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Build and upload release bundles
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Avoid AppImage strip failures on newer glibc (see tauri-action issue discussions).
+          NO_STRIP: 'true'
+        with:
+          tagName: ${{ needs.resolve-version.outputs.tag }}
+          releaseName: efvibe Studio ${{ needs.resolve-version.outputs.tag }}
+          releaseBody: |
+            Desktop release for **efvibe Studio** ${{ needs.resolve-version.outputs.version }}.
+
+            ### Downloads
+            | Platform | Artifacts |
+            |----------|-----------|
+            | **Linux** | `.deb` (Debian/Ubuntu), `.rpm` (Fedora/RHEL), `.AppImage` (portable) |
+            | **macOS** | `.dmg` (universal: Apple Silicon + Intel) |
+            | **Windows** | `.msi` (recommended) and `.exe` (NSIS) |
+
+            ### Prerequisites
+            Studio still requires the [efvibe](https://www.nuget.org/packages/efvibe) CLI and .NET SDK on the machine. See [INSTALL.md](https://github.com/${{ github.repository }}/blob/main/INSTALL.md).
+          releaseDraft: ${{ needs.resolve-version.outputs.draft == 'true' }}
+          prerelease: false
+          args: ${{ matrix.args }}

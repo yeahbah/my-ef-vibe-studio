@@ -32,9 +32,32 @@ Artifacts are written under `src-tauri/target/release/bundle/`:
 
 | Platform | Typical artifact |
 |----------|------------------|
-| Linux | `.deb`, `.AppImage`, or `.rpm` (depends on host) |
+| Linux | `.deb`, `.AppImage`, `.rpm` |
 | macOS | `.dmg`, `.app` |
+| Windows | `.msi`, `.exe` (NSIS) |
+
+## CI/CD and GitHub Releases
+
+GitHub Actions builds installers on every version tag:
+
+```bash
+git tag v0.2.0
+git push origin v0.2.0
+```
+
+The **Release** workflow publishes:
+
+| Platform | Artifacts |
+|----------|-----------|
+| Linux | `.deb`, `.rpm`, `.AppImage` |
+| macOS | `.dmg` (universal: Apple Silicon + Intel) |
 | Windows | `.msi`, `.exe` |
+
+You can also start a release manually from **Actions → Release → Run workflow** (optional version input; draft releases are enabled by default for manual runs).
+
+**CI** runs on pushes and pull requests to `main`: frontend build plus `cargo check` for the Tauri backend.
+
+Download builds from [GitHub Releases](https://github.com/yeahbah/my-ef-vibe-studio/releases).
 
 ## First run checklist
 
