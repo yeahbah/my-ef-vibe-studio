@@ -131,14 +131,9 @@ jobs:
         shell: bash
         run: |
           mkdir -p release-artifacts
-          shopt -s nullglob globstar
-          for path in src-tauri/target/release/bundle/**/*; do
-            if [[ -f "$path" ]]; then
-              cp "$path" release-artifacts/
-            fi
-          done
+          find src-tauri/target/release/bundle -type f -exec cp {} release-artifacts/ \;
           ls -la release-artifacts
-          test "$(ls -1 release-artifacts | wc -l)" -gt 0
+          test "$(find release-artifacts -type f | wc -l | tr -d ' ')" -gt 0
 
       - name: Upload platform artifacts
         uses: actions/upload-artifact@v4
