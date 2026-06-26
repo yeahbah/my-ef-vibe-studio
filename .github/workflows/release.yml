@@ -33,7 +33,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Resolve version
         id: version
@@ -88,7 +88,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Sync app version
         env:
@@ -98,7 +98,7 @@ jobs:
           .github/scripts/sync-version.sh "$VERSION"
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: '22'
           cache: npm
@@ -133,7 +133,7 @@ jobs:
           .github/scripts/stage-release-artifacts.sh
 
       - name: Upload platform artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: studio-${{ matrix.artifact }}-${{ needs.resolve-version.outputs.version }}
           path: release-artifacts/*
@@ -147,10 +147,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Download all bundles
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           pattern: studio-*-${{ needs.resolve-version.outputs.version }}
           path: artifacts
