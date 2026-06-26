@@ -31,6 +31,7 @@ pub fn run() {
             commands::start_repl,
             commands::git_status,
             commands::git_commit_files,
+            commands::set_window_title,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -7,14 +7,14 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Semver to publish (e.g. 0.2.1). Required for manual runs without a tag.'
+        description: 'Semver to publish (e.g. 0.2.0). Defaults to package.json.'
         required: false
         type: string
       draft:
         description: 'Create the GitHub release as a draft'
         required: false
         type: boolean
-        default: true
+        default: false
 
 permissions:
   contents: write
@@ -72,12 +72,15 @@ jobs:
       matrix:
         include:
           - platform: macos-latest
+            artifact: macos
             args: '--target aarch64-apple-darwin'
             rust_targets: aarch64-apple-darwin
           - platform: ubuntu-22.04
+            artifact: linux
             args: ''
             rust_targets: ''
           - platform: windows-latest
+            artifact: windows
             args: ''
             rust_targets: ''
 
@@ -119,16 +122,62 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
-      - name: Build and upload release bundles
-        uses: tauri-apps/tauri-action@v0
+      - name: Build Tauri bundles
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # Avoid AppImage strip failures on newer glibc (see tauri-action issue discussions).
           NO_STRIP: 'true'
+        run: npm run tauri build -- ${{ matrix.args }}
+
+      - name: Stage release artifacts
+        shell: bash
+        run: |
+          mkdir -p release-artifacts
+          shopt -s nullglob globstar
+          for path in src-tauri/target/release/bundle/**/*; do
+            if [[ -f "$path" ]]; then
+              cp "$path" release-artifacts/
+            fi
+          done
+          ls -la release-artifacts
+          test "$(ls -1 release-artifacts | wc -l)" -gt 0
+
+      - name: Upload platform artifacts
+        uses: actions/upload-artifact@v4
         with:
-          tagName: ${{ needs.resolve-version.outputs.tag }}
-          releaseName: efvibe Studio ${{ needs.resolve-version.outputs.tag }}
-          releaseBody: |
+          name: studio-${{ matrix.artifact }}-${{ needs.resolve-version.outputs.version }}
+          path: release-artifacts/*
+          if-no-files-found: error
+
+  publish:
+    needs:
+      - resolve-version
+      - build-tauri
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download all bundles
+        uses: actions/download-artifact@v4
+        with:
+          pattern: studio-*-${{ needs.resolve-version.outputs.version }}
+          path: artifacts
+          merge-multiple: true
+
+      - name: List release files
+        run: find artifacts -type f -maxdepth 2 -print
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.resolve-version.outputs.tag }}
+          name: efvibe Studio ${{ needs.resolve-version.outputs.tag }}
+          target_commitish: ${{ github.sha }}
+          generate_release_notes: true
+          draft: ${{ needs.resolve-version.outputs.draft == 'true' }}
+          prerelease: false
+          files: artifacts/*
+          body: |
             Desktop release for **efvibe Studio** ${{ needs.resolve-version.outputs.version }}.
 
             ### Downloads
@@ -140,6 +189,3 @@ jobs:
 
             ### Prerequisites
             Studio still requires the [efvibe](https://www.nuget.org/packages/efvibe) CLI and .NET SDK on the machine. See [INSTALL.md](https://github.com/${{ github.repository }}/blob/main/INSTALL.md).
-          releaseDraft: ${{ needs.resolve-version.outputs.draft == 'true' }}
-          prerelease: false
-          args: ${{ matrix.args }}

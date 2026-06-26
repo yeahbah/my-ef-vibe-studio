@@ -53,11 +53,13 @@ The **Release** workflow publishes:
 | macOS | `.dmg` (Apple Silicon) |
 | Windows | `.msi`, `.exe` |
 
-You can also start a release manually from **Actions → Release → Run workflow** (optional version input; draft releases are enabled by default for manual runs).
+You can also start a release manually from **Actions → Release → Run workflow** (optional version input; releases publish immediately by default).
 
 **CI** runs on pushes and pull requests to `main`: frontend build plus `cargo check` for the Tauri backend.
 
 Download builds from [GitHub Releases](https://github.com/yeahbah/my-ef-vibe-studio/releases).
+
+If no release appears after a workflow run, open the run’s **publish** job — older workflow versions could report success without uploading assets when no git tag existed yet.
 
 ## First run checklist
 

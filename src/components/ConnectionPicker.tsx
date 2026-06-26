@@ -1,4 +1,5 @@
 import type { WorkspaceConnection } from "../types/workspace";
+import { connectionDisplayName } from "../types/workspace";
 
 interface ConnectionPickerProps {
   connections: WorkspaceConnection[];
@@ -20,7 +21,7 @@ export function ConnectionPicker({
       >
         {connections.map((connection) => (
           <option key={connection.id} value={connection.id}>
-            {connection.name || connection.context || "Unnamed"}
+            {connectionDisplayName(connection)}
           </option>
         ))}
       </select>

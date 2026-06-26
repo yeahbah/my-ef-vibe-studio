@@ -301,3 +301,24 @@ pub fn start_repl(
         Err("No terminal emulator found. Install x-terminal-emulator, gnome-terminal, or konsole.".to_string())
     }
 }
+
+#[tauri::command]
+pub fn set_window_title(app: tauri::AppHandle, title: String) -> Result<(), String> {
+    use tauri::Manager;
+
+    let window = app
+        .get_webview_window("main")
+        .ok_or_else(|| "'main' window not found".to_string())?;
+
+    window.set_title(&title).map_err(|error| error.to_string())?;
+
+    #[cfg(target_os = "linux")]
+    {
+        use gtk::prelude::*;
+        if let Ok(gtk_window) = window.gtk_window() {
+            gtk_window.set_title(&title);
+        }
+    }
+
+    Ok(())
+}

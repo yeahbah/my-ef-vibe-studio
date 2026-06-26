@@ -57,6 +57,20 @@ export function getActiveConnection(
   return workspace.connections.find((connection) => connection.id === activeConnectionId);
 }
 
+export function connectionDisplayName(connection: WorkspaceConnection): string {
+  const name = connection.name.trim();
+  if (name) {
+    return name;
+  }
+
+  const context = connection.context.trim();
+  if (context) {
+    return context;
+  }
+
+  return "Unnamed";
+}
+
 export function resolveSearchDirectory(
   connection: WorkspaceConnection,
   workspaceDirectory: string,

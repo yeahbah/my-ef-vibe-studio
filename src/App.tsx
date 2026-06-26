@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { getCurrentWindow } from "@tauri-apps/api/window";
 import { homeDir } from "@tauri-apps/api/path";
 import { save } from "@tauri-apps/plugin-dialog";
 import { writeTextFile } from "@tauri-apps/plugin-fs";
@@ -43,6 +42,7 @@ import {
 import { applyTheme, toggleTheme } from "./lib/theme";
 import { useDebouncedEffect } from "./lib/debounce";
 import { yieldToUi } from "./lib/yieldToUi";
+import { formatStudioWindowTitle, setWindowTitle } from "./lib/windowTitle";
 import {
   createNewWorkspace,
   openWorkspaceFile,
@@ -62,6 +62,7 @@ import {
 } from "./types/queryLibrary";
 import {
   createSampleConnection,
+  connectionDisplayName,
   duplicateConnection,
   getActiveConnection,
   resolveSearchDirectory,
@@ -462,11 +463,15 @@ function App() {
   }, []);
 
   useEffect(() => {
-    const connectionName = activeConnection?.name?.trim() || "Unnamed";
-    const title = `${connectionName} — efvibe Studio`;
-    globalThis.document.title = title;
-    void getCurrentWindow().setTitle(title);
-  }, [activeConnection?.name]);
+    if (!activeConnection) {
+      return;
+    }
+
+    const title = formatStudioWindowTitle(connectionDisplayName(activeConnection));
+    void setWindowTitle(title).catch((error) => {
+      console.error("Failed to set window title:", error);
+    });
+  }, [activeConnection]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
