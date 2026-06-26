@@ -20,10 +20,20 @@ thread_local! {
 }
 
 pub fn use_system_window_decorations(app: &App) -> Result<(), Box<dyn std::error::Error>> {
+    if std::env::var_os("APPIMAGE").is_some() {
+        return Ok(());
+    }
+
     let window = app
         .get_webview_window("main")
         .ok_or("'main' window not found")?
         .clone();
+
+    if let Ok(gtk_window) = window.gtk_window() {
+        if apply_system_decorations_if_possible(gtk_window.upcast_ref()) {
+            return Ok(());
+        }
+    }
 
     // Defer GTK calls until the native window exists (avoids AppImage launch crashes).
     glib::idle_add_local_once(move || {
@@ -32,11 +42,20 @@ pub fn use_system_window_decorations(app: &App) -> Result<(), Box<dyn std::error
             return;
         };
 
-        gtk_window.set_titlebar(Option::<&gtk::Widget>::None);
-        bind_work_area_constraints(gtk_window.upcast_ref());
+        apply_system_decorations_if_possible(gtk_window.upcast_ref());
     });
 
     Ok(())
+}
+
+fn apply_system_decorations_if_possible(gtk_window: &gtk::Window) -> bool {
+    // set_titlebar() on a realized window is undefined and can crash packaged GTK builds.
+    if !gtk_window.is_realized() {
+        gtk_window.set_titlebar(Option::<&gtk::Widget>::None);
+    }
+
+    bind_work_area_constraints(gtk_window);
+    gtk_window.is_realized()
 }
 
 fn work_area_for_window(window: &gtk::Window) -> Rectangle {

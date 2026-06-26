@@ -85,11 +85,11 @@ Download builds from [GitHub Releases](https://github.com/yeahbah/my-ef-vibe-stu
   update-desktop-database /usr/share/applications
   ```
   Then log out and back in (or restart Plasma).
-- **AppImage crashes on launch (segmentation fault)** — common with WebKitGTK on NVIDIA / some Wayland setups. v0.2.1+ sets workarounds automatically; for older builds try:
+- **AppImage crashes on launch (segmentation fault)** — common with WebKitGTK on NVIDIA / some Wayland setups. Ubuntu-built AppImages also require a `lib → usr/lib` layout for WebKit helper processes; Studio creates that symlink automatically at startup on recent builds. v0.2.1+ sets graphics workarounds automatically. For older builds try:
   ```bash
   WEBKIT_DISABLE_DMABUF_RENDERER=1 ./efvibe.Studio_0.2.0_amd64.AppImage
   ```
-  To re-enable the faster GPU path if your machine is unaffected: `WEBKIT_DISABLE_DMABUF_RENDERER=0 ./efvibe.Studio_….AppImage`
+  On **Fedora / Nobara**, prefer the `.rpm` package — it uses your system WebKit and is more reliable than the Ubuntu-built AppImage. To re-enable the faster GPU path if your machine is unaffected: `WEBKIT_DISABLE_DMABUF_RENDERER=0 ./efvibe.Studio_….AppImage`
 - **Prerequisites banner** — confirms `dotnet` and `efvibe` are reachable from the search directory.
 - **Save/Open dialogs** — Tauri FS scopes include home, documents, desktop, and downloads.
 - **Git commit in Team panel** — requires a git repo; only efvibe file types are listed by default.
