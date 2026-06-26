@@ -79,6 +79,12 @@ Download builds from [GitHub Releases](https://github.com/yeahbah/my-ef-vibe-stu
 
 ## Troubleshooting
 
+- **Wrong icon in taskbar or app menu (Linux)** — older RPM/deb builds installed icons under invalid `hicolor` paths. Upgrade to **v0.2.2+**, or after install run:
+  ```bash
+  sudo gtk-update-icon-cache -f /usr/share/icons/hicolor
+  update-desktop-database /usr/share/applications
+  ```
+  Then log out and back in (or restart Plasma).
 - **AppImage crashes on launch (segmentation fault)** — common with WebKitGTK on NVIDIA / some Wayland setups. v0.2.1+ sets workarounds automatically; for older builds try:
   ```bash
   WEBKIT_DISABLE_DMABUF_RENDERER=1 ./efvibe.Studio_0.2.0_amd64.AppImage

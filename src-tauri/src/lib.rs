@@ -13,6 +13,8 @@ pub fn run() {
     #[cfg(target_os = "linux")]
     linux_graphics::apply_workarounds();
 
+    use tauri::Manager;
+
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
@@ -20,6 +22,12 @@ pub fn run() {
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_store::Builder::default().build())
         .setup(|app| {
+            if let Some(icon) = app.default_window_icon().cloned() {
+                if let Some(window) = app.get_webview_window("main") {
+                    let _ = window.set_icon(icon);
+                }
+            }
+
             #[cfg(target_os = "linux")]
             if let Err(error) = linux_window::use_system_window_decorations(app) {
                 eprintln!("efvibe Studio: could not enable system window decorations: {error}");

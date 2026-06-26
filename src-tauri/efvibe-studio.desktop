@@ -1,0 +1,9 @@
+[Desktop Entry]
+Categories=Development;Database;
+Comment=efvibe Studio — EF Core database client and LINQ scratchpad
+Exec=my-ef-vibe-studio
+StartupWMClass=my-ef-vibe-studio
+Icon=my-ef-vibe-studio
+Name=efvibe Studio
+Terminal=false
+Type=Application
