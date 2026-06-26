@@ -13,8 +13,11 @@ export function ConnectionPicker({
 }: ConnectionPickerProps) {
   return (
     <label className="connection-picker">
-      <span>Connection</span>
-      <select value={activeConnectionId} onChange={(event) => onChange(event.target.value)}>
+      <select
+        value={activeConnectionId}
+        onChange={(event) => onChange(event.target.value)}
+        aria-label="Active connection"
+      >
         {connections.map((connection) => (
           <option key={connection.id} value={connection.id}>
             {connection.name || connection.context || "Unnamed"}

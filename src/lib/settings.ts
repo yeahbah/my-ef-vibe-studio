@@ -45,6 +45,7 @@ export interface StudioSession {
   queryLibrary?: QueryLibraryState;
   compareBaseline?: EvaluationHistoryEntry;
   installedPackIds?: string[];
+  explorerOpen?: boolean;
 }
 
 export async function loadAppSettings(): Promise<AppSettings> {

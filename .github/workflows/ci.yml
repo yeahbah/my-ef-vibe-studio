@@ -34,6 +34,11 @@ jobs:
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Install Linux dependencies
+        run: |
+          chmod +x .github/scripts/install-linux-deps.sh
+          .github/scripts/install-linux-deps.sh
+
       - name: Cache Rust
         uses: swatinem/rust-cache@v2
         with:

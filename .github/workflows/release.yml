@@ -72,8 +72,8 @@ jobs:
       matrix:
         include:
           - platform: macos-latest
-            args: '--target universal-apple-darwin'
-            rust_targets: aarch64-apple-darwin,x86_64-apple-darwin
+            args: '--target aarch64-apple-darwin'
+            rust_targets: aarch64-apple-darwin
           - platform: ubuntu-22.04
             args: ''
             rust_targets: ''
@@ -113,15 +113,8 @@ jobs:
       - name: Install Linux dependencies
         if: matrix.platform == 'ubuntu-22.04'
         run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            libwebkit2gtk-4.1-dev \
-            libayatana-appindicator3-dev \
-            librsvg2-dev \
-            patchelf \
-            rpm \
-            libssl-dev \
-            libxdo-dev
+          chmod +x .github/scripts/install-linux-deps.sh
+          .github/scripts/install-linux-deps.sh
 
       - name: Install frontend dependencies
         run: npm ci
@@ -142,7 +135,7 @@ jobs:
             | Platform | Artifacts |
             |----------|-----------|
             | **Linux** | `.deb` (Debian/Ubuntu), `.rpm` (Fedora/RHEL), `.AppImage` (portable) |
-            | **macOS** | `.dmg` (universal: Apple Silicon + Intel) |
+            | **macOS** | `.dmg` (Apple Silicon) |
             | **Windows** | `.msi` (recommended) and `.exe` (NSIS) |
 
             ### Prerequisites

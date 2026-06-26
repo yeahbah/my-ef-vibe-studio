@@ -114,3 +114,80 @@ export function IconStar(props: IconProps) {
     </svg>
   );
 }
+
+export function IconNew(props: IconProps) {
+  return (
+    <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" {...props}>
+      <path
+        d="M9 1.75H4.75A1 1 0 0 0 3.75 2.75v10.5a1 1 0 0 0 1 1h6.5a1 1 0 0 0 1-1V5.5L9 1.75Z"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.15"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M9 1.75v3.75h3.75M6.5 8.25v3.5M8.25 6.5h-3.5"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.15"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+export function IconOpen(props: IconProps) {
+  return (
+    <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" {...props}>
+      <path
+        d="M2.25 5.75V12a1 1 0 0 0 1 1h9.5a1 1 0 0 0 1-1V5.75"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.15"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M2.25 5.75 4.5 3.25h4.25L9.75 5.75"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.15"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+export function IconSave(props: IconProps) {
+  return (
+    <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" {...props}>
+      <path
+        d="M3.25 2.75h7.1l2.4 2.4V13a1 1 0 0 1-1 1H4.25a1 1 0 0 1-1-1V3.75a1 1 0 0 1 1-1Z"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.15"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M6.25 2.75V6h3.5V2.75M5.25 10.25h5.5"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.15"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+export function IconPlus(props: IconProps) {
+  return (
+    <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" {...props}>
+      <path
+        d="M8 3.25v9.5M3.25 8h9.5"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.35"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}

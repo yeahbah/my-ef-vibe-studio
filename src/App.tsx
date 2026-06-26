@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { homeDir } from "@tauri-apps/api/path";
 import { save } from "@tauri-apps/plugin-dialog";
 import { writeTextFile } from "@tauri-apps/plugin-fs";
@@ -117,6 +118,7 @@ function App() {
   const [explorerExpandedNodes, setExplorerExpandedNodes] = useState<string[]>(
     resolveExplorerExpandedNodes(),
   );
+  const [explorerOpen, setExplorerOpen] = useState(true);
   const [history, setHistory] = useState<EvaluationHistoryEntry[]>([]);
   const [notebookOpen, setNotebookOpen] = useState(false);
   const [notebookName, setNotebookName] = useState("Notebook");
@@ -324,6 +326,9 @@ function App() {
         if (savedSession.installedPackIds) {
           setInstalledPackIds(savedSession.installedPackIds);
         }
+        if (savedSession.explorerOpen !== undefined) {
+          setExplorerOpen(savedSession.explorerOpen);
+        }
       } else {
         const connection = createSampleConnection();
         const tab = createQueryTab(connection.id);
@@ -423,6 +428,7 @@ function App() {
         queryLibrary,
         compareBaseline,
         installedPackIds,
+        explorerOpen,
       });
     },
     [
@@ -446,9 +452,37 @@ function App() {
       queryLibrary,
       compareBaseline,
       installedPackIds,
+      explorerOpen,
     ],
     800,
   );
+
+  const toggleExplorer = useCallback(() => {
+    setExplorerOpen((open) => !open);
+  }, []);
+
+  useEffect(() => {
+    const connectionName = activeConnection?.name?.trim() || "Unnamed";
+    const title = `${connectionName} — efvibe Studio`;
+    globalThis.document.title = title;
+    void getCurrentWindow().setTitle(title);
+  }, [activeConnection?.name]);
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.defaultPrevented) {
+        return;
+      }
+
+      if (event.ctrlKey && !event.altKey && !event.metaKey && event.key.toLowerCase() === "b") {
+        event.preventDefault();
+        toggleExplorer();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [toggleExplorer]);
 
   useEffect(() => {
     if (!settings) {
@@ -1114,10 +1148,6 @@ function App() {
   return (
     <main className="app">
       <header className="topbar">
-        <div className="brand">
-          <strong>efvibe Studio</strong>
-          <span>{activeConnection.name}</span>
-        </div>
         <ConnectionPicker
           connections={document.workspace.connections}
           activeConnectionId={activeConnectionId}
@@ -1169,7 +1199,8 @@ function App() {
 
       <PrerequisitesBanner result={prerequisites} loading={prerequisitesLoading} />
 
-      <div className="workspace">
+      <div className={explorerOpen ? "workspace" : "workspace explorer-hidden"}>
+        {explorerOpen ? (
         <ExplorerSidebar
           documentPath={document.path}
           workspaceDirectory={workspaceDirectory}
@@ -1266,6 +1297,7 @@ function App() {
           theme={settings.theme ?? "dark"}
           onToggleTheme={handleToggleTheme}
         />
+        ) : null}
 
         <div className="main-stack">
           <QueryTabBar

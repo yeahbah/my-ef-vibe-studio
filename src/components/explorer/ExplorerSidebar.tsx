@@ -31,7 +31,7 @@ import type { WorkspaceConnection } from "../../types/workspace";
 import { resolveSearchDirectory, workspaceConnectionToSettings } from "../../types/workspace";
 import { ContextMenu } from "./ContextMenu";
 import { DbInfoDialog } from "../DbInfoDialog";
-import { IconMoon, IconSettings, IconSun } from "../icons";
+import { IconMoon, IconNew, IconOpen, IconSave, IconSettings, IconSun } from "../icons";
 import { TreeView } from "./TreeView";
 import type { AppTheme } from "../../types/theme";
 import type { ContextMenuItem, ExplorerNode } from "./types";
@@ -652,14 +652,14 @@ export function ExplorerSidebar(props: ExplorerSidebarProps) {
   return (
     <aside className="sidebar explorer-sidebar">
       <div className="sidebar-toolbar" role="toolbar" aria-label="Workspace">
-        <button type="button" onClick={onNewWorkspace}>
-          New
+        <button type="button" className="sidebar-icon-btn" title="New workspace" aria-label="New workspace" onClick={onNewWorkspace}>
+          <IconNew />
         </button>
-        <button type="button" onClick={onOpenWorkspace}>
-          Open
+        <button type="button" className="sidebar-icon-btn" title="Open workspace" aria-label="Open workspace" onClick={onOpenWorkspace}>
+          <IconOpen />
         </button>
-        <button type="button" onClick={onSaveWorkspace}>
-          Save
+        <button type="button" className="sidebar-icon-btn" title="Save workspace" aria-label="Save workspace" onClick={onSaveWorkspace}>
+          <IconSave />
         </button>
       </div>
 

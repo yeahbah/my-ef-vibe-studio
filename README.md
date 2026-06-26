@@ -104,6 +104,7 @@ An example file lives at `examples/sample.efvibe-workspace`.
 | Shortcut | Action |
 |----------|--------|
 | Ctrl+Enter | Run query |
+| Ctrl+B | Toggle explorer sidebar |
 | Ctrl+S | Save query tab (when bound to a file) |
 
 ## File formats

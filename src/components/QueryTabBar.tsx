@@ -1,4 +1,5 @@
 import type { QueryTab } from "../types/query";
+import { IconOpen, IconPlus, IconSave } from "./icons";
 
 interface QueryTabBarProps {
   tabs: QueryTab[];
@@ -54,16 +55,16 @@ export function QueryTabBar({
             )}
           </div>
         ))}
-        <button type="button" className="query-tab-add" onClick={onAdd}>
-          +
+        <button type="button" className="query-tab-add" title="New query tab" aria-label="New query tab" onClick={onAdd}>
+          <IconPlus />
         </button>
       </div>
       <div className="query-tab-actions">
-        <button type="button" onClick={onOpen}>
-          Open query
+        <button type="button" className="query-tab-icon-btn" title="Open query" aria-label="Open query" onClick={onOpen}>
+          <IconOpen />
         </button>
-        <button type="button" onClick={onSave}>
-          Save query
+        <button type="button" className="query-tab-icon-btn" title="Save query" aria-label="Save query" onClick={onSave}>
+          <IconSave />
         </button>
       </div>
     </div>

@@ -6,7 +6,7 @@ efvibe Studio is a Tauri desktop app. You need the **efvibe** CLI on your PATH (
 
 - Node.js 20+
 - Rust stable
-- Linux desktop deps: `webkit2gtk`, `rsvg2` ([Tauri prerequisites](https://tauri.app/start/prerequisites/))
+- Linux desktop deps: `webkit2gtk`, `gtk3`, `rsvg2` ([Tauri prerequisites](https://tauri.app/start/prerequisites/))
 - .NET SDK 8+
 - [efvibe](https://www.nuget.org/packages/efvibe) 0.6.13+ (for engine-backed SQL → LINQ)
 
@@ -50,7 +50,7 @@ The **Release** workflow publishes:
 | Platform | Artifacts |
 |----------|-----------|
 | Linux | `.deb`, `.rpm`, `.AppImage` |
-| macOS | `.dmg` (universal: Apple Silicon + Intel) |
+| macOS | `.dmg` (Apple Silicon) |
 | Windows | `.msi`, `.exe` |
 
 You can also start a release manually from **Actions → Release → Run workflow** (optional version input; draft releases are enabled by default for manual runs).
