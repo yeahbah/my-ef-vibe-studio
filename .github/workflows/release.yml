@@ -128,16 +128,9 @@ jobs:
         run: npm run tauri build -- ${{ matrix.args }}
 
       - name: Stage release artifacts
-        shell: bash
         run: |
-          mkdir -p release-artifacts
-          find src-tauri/target -path '*/bundle/*' -type f -exec cp {} release-artifacts/ \;
-          if [[ "$(find release-artifacts -type f | wc -l | tr -d ' ')" -eq 0 ]]; then
-            echo "No bundle files found under src-tauri/target"
-            find src-tauri/target -maxdepth 4 -type d 2>/dev/null | head -50 || true
-            exit 1
-          fi
-          ls -la release-artifacts
+          chmod +x .github/scripts/stage-release-artifacts.sh
+          .github/scripts/stage-release-artifacts.sh
 
       - name: Upload platform artifacts
         uses: actions/upload-artifact@v4
