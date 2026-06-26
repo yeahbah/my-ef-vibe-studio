@@ -79,6 +79,11 @@ Download builds from [GitHub Releases](https://github.com/yeahbah/my-ef-vibe-stu
 
 ## Troubleshooting
 
+- **AppImage crashes on launch (segmentation fault)** — common with WebKitGTK on NVIDIA / some Wayland setups. v0.2.1+ sets workarounds automatically; for older builds try:
+  ```bash
+  WEBKIT_DISABLE_DMABUF_RENDERER=1 ./efvibe.Studio_0.2.0_amd64.AppImage
+  ```
+  To re-enable the faster GPU path if your machine is unaffected: `WEBKIT_DISABLE_DMABUF_RENDERER=0 ./efvibe.Studio_….AppImage`
 - **Prerequisites banner** — confirms `dotnet` and `efvibe` are reachable from the search directory.
 - **Save/Open dialogs** — Tauri FS scopes include home, documents, desktop, and downloads.
 - **Git commit in Team panel** — requires a git repo; only efvibe file types are listed by default.

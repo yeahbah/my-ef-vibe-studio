@@ -4,10 +4,15 @@ mod git;
 mod tool;
 
 #[cfg(target_os = "linux")]
+mod linux_graphics;
+#[cfg(target_os = "linux")]
 mod linux_window;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    #[cfg(target_os = "linux")]
+    linux_graphics::apply_workarounds();
+
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())

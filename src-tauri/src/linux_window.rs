@@ -22,11 +22,19 @@ thread_local! {
 pub fn use_system_window_decorations(app: &App) -> Result<(), Box<dyn std::error::Error>> {
     let window = app
         .get_webview_window("main")
-        .ok_or("'main' window not found")?;
+        .ok_or("'main' window not found")?
+        .clone();
 
-    let gtk_window = window.gtk_window()?;
-    gtk_window.set_titlebar(Option::<&gtk::Widget>::None);
-    bind_work_area_constraints(gtk_window.upcast_ref());
+    // Defer GTK calls until the native window exists (avoids AppImage launch crashes).
+    glib::idle_add_local_once(move || {
+        let Ok(gtk_window) = window.gtk_window() else {
+            eprintln!("efvibe Studio: could not access GTK window for decorations");
+            return;
+        };
+
+        gtk_window.set_titlebar(Option::<&gtk::Widget>::None);
+        bind_work_area_constraints(gtk_window.upcast_ref());
+    });
 
     Ok(())
 }
