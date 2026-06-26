@@ -4,6 +4,7 @@ import {
   applyImportedPack,
   buildPackFromStudio,
   exportTeamPack,
+  fetchPackFromUrl,
   importTeamPack,
   readPackFromSyncDirectory,
   writePackToSyncDirectory,
@@ -24,6 +25,9 @@ import {
 } from "../../lib/fileManager";
 import { BUILTIN_SNIPPETS } from "../../types/snippets";
 import { BUILTIN_SNIPPET_PACKS } from "../../types/snippetPacks";
+import { REMOTE_SNIPPET_PACK_REGISTRY } from "../../lib/packRegistry";
+import { pushCloudSync, pullCloudSync } from "../../lib/cloudSync";
+import { InstallPackUrlDialog } from "../InstallPackUrlDialog";
 import type { EvaluationHistoryEntry } from "../../lib/history";
 import type { AppSettings, ConnectionSettings, PreferredEditor } from "../../types/connection";
 import type { QueryLibraryState } from "../../types/queryLibrary";
@@ -57,6 +61,7 @@ interface ExplorerSidebarProps {
   queryLibrary: QueryLibraryState;
   userSnippets: SnippetDefinition[];
   teamSyncDirectory: string;
+  cloudSyncDirectory: string;
   preferredEditor: PreferredEditor;
   installedPackIds: string[];
   expandedNodeIds: string[];
@@ -64,6 +69,7 @@ interface ExplorerSidebarProps {
   onSelectConnection: (connectionId: string) => void;
   onAddConnection: () => void;
   onDuplicateConnection: (connectionId: string) => void;
+  onRefreshConnection: (connectionId: string) => void;
   onDeleteConnection: (connectionId: string) => void;
   onEditConnection: (connectionId: string) => void;
   onRunExpression: (expression: string) => void;
@@ -124,6 +130,7 @@ export function ExplorerSidebar(props: ExplorerSidebarProps) {
     queryLibrary,
     userSnippets,
     teamSyncDirectory,
+    cloudSyncDirectory,
     preferredEditor,
     installedPackIds,
     expandedNodeIds,
@@ -131,6 +138,7 @@ export function ExplorerSidebar(props: ExplorerSidebarProps) {
     onSelectConnection,
     onAddConnection,
     onDuplicateConnection,
+    onRefreshConnection,
     onDeleteConnection,
     onEditConnection,
     onRunExpression,
@@ -170,6 +178,7 @@ export function ExplorerSidebar(props: ExplorerSidebarProps) {
   const [gitLoading, setGitLoading] = useState(false);
   const [selectedGitFiles, setSelectedGitFiles] = useState<string[]>([]);
   const [menu, setMenu] = useState<{ x: number; y: number; items: ContextMenuItem[] } | undefined>();
+  const [packUrlDialogOpen, setPackUrlDialogOpen] = useState(false);
   const [workspacePropertiesOpen, setWorkspacePropertiesOpen] = useState(false);
   const [fileManagerLabel, setFileManagerLabel] = useState("file manager");
   const [dbInfoDialog, setDbInfoDialog] = useState<
@@ -613,6 +622,7 @@ export function ExplorerSidebar(props: ExplorerSidebarProps) {
         onSelectConnection,
         onAddConnection,
         onDuplicateConnection,
+        onRefreshConnection,
         onDeleteConnection,
         onEditConnection,
         onRunExpression,
@@ -642,6 +652,10 @@ export function ExplorerSidebar(props: ExplorerSidebarProps) {
         handleImportPack,
         handleSyncPush,
         handleSyncPull,
+        handleCloudPush,
+        handleCloudPull,
+        handleInstallRemotePack,
+        openPackUrlDialog: () => setPackUrlDialogOpen(true),
       }),
     });
   }
@@ -696,12 +710,83 @@ export function ExplorerSidebar(props: ExplorerSidebarProps) {
         onStatus("No team-pack.efvibe-pack in sync directory.");
         return;
       }
-      const applied = applyImportedPack(pack, queryTabs[0]?.connectionId ?? "");
+      const applied = applyImportedPack(pack, queryTabs[0]?.connectionId ?? activeConnectionId);
       onImportPack(applied.snippets, applied.queries, applied.folderNames);
       onStatus(`Pulled pack ${pack.name}`);
     } catch (error) {
       onStatus(error instanceof Error ? error.message : String(error));
     }
+  }
+
+  async function handleCloudPush() {
+    if (!cloudSyncDirectory.trim()) {
+      onStatus("Set a cloud sync directory in Settings.");
+      return;
+    }
+
+    try {
+      const result = await pushCloudSync(
+        cloudSyncDirectory,
+        queryTabs,
+        userSnippets,
+        queryLibrary,
+        activeConnectionId,
+      );
+      onStatus(`Pushed ${result.queryCount} favorite queries to cloud sync.`);
+    } catch (error) {
+      onStatus(error instanceof Error ? error.message : String(error));
+    }
+  }
+
+  async function handleCloudPull() {
+    if (!cloudSyncDirectory.trim()) {
+      onStatus("Set a cloud sync directory in Settings.");
+      return;
+    }
+
+    try {
+      const result = await pullCloudSync(cloudSyncDirectory, activeConnectionId);
+      for (const query of result.queries) {
+        onOpenLibraryQuery(query.expression, query.connectionId, query.name);
+      }
+
+      if (result.pack) {
+        const applied = applyImportedPack(result.pack, activeConnectionId);
+        onImportPack(applied.snippets, applied.queries, applied.folderNames);
+      }
+
+      if (result.queries.length === 0 && !result.pack) {
+        onStatus("Cloud sync folder is empty.");
+        return;
+      }
+
+      onStatus(
+        `Pulled ${result.queries.length} queries${result.pack ? ` and pack ${result.pack.name}` : ""} from cloud sync.`,
+      );
+    } catch (error) {
+      onStatus(error instanceof Error ? error.message : String(error));
+    }
+  }
+
+  async function handleInstallPackFromUrl(url: string) {
+    const pack = await fetchPackFromUrl(url);
+    const applied = applyImportedPack(pack, activeConnectionId);
+    onImportPack(applied.snippets, applied.queries, applied.folderNames);
+    onInstallPackId(`url:${url}`);
+    onStatus(`Installed ${pack.name}`);
+  }
+
+  async function handleInstallRemotePack(packId: string) {
+    const entry = REMOTE_SNIPPET_PACK_REGISTRY.find((pack) => pack.id === packId);
+    if (!entry) {
+      return;
+    }
+
+    const pack = await fetchPackFromUrl(entry.url);
+    const applied = applyImportedPack(pack, activeConnectionId);
+    onImportPack(applied.snippets, applied.queries, applied.folderNames);
+    onInstallPackId(entry.id);
+    onStatus(`Installed ${entry.name}`);
   }
 
   const activeFinding = scanItems[scanIndex];
@@ -787,6 +872,12 @@ export function ExplorerSidebar(props: ExplorerSidebarProps) {
         error={dbSetPropertiesDialog?.error}
         payload={dbSetPropertiesDialog?.payload}
         onClose={() => setDbSetPropertiesDialog(undefined)}
+      />
+
+      <InstallPackUrlDialog
+        open={packUrlDialogOpen}
+        onClose={() => setPackUrlDialogOpen(false)}
+        onInstall={handleInstallPackFromUrl}
       />
     </aside>
   );
@@ -918,12 +1009,22 @@ function buildExplorerTree(input: {
               id: "team:packs",
               label: "Snippet packs",
               kind: "folder",
-              children: BUILTIN_SNIPPET_PACKS.map((pack) => ({
-                id: `team:pack:${pack.id}`,
-                label: pack.name,
-                subtitle: input.installedPackIds.includes(pack.id) ? "installed" : undefined,
-                kind: "pack" as const,
-              })),
+              children: [
+                ...BUILTIN_SNIPPET_PACKS.map((pack) => ({
+                  id: `team:pack:${pack.id}`,
+                  label: pack.name,
+                  subtitle: input.installedPackIds.includes(pack.id) ? "installed" : undefined,
+                  kind: "pack" as const,
+                })),
+                ...REMOTE_SNIPPET_PACK_REGISTRY.map((pack) => ({
+                  id: `team:remote-pack:${pack.id}`,
+                  label: pack.name,
+                  subtitle: input.installedPackIds.includes(pack.id)
+                    ? "installed"
+                    : "registry",
+                  kind: "pack" as const,
+                })),
+              ],
             },
           ],
         },
@@ -951,6 +1052,7 @@ function buildContextMenuItems(
   const onSelectConnection = ctx.onSelectConnection as (id: string) => void;
   const onAddConnection = ctx.onAddConnection as () => void;
   const onDuplicateConnection = ctx.onDuplicateConnection as (id: string) => void;
+  const onRefreshConnection = ctx.onRefreshConnection as (id: string) => void;
   const onDeleteConnection = ctx.onDeleteConnection as (id: string) => void;
   const onEditConnection = ctx.onEditConnection as (id: string) => void;
   const onRunExpression = ctx.onRunExpression as (expr: string) => void;
@@ -985,6 +1087,10 @@ function buildContextMenuItems(
   const handleImportPack = ctx.handleImportPack as () => Promise<void>;
   const handleSyncPush = ctx.handleSyncPush as () => Promise<void>;
   const handleSyncPull = ctx.handleSyncPull as () => Promise<void>;
+  const handleCloudPush = ctx.handleCloudPush as () => Promise<void>;
+  const handleCloudPull = ctx.handleCloudPull as () => Promise<void>;
+  const handleInstallRemotePack = ctx.handleInstallRemotePack as (packId: string) => Promise<void>;
+  const openPackUrlDialog = ctx.openPackUrlDialog as () => void;
 
   if (!node) {
     return [
@@ -1038,6 +1144,7 @@ function buildContextMenuItems(
     const connectionId = node.id.replace("connection:", "");
     return [
       { id: "select", label: "Activate", onClick: () => onSelectConnection(connectionId) },
+      { id: "refresh", label: "Refresh", onClick: () => onRefreshConnection(connectionId) },
       { id: "db-info", label: "DB Info", onClick: () => void loadDbInfoForConnection(connectionId) },
       { id: "edit", label: "Edit…", onClick: () => onEditConnection(connectionId) },
       { id: "dup", label: "Duplicate", onClick: () => onDuplicateConnection(connectionId) },
@@ -1246,14 +1353,26 @@ function buildContextMenuItems(
     return [
       { id: "export-pack", label: "Export team pack", onClick: () => void handleExportPack() },
       { id: "import-pack", label: "Import team pack", onClick: () => void handleImportPack() },
+      { id: "install-pack-url", label: "Install pack from URL…", onClick: openPackUrlDialog },
       { id: "sync-push", label: "Push favorites to sync folder", onClick: () => void handleSyncPush() },
       { id: "sync-pull", label: "Pull pack from sync folder", onClick: () => void handleSyncPull() },
+      { id: "cloud-push", label: "Push to cloud sync", onClick: () => void handleCloudPush() },
+      { id: "cloud-pull", label: "Pull from cloud sync", onClick: () => void handleCloudPull() },
+    ];
+  }
+
+  if (node.id === "team:packs") {
+    return [
+      { id: "install-pack-url", label: "Install pack from URL…", onClick: openPackUrlDialog },
     ];
   }
 
   if (node.kind === "pack") {
-    const packId = node.id.replace("team:pack:", "");
-    const manifest = BUILTIN_SNIPPET_PACKS.find((entry) => entry.id === packId);
+    const packId = node.id.replace(/^team:(?:remote-)?pack:/, "");
+    const isRemote = node.id.startsWith("team:remote-pack:");
+    const manifest = isRemote
+      ? REMOTE_SNIPPET_PACK_REGISTRY.find((entry) => entry.id === packId)
+      : BUILTIN_SNIPPET_PACKS.find((entry) => entry.id === packId);
     if (!manifest) {
       return [];
     }
@@ -1263,7 +1382,15 @@ function buildContextMenuItems(
         label: installedPackIds.includes(packId) ? "Already installed" : "Install pack",
         disabled: installedPackIds.includes(packId),
         onClick: () => {
-          const applied = applyImportedPack(manifest.pack, queryTabs[0]?.connectionId ?? "");
+          if (isRemote) {
+            void handleInstallRemotePack(packId);
+            return;
+          }
+
+          const applied = applyImportedPack(
+            (manifest as (typeof BUILTIN_SNIPPET_PACKS)[number]).pack,
+            queryTabs[0]?.connectionId ?? activeConnectionId,
+          );
           onImportPack(applied.snippets, applied.queries, applied.folderNames);
           onInstallPackId(packId);
           onStatus(`Installed ${manifest.name}`);

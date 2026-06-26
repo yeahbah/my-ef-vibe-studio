@@ -15,6 +15,8 @@ import { PrerequisitesBanner } from "./components/PrerequisitesBanner";
 import { QueryTabBar } from "./components/QueryTabBar";
 import { ResizableResultsDock, DEFAULT_RESULTS_DOCK_HEIGHT } from "./components/ResizableResultsDock";
 import { ResultsTabs } from "./components/ResultsTabs";
+import { ConnectionPanel } from "./components/ConnectionPanel";
+import { ConfirmDialog } from "./components/ConfirmDialog";
 import { SettingsPanel } from "./components/SettingsPanel";
 import { ExplorerSidebar } from "./components/explorer/ExplorerSidebar";
 import { resolveExplorerExpandedNodes, normalizeExplorerExpandedNodes } from "./components/explorer/types";
@@ -31,7 +33,13 @@ import { openNotebookFile, saveNotebookFile } from "./lib/notebook";
 import { openQueryFile, saveQueryFile } from "./lib/queryFile";
 import { runSqlViaDaemon } from "./lib/rawSql";
 import { looksLikeRawSql } from "./lib/sqlDetect";
-import { RUN_QUERY_EVENT, type RunQueryEventDetail } from "./lib/editorRun";
+import { RUN_QUERY_EVENT, RUN_PLAN_EVENT, type RunQueryEventDetail } from "./lib/editorRun";
+import {
+  hydrateWorkspaceSecrets,
+  stripConnectionSecretsForSave,
+  syncConnectionSecretToVault,
+} from "./lib/connectionVault";
+import { matchesKeybinding, resolveKeybindings } from "./lib/keybindings";
 import { buildExportContent } from "./lib/resultFormat";
 import { inferResultEntity, persistResultChanges } from "./lib/resultPersist";
 import {
@@ -111,13 +119,20 @@ function App() {
   const [activeConnectionId, setActiveConnectionId] = useState("");
   const [settings, setSettings] = useState<AppSettings | undefined>();
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [editingConnectionId, setEditingConnectionId] = useState<string | undefined>();
+  const [connectionEditorId, setConnectionEditorId] = useState<string | undefined>();
   const [prerequisites, setPrerequisites] = useState<PrerequisiteCheckResult>();
   const [prerequisitesLoading, setPrerequisitesLoading] = useState(true);
   const [status, setStatus] = useState("Ready");
   const [running, setRunning] = useState(false);
   const [engineBusyCount, setEngineBusyCount] = useState(0);
   const [sessionLoaded, setSessionLoaded] = useState(false);
+  const keybindings = useMemo(
+    () => resolveKeybindings(settings?.keybindings),
+    [settings?.keybindings],
+  );
+
+  const vaultConnectionSecrets = settings?.vaultConnectionSecrets ?? true;
+  const vaultEnabledRef = useRef<boolean | undefined>(undefined);
   const [resultsDockHeight, setResultsDockHeight] = useState(DEFAULT_RESULTS_DOCK_HEIGHT);
   const [explorerExpandedNodes, setExplorerExpandedNodes] = useState<string[]>(
     resolveExplorerExpandedNodes(),
@@ -139,7 +154,10 @@ function App() {
   const [queryLibrary, setQueryLibrary] = useState<QueryLibraryState>(createEmptyQueryLibrary());
   const [activeEditorTool, setActiveEditorTool] = useState<EditorToolId | undefined>();
   const [benchmarkResult, setBenchmarkResult] = useState<BenchmarkResult | undefined>();
+  const [compareBaseline, setCompareBaseline] = useState<EvaluationHistoryEntry | undefined>();
   const [benchmarking, setBenchmarking] = useState(false);
+  const [benchmarkConfirmOpen, setBenchmarkConfirmOpen] = useState(false);
+  const [benchmarkIterations, setBenchmarkIterations] = useState(5);
   const [installedPackIds, setInstalledPackIds] = useState<string[]>([]);
   const [splashExiting, setSplashExiting] = useState(false);
   const [splashDone, setSplashDone] = useState(false);
@@ -278,9 +296,13 @@ function App() {
 
       const savedSession = await loadStudioSession();
       if (savedSession?.workspace.connections.length) {
+        const hydratedWorkspace = await hydrateWorkspaceSecrets(
+          savedSession.workspacePath,
+          savedSession.workspace,
+        );
         setDocument({
           path: savedSession.workspacePath,
-          workspace: savedSession.workspace,
+          workspace: hydratedWorkspace,
         });
         const connectionId =
           savedSession.workspace.connections.find(
@@ -437,7 +459,9 @@ function App() {
 
       void saveStudioSession({
         workspacePath: document.path,
-        workspace: document.workspace,
+        workspace: vaultConnectionSecrets
+          ? stripConnectionSecretsForSave(document.workspace)
+          : document.workspace,
         activeConnectionId,
         queryTabs,
         activeQueryTabId,
@@ -480,6 +504,7 @@ function App() {
       queryLibrary,
       installedPackIds,
       explorerOpen,
+      vaultConnectionSecrets,
     ],
     800,
   );
@@ -487,6 +512,23 @@ function App() {
   const toggleExplorer = useCallback(() => {
     setExplorerOpen((open) => !open);
   }, []);
+
+  const handleSaveQuery = useCallback(async () => {
+    if (!activeQueryTab) {
+      return;
+    }
+
+    try {
+      const saved = await saveQueryFile(activeQueryTab, activeConnectionId);
+      updateQueryTab(activeQueryTab.id, saved);
+      setStatus(`Saved ${saved.filePath}`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (message !== "Save cancelled.") {
+        setStatus(`Save failed: ${message}`);
+      }
+    }
+  }, [activeConnectionId, activeQueryTab, updateQueryTab]);
 
   useEffect(() => {
     const title = activeConnection
@@ -498,20 +540,56 @@ function App() {
   }, [activeConnection]);
 
   useEffect(() => {
+    if (!document) {
+      return;
+    }
+
+    const enabled = vaultConnectionSecrets;
+    const wasEnabled = vaultEnabledRef.current;
+    vaultEnabledRef.current = enabled;
+    if (!enabled || wasEnabled === enabled) {
+      return;
+    }
+
+    void (async () => {
+      for (const connection of document.workspace.connections) {
+        await syncConnectionSecretToVault(document.path, connection, true);
+      }
+    })();
+  }, [document, vaultConnectionSecrets]);
+
+  useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.defaultPrevented) {
         return;
       }
 
-      if (event.ctrlKey && !event.altKey && !event.metaKey && event.key.toLowerCase() === "b") {
+      const target = event.target;
+      if (
+        target instanceof HTMLElement &&
+        (target.tagName === "INPUT" ||
+          target.tagName === "TEXTAREA" ||
+          target.tagName === "SELECT" ||
+          target.isContentEditable)
+      ) {
+        return;
+      }
+
+      if (matchesKeybinding(event, keybindings.toggleExplorer)) {
         event.preventDefault();
         toggleExplorer();
+        return;
+      }
+
+      if (matchesKeybinding(event, keybindings.saveQuery)) {
+        event.preventDefault();
+        void handleSaveQuery();
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [toggleExplorer]);
+  }, [handleSaveQuery, keybindings.saveQuery, keybindings.toggleExplorer, toggleExplorer]);
 
   useEffect(() => {
     if (!settings) {
@@ -792,6 +870,16 @@ function App() {
     return () => window.removeEventListener(RUN_QUERY_EVENT, listener);
   }, [handleRun]);
 
+  useEffect(() => {
+    const listener = (event: Event) => {
+      const text = (event as CustomEvent<RunQueryEventDetail>).detail?.text?.trim();
+      void handleRun(true, text || undefined);
+    };
+
+    window.addEventListener(RUN_PLAN_EVENT, listener);
+    return () => window.removeEventListener(RUN_PLAN_EVENT, listener);
+  }, [handleRun]);
+
   function selectQueryTab(tabId: string) {
     setActiveQueryTabId(tabId);
     const tab = queryTabs.find((entry) => entry.id === tabId);
@@ -850,23 +938,6 @@ function App() {
     }
   }
 
-  async function handleSaveQuery() {
-    if (!activeQueryTab) {
-      return;
-    }
-
-    try {
-      const saved = await saveQueryFile(activeQueryTab, activeConnectionId);
-      updateQueryTab(activeQueryTab.id, saved);
-      setStatus(`Saved ${saved.filePath}`);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      if (message !== "Save cancelled.") {
-        setStatus(`Save failed: ${message}`);
-      }
-    }
-  }
-
   async function handleOpenWorkspace() {
     try {
       const opened = await openWorkspaceFile();
@@ -874,14 +945,18 @@ function App() {
         return;
       }
 
-      setDocument(opened);
+      const hydratedWorkspace = await hydrateWorkspaceSecrets(opened.path, opened.workspace);
+      setDocument({
+        path: opened.path,
+        workspace: hydratedWorkspace,
+      });
       const connectionId = opened.workspace.connections[0]?.id ?? "";
       setActiveConnectionId(connectionId);
       const tab = createQueryTab(connectionId);
       setQueryTabs([tab]);
       setActiveQueryTabId(tab.id);
       await invalidateEfvibeDaemon();
-      setStatus(`Opened ${opened.workspace.name}`);
+      setStatus(`Opened ${hydratedWorkspace.name}`);
     } catch (error) {
       setStatus(error instanceof Error ? error.message : String(error));
     }
@@ -893,7 +968,9 @@ function App() {
     }
 
     try {
-      const saved = await saveWorkspaceFile(document);
+      const saved = await saveWorkspaceFile(document, {
+        stripConnectionSecrets: vaultConnectionSecrets,
+      });
       setDocument(saved);
       setStatus(`Saved ${saved.path}`);
     } catch (error) {
@@ -990,13 +1067,21 @@ function App() {
       return;
     }
 
-    updateWorkspace({
-      ...document.workspace,
-      connections: document.workspace.connections.map((entry) =>
-        entry.id === connection.id ? connection : entry,
-      ),
-    });
-    void invalidateEfvibeDaemon();
+    void (async () => {
+      const synced = await syncConnectionSecretToVault(
+        document.path,
+        connection,
+        vaultConnectionSecrets,
+      );
+
+      updateWorkspace({
+        ...document.workspace,
+        connections: document.workspace.connections.map((entry) =>
+          entry.id === connection.id ? synced : entry,
+        ),
+      });
+      await invalidateEfvibeDaemon();
+    })();
   }
 
   async function handleOpenNotebook() {
@@ -1046,6 +1131,21 @@ function App() {
     } finally {
       setNotebookRunning(false);
     }
+  }
+
+  function requestBenchmark(iterations = 5) {
+    if (!connectionSettings || !searchDirectory || !activeQueryTab) {
+      setStatus("Configure a connection before benchmarking.");
+      return;
+    }
+
+    if (!activeQueryTab.expression.trim()) {
+      setStatus("Enter a query in the editor before benchmarking.");
+      return;
+    }
+
+    setBenchmarkIterations(iterations);
+    setBenchmarkConfirmOpen(true);
   }
 
   async function handleBenchmark(iterations = 5) {
@@ -1162,10 +1262,10 @@ function App() {
     );
   }
 
-  const editingConnection =
-    document && editingConnectionId
-      ? document.workspace.connections.find((connection) => connection.id === editingConnectionId)
-      : activeConnection;
+  const connectionEditorConnection =
+    document && connectionEditorId
+      ? document.workspace.connections.find((connection) => connection.id === connectionEditorId)
+      : undefined;
 
   const showBusyOverlay =
     running || benchmarking || notebookRunning || engineBusyCount > 0;
@@ -1202,6 +1302,16 @@ function App() {
           </button>
           <button type="button" disabled={running} onClick={() => void handleRun(true)}>
             Run Plan
+          </button>
+          <button
+            type="button"
+            disabled={history.length === 0}
+            onClick={() => {
+              setCompareBaseline(history[0]);
+              setStatus("Compare baseline set from last run.");
+            }}
+          >
+            Set baseline
           </button>
         </div>
         ) : null}
@@ -1241,6 +1351,7 @@ function App() {
           queryLibrary={queryLibrary}
           userSnippets={userSnippets}
           teamSyncDirectory={settings.teamSyncDirectory}
+          cloudSyncDirectory={settings.cloudSyncDirectory ?? ""}
           preferredEditor={settings.preferredEditor}
           installedPackIds={installedPackIds}
           onSelectConnection={(connectionId) => {
@@ -1257,6 +1368,7 @@ function App() {
               connections: [...document.workspace.connections, connection],
             });
             setActiveConnectionId(connection.id);
+            setConnectionEditorId(connection.id);
           }}
           onDuplicateConnection={(connectionId) => {
             const source = document.workspace.connections.find(
@@ -1272,6 +1384,24 @@ function App() {
               connections: [...document.workspace.connections, copy],
             });
             setActiveConnectionId(copy.id);
+          }}
+          onRefreshConnection={(connectionId) => {
+            const connection = document.workspace.connections.find(
+              (entry) => entry.id === connectionId,
+            );
+            if (!connection) {
+              return;
+            }
+
+            if (connectionId !== activeConnectionId) {
+              setActiveConnectionId(connectionId);
+              updateQueryTab(activeQueryTab.id, { connectionId });
+            }
+
+            void (async () => {
+              await invalidateEfvibeDaemon();
+              setStatus(`Refreshed ${connectionDisplayName(connection)}`);
+            })();
           }}
           onDeleteConnection={(connectionId) => {
             const remaining = document.workspace.connections.filter(
@@ -1291,8 +1421,7 @@ function App() {
             );
           }}
           onEditConnection={(connectionId) => {
-            setEditingConnectionId(connectionId);
-            setSettingsOpen(true);
+            setConnectionEditorId(connectionId);
           }}
           onRunExpression={(nextExpression) => {
             updateQueryTab(activeQueryTab.id, { expression: nextExpression });
@@ -1346,7 +1475,7 @@ function App() {
                 <EditorToolRail
                   activeTool={activeEditorTool}
                   onSelect={handleEditorTool}
-                  onBenchmark={() => void handleBenchmark(5)}
+                  onBenchmark={() => requestBenchmark(5)}
                   benchmarking={benchmarking}
                   running={running}
                 />
@@ -1355,6 +1484,7 @@ function App() {
                   <EditorToolPanel
                     tool={activeEditorTool}
                     history={history}
+                    compareBaseline={compareBaseline}
                     benchmark={benchmarkResult}
                     userSnippets={userSnippets}
                     favoriteTabs={favoriteTabs}
@@ -1392,6 +1522,7 @@ function App() {
                         onEngineBusyChange={adjustEngineBusy}
                         onRequestEngine={allowEngine}
                         onRunSql={(sql) => void handleRunSql(sql)}
+                        keybindings={keybindings}
                       />
                     }
                     results={
@@ -1503,13 +1634,33 @@ function App() {
       <SettingsPanel
         open={settingsOpen}
         settings={settings}
-        connection={editingConnection ?? activeConnection}
-        onClose={() => {
-          setSettingsOpen(false);
-          setEditingConnectionId(undefined);
-        }}
+        onClose={() => setSettingsOpen(false)}
         onSettingsChange={setSettings}
-        onConnectionChange={updateConnection}
+      />
+
+      {connectionEditorConnection ? (
+        <ConnectionPanel
+          open
+          connection={connectionEditorConnection}
+          workspacePath={document?.path ?? ""}
+          vaultConnectionSecrets={vaultConnectionSecrets}
+          onClose={() => setConnectionEditorId(undefined)}
+          onConnectionChange={updateConnection}
+        />
+      ) : null}
+
+      <ConfirmDialog
+        open={benchmarkConfirmOpen}
+        title="Run benchmark?"
+        message={`The query in the editor will be executed ${benchmarkIterations} times against your database.`}
+        detail={activeQueryTab?.expression.trim()}
+        confirmLabel="Run benchmark"
+        cancelLabel="Cancel"
+        onClose={() => setBenchmarkConfirmOpen(false)}
+        onConfirm={() => {
+          setBenchmarkConfirmOpen(false);
+          void handleBenchmark(benchmarkIterations);
+        }}
       />
 
     </main>

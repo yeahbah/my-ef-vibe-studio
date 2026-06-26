@@ -1,0 +1,37 @@
+{
+  "version": 1,
+  "kind": "snippet-pack",
+  "name": "EF Core basics",
+  "description": "Common DbSet queries for everyday exploration.",
+  "author": "efvibe Studio",
+  "exportedAt": "2026-01-01T00:00:00.000Z",
+  "folders": [],
+  "snippets": [
+    {
+      "title": "Count all",
+      "expression": "db.Products.Count();",
+      "description": "Count rows in a DbSet."
+    },
+    {
+      "title": "Latest 20",
+      "expression": "db.Orders.OrderByDescending(o => o.OrderDate).Take(20).ToList();",
+      "description": "Recent rows ordered by date."
+    },
+    {
+      "title": "Filter active",
+      "expression": "db.Products.Where(p => p.IsActive).ToList();",
+      "description": "Simple boolean filter."
+    },
+    {
+      "title": "Include child",
+      "expression": "db.Orders.Include(o => o.OrderLines).Take(10).ToList();",
+      "description": "Eager load a collection navigation."
+    },
+    {
+      "title": "SQL preview",
+      "expression": "db.Products.Where(p => p.Name.Contains(\"Pro\")).ToQueryString();",
+      "description": "Preview translated SQL without executing."
+    }
+  ],
+  "queries": []
+}

@@ -10,6 +10,7 @@ import { EditorWorkspace } from "./EditorWorkspace";
 import { LiveSqlPane } from "./LiveSqlPane";
 import { MonacoEditor } from "./MonacoEditor";
 import type { ConnectionSettings } from "../types/connection";
+import type { KeybindingSettings } from "../types/keybindings";
 import type { AppTheme } from "../types/theme";
 
 export interface QueryWorkspaceHandle {
@@ -33,6 +34,7 @@ interface QueryWorkspaceProps {
   onRequestEngine?: () => void;
   onEngineBusyChange?: (delta: number) => void;
   onRunSql: (sql: string) => void;
+  keybindings?: KeybindingSettings;
 }
 
 const EXPRESSION_SYNC_MS = 400;
@@ -55,6 +57,7 @@ export const QueryWorkspace = forwardRef<QueryWorkspaceHandle, QueryWorkspacePro
       onRequestEngine,
       onEngineBusyChange,
       onRunSql,
+      keybindings,
     },
     ref,
   ) {
@@ -123,7 +126,7 @@ export const QueryWorkspace = forwardRef<QueryWorkspaceHandle, QueryWorkspacePro
         onSqlPaneOpenChange={onSqlPaneOpenChange}
         sqlPaneWidth={sqlPaneWidth}
         onSqlPaneWidthChange={onSqlPaneWidthChange}
-        editor={<MonacoEditor value={draft} theme={theme} onChange={handleChange} />}
+        editor={<MonacoEditor value={draft} theme={theme} onChange={handleChange} keybindings={keybindings} />}
         sqlPane={
           <LiveSqlPane
             expression={draft}

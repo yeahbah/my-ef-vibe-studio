@@ -1,4 +1,3 @@
-import type { BenchmarkResult } from "../lib/benchmark";
 import type { EvaluationHistoryEntry } from "../lib/history";
 import { BUILTIN_SNIPPETS } from "../types/snippets";
 import type { QueryTab } from "../types/query";
@@ -8,7 +7,8 @@ import type { EditorToolId } from "./EditorToolRail";
 interface EditorToolPanelProps {
   tool: EditorToolId;
   history: EvaluationHistoryEntry[];
-  benchmark?: BenchmarkResult;
+  compareBaseline?: EvaluationHistoryEntry;
+  benchmark?: import("../lib/benchmark").BenchmarkResult;
   userSnippets: SnippetDefinition[];
   favoriteTabs: QueryTab[];
   onClose: () => void;
@@ -30,6 +30,7 @@ const TOOL_TITLES: Record<EditorToolId, string> = {
 export function EditorToolPanel({
   tool,
   history,
+  compareBaseline,
   benchmark,
   userSnippets,
   favoriteTabs,
@@ -52,7 +53,7 @@ export function EditorToolPanel({
 
       <div className="editor-tool-panel-body">
         {tool === "charts" ? (
-          <ChartsToolView history={history} benchmark={benchmark} />
+          <ChartsToolView history={history} compareBaseline={compareBaseline} benchmark={benchmark} />
         ) : null}
 
         {tool === "history" ? (
@@ -82,12 +83,19 @@ export function EditorToolPanel({
 
 function ChartsToolView({
   history,
+  compareBaseline,
   benchmark,
 }: {
   history: EvaluationHistoryEntry[];
-  benchmark?: BenchmarkResult;
+  compareBaseline?: EvaluationHistoryEntry;
+  benchmark?: import("../lib/benchmark").BenchmarkResult;
 }) {
+  const latest = history[0];
   const maxMs = Math.max(...history.map((entry) => entry.totalMs), benchmark?.maxMs ?? 0, 1);
+  const appMs =
+    latest && latest.databaseMs !== undefined
+      ? Math.max(0, latest.totalMs - latest.databaseMs)
+      : undefined;
 
   return (
     <div className="tool-panel-sections">
@@ -126,12 +134,113 @@ function ChartsToolView({
         )}
       </section>
 
+      {latest ? (
+        <section className="tool-panel-section">
+          <h3>Last run timing</h3>
+          <table className="charts-table">
+            <tbody>
+              <tr>
+                <td>Total</td>
+                <td>{latest.totalMs} ms</td>
+                <td>
+                  <div
+                    className="chart-bar"
+                    style={{ width: `${Math.max(4, (latest.totalMs / maxMs) * 100)}%` }}
+                  />
+                </td>
+              </tr>
+              <tr>
+                <td>Database</td>
+                <td>{latest.databaseMs ?? "—"} ms</td>
+                <td>
+                  {latest.databaseMs !== undefined ? (
+                    <div
+                      className="chart-bar chart-bar-database"
+                      style={{ width: `${Math.max(4, (latest.databaseMs / maxMs) * 100)}%` }}
+                    />
+                  ) : null}
+                </td>
+              </tr>
+              <tr>
+                <td>App / Roslyn</td>
+                <td>{appMs ?? "—"} ms</td>
+                <td>
+                  {appMs !== undefined ? (
+                    <div
+                      className="chart-bar chart-bar-app"
+                      style={{ width: `${Math.max(4, (appMs / maxMs) * 100)}%` }}
+                    />
+                  ) : null}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+      ) : null}
+
+      <section className="tool-panel-section">
+        <h3>Compare baseline</h3>
+        {compareBaseline && latest ? (
+          <table className="charts-table">
+            <thead>
+              <tr>
+                <th>Metric</th>
+                <th>Baseline</th>
+                <th>Latest</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Total</td>
+                <td>{compareBaseline.totalMs} ms</td>
+                <td>{latest.totalMs} ms</td>
+              </tr>
+              <tr>
+                <td>Database</td>
+                <td>{compareBaseline.databaseMs ?? "—"} ms</td>
+                <td>{latest.databaseMs ?? "—"} ms</td>
+              </tr>
+              <tr>
+                <td>Rows</td>
+                <td>{compareBaseline.rowCount ?? "—"}</td>
+                <td>{latest.rowCount ?? "—"}</td>
+              </tr>
+            </tbody>
+          </table>
+        ) : (
+          <p className="muted">Use Set baseline in the run bar, then run another query.</p>
+        )}
+      </section>
+
       {benchmark ? (
         <section className="tool-panel-section">
           <h3>Benchmark ({benchmark.iterations} runs)</h3>
           <p className="muted">
             Avg {benchmark.averageMs} ms · min {benchmark.minMs} ms · max {benchmark.maxMs} ms
           </p>
+          <table className="charts-table">
+            <thead>
+              <tr>
+                <th>Run</th>
+                <th>Total</th>
+                <th />
+              </tr>
+            </thead>
+            <tbody>
+              {benchmark.samples.map((sample) => (
+                <tr key={sample.iteration}>
+                  <td>{sample.iteration}</td>
+                  <td>{sample.totalMs} ms</td>
+                  <td>
+                    <div
+                      className="chart-bar"
+                      style={{ width: `${Math.max(4, (sample.totalMs / maxMs) * 100)}%` }}
+                    />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </section>
       ) : null}
     </div>

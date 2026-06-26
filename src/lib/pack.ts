@@ -53,6 +53,10 @@ export async function importTeamPack(): Promise<EfvibePack | undefined> {
   }
 
   const contents = await readTextFile(selected);
+  return parsePackJson(contents);
+}
+
+export function parsePackJson(contents: string): EfvibePack {
   const parsed = JSON.parse(contents) as EfvibePack;
   if (parsed.version !== 1) {
     throw new Error("Unsupported pack version.");
@@ -61,25 +65,41 @@ export async function importTeamPack(): Promise<EfvibePack | undefined> {
   return parsed;
 }
 
+export async function fetchPackFromUrl(url: string): Promise<EfvibePack> {
+  const trimmed = url.trim();
+  if (!trimmed) {
+    throw new Error("Pack URL is required.");
+  }
+
+  const response = await fetch(trimmed);
+  if (!response.ok) {
+    throw new Error(`Failed to download pack (HTTP ${response.status}).`);
+  }
+
+  return parsePackJson(await response.text());
+}
+
 export async function writePackToSyncDirectory(
   syncDirectory: string,
   pack: EfvibePack,
+  fileName = "team-pack.efvibe-pack",
 ): Promise<string> {
   const normalized = syncDirectory.replace(/\/$/, "");
-  const targetPath = `${normalized}/team-pack.efvibe-pack`;
+  const targetPath = `${normalized}/${fileName}`;
   await writeTextFile(targetPath, `${JSON.stringify(pack, null, 2)}\n`);
   return targetPath;
 }
 
 export async function readPackFromSyncDirectory(
   syncDirectory: string,
+  fileName = "team-pack.efvibe-pack",
 ): Promise<EfvibePack | undefined> {
   const normalized = syncDirectory.replace(/\/$/, "");
-  const targetPath = `${normalized}/team-pack.efvibe-pack`;
+  const targetPath = `${normalized}/${fileName}`;
 
   try {
     const contents = await readTextFile(targetPath);
-    return JSON.parse(contents) as EfvibePack;
+    return parsePackJson(contents);
   } catch {
     return undefined;
   }

@@ -1,7 +1,12 @@
 import { open, save } from "@tauri-apps/plugin-dialog";
 import { readTextFile, writeTextFile } from "@tauri-apps/plugin-fs";
+import { stripConnectionSecretsForSave } from "./connectionVault";
 import type { EfvibeWorkspace } from "../types/workspace";
 import { createEmptyWorkspace } from "../types/workspace";
+
+export interface SaveWorkspaceOptions {
+  stripConnectionSecrets?: boolean;
+}
 
 export interface WorkspaceDocument {
   path: string;
@@ -29,6 +34,7 @@ export async function openWorkspaceFile(): Promise<WorkspaceDocument | undefined
 
 export async function saveWorkspaceFile(
   document: WorkspaceDocument,
+  options?: SaveWorkspaceOptions,
 ): Promise<WorkspaceDocument> {
   const targetPath =
     document.path ||
@@ -41,7 +47,10 @@ export async function saveWorkspaceFile(
     throw new Error("Save cancelled.");
   }
 
-  const payload = `${JSON.stringify(document.workspace, null, 2)}\n`;
+  const workspaceToWrite = options?.stripConnectionSecrets
+    ? stripConnectionSecretsForSave(document.workspace)
+    : document.workspace;
+  const payload = `${JSON.stringify(workspaceToWrite, null, 2)}\n`;
   await writeTextFile(targetPath, payload);
 
   return {

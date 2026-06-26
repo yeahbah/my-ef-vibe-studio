@@ -1395,6 +1395,69 @@ pre,
   align-items: center;
 }
 
+.settings-hint {
+  margin: 0.25rem 0 0;
+  font-size: 0.8rem;
+  color: var(--text-muted, #8b949e);
+}
+
+.path-input-row {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+
+.path-input-row input {
+  flex: 1;
+  min-width: 0;
+}
+
+.path-input-browse {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.chart-bar-database {
+  background: var(--accent-warn, #d29922);
+}
+
+.chart-bar-app {
+  background: var(--accent-info, #58a6ff);
+}
+
+.install-pack-error {
+  color: var(--error, #f85149);
+  margin: 0.5rem 0 0;
+}
+
+.install-pack-actions {
+  margin-top: 0.75rem;
+}
+
+.confirm-dialog section > p {
+  margin: 0 0 0.75rem;
+}
+
+.confirm-dialog-detail {
+  margin: 0 0 1rem;
+  padding: 0.75rem;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg-app);
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 0.85rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 8rem;
+  overflow: auto;
+}
+
+.confirm-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
 .sidebar-tabs-3 {
   grid-template-columns: repeat(3, 1fr);
 }

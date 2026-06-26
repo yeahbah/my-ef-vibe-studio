@@ -1,23 +1,26 @@
 import type { AppSettings } from "../types/connection";
-import type { WorkspaceConnection } from "../types/workspace";
+import { keybindingLabel } from "../lib/keybindings";
+import { DEFAULT_KEYBINDINGS } from "../types/keybindings";
+import { PathInput } from "./PathInput";
 
 interface SettingsPanelProps {
   open: boolean;
   settings: AppSettings;
-  connection: WorkspaceConnection;
   onClose: () => void;
   onSettingsChange: (settings: AppSettings) => void;
-  onConnectionChange: (connection: WorkspaceConnection) => void;
 }
 
 export function SettingsPanel({
   open,
   settings,
-  connection,
   onClose,
   onSettingsChange,
-  onConnectionChange,
 }: SettingsPanelProps) {
+  const keybindings = {
+    ...DEFAULT_KEYBINDINGS,
+    ...(settings.keybindings ?? {}),
+  };
+
   if (!open) {
     return null;
   }
@@ -46,10 +49,11 @@ export function SettingsPanel({
           </label>
           <label>
             Default workspace root
-            <input
+            <PathInput
+              kind="folder"
               value={settings.defaultWorkspaceRoot}
-              onChange={(event) =>
-                onSettingsChange({ ...settings, defaultWorkspaceRoot: event.target.value })
+              onChange={(defaultWorkspaceRoot) =>
+                onSettingsChange({ ...settings, defaultWorkspaceRoot })
               }
               placeholder="~/.efvibe"
             />
@@ -85,95 +89,103 @@ export function SettingsPanel({
           )}
           <label>
             Team sync directory
-            <input
+            <PathInput
+              kind="folder"
               value={settings.teamSyncDirectory}
-              onChange={(event) =>
-                onSettingsChange({ ...settings, teamSyncDirectory: event.target.value })
+              onChange={(teamSyncDirectory) =>
+                onSettingsChange({ ...settings, teamSyncDirectory })
               }
               placeholder="Shared folder for team query packs (optional)"
             />
           </label>
-        </section>
-
-        <section>
-          <h3>Active connection</h3>
           <label>
-            Name
-            <input
-              value={connection.name}
-              onChange={(event) => onConnectionChange({ ...connection, name: event.target.value })}
-            />
-          </label>
-          <label>
-            Search directory
-            <input
-              value={connection.searchDirectory ?? ""}
-              onChange={(event) =>
-                onConnectionChange({ ...connection, searchDirectory: event.target.value })
+            Cloud sync directory
+            <PathInput
+              kind="folder"
+              value={settings.cloudSyncDirectory ?? ""}
+              onChange={(cloudSyncDirectory) =>
+                onSettingsChange({ ...settings, cloudSyncDirectory })
               }
-              placeholder="Folder with your solution (efvibe discovers .csproj here)"
+              placeholder="Dropbox / iCloud / OneDrive folder for queries (optional)"
             />
           </label>
-          <label>
-            EF project (-p, optional)
-            <input
-              value={connection.efProject}
-              onChange={(event) =>
-                onConnectionChange({ ...connection, efProject: event.target.value })
-              }
-              placeholder="Leave empty to auto-discover from search directory"
-            />
-          </label>
-          <label>
-            Startup project (-s)
-            <input
-              value={connection.startupProject ?? ""}
-              onChange={(event) =>
-                onConnectionChange({ ...connection, startupProject: event.target.value })
-              }
-              placeholder="path/to/API.csproj"
-            />
-          </label>
-          <label>
-            DbContext (-c, optional)
-            <input
-              value={connection.context}
-              onChange={(event) =>
-                onConnectionChange({ ...connection, context: event.target.value })
-              }
-              placeholder="Leave empty to auto-discover"
-            />
-          </label>
-          <label>
-            Connection string override
-            <input
-              value={connection.connectionString ?? ""}
-              onChange={(event) =>
-                onConnectionChange({ ...connection, connectionString: event.target.value })
-              }
-              placeholder="Optional --connection-string"
-            />
-          </label>
-          <label>
-            .NET framework
-            <input
-              value={connection.dotnetFramework ?? ""}
-              onChange={(event) =>
-                onConnectionChange({ ...connection, dotnetFramework: event.target.value })
-              }
-              placeholder="net10.0"
-            />
-          </label>
+          <p className="settings-hint">
+            Cloud sync writes favorite queries as <code>.efvibe-query</code> files and a pack manifest.
+            Connection strings are never synced.
+          </p>
           <label className="checkbox">
             <input
               type="checkbox"
-              checked={connection.dbLog ?? true}
+              checked={settings.vaultConnectionSecrets ?? true}
               onChange={(event) =>
-                onConnectionChange({ ...connection, dbLog: event.target.checked })
+                onSettingsChange({
+                  ...settings,
+                  vaultConnectionSecrets: event.target.checked,
+                })
               }
             />
-            Show SQL in daemon logs
+            Store connection strings in the local secret vault (not in workspace files)
           </label>
+        </section>
+
+        <section>
+          <h3>Keybindings</h3>
+          <label>
+            Run query
+            <input
+              value={keybindings.runQuery}
+              onChange={(event) =>
+                onSettingsChange({
+                  ...settings,
+                  keybindings: { ...settings.keybindings, runQuery: event.target.value },
+                })
+              }
+              placeholder={DEFAULT_KEYBINDINGS.runQuery}
+            />
+          </label>
+          <label>
+            Run plan
+            <input
+              value={keybindings.runPlan}
+              onChange={(event) =>
+                onSettingsChange({
+                  ...settings,
+                  keybindings: { ...settings.keybindings, runPlan: event.target.value },
+                })
+              }
+              placeholder={DEFAULT_KEYBINDINGS.runPlan}
+            />
+          </label>
+          <label>
+            Toggle explorer
+            <input
+              value={keybindings.toggleExplorer}
+              onChange={(event) =>
+                onSettingsChange({
+                  ...settings,
+                  keybindings: { ...settings.keybindings, toggleExplorer: event.target.value },
+                })
+              }
+              placeholder={DEFAULT_KEYBINDINGS.toggleExplorer}
+            />
+          </label>
+          <label>
+            Save query
+            <input
+              value={keybindings.saveQuery}
+              onChange={(event) =>
+                onSettingsChange({
+                  ...settings,
+                  keybindings: { ...settings.keybindings, saveQuery: event.target.value },
+                })
+              }
+              placeholder={DEFAULT_KEYBINDINGS.saveQuery}
+            />
+          </label>
+          <p className="settings-hint">
+            Use <code>Ctrl</code> or <code>Cmd</code> with <code>+</code> (for example{" "}
+            {keybindingLabel(DEFAULT_KEYBINDINGS.runQuery)}).
+          </p>
         </section>
       </div>
     </div>

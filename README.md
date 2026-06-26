@@ -4,7 +4,21 @@ Standalone desktop app for EF Core LINQ exploration — a LINQPad-style scratchp
 
 Built with **Tauri 2** + **React** + **Monaco**. The [efvibe](https://github.com/yeahbah/my-ef-vibe) CLI remains the evaluation engine; Studio is orchestration and UX.
 
-## Phase 3 (current)
+## Phase 5 (current)
+
+- **Cloud sync** — push/pull favorite queries to a cloud-backed folder (Dropbox, iCloud, OneDrive); no credentials synced
+- **Pack marketplace** — install snippet packs from a registry URL or any direct `.efvibe-pack` link
+- **Session charts** — timing breakdown, compare baseline, and benchmark bars in the Charts tool panel
+- **Connection form** — dedicated connection editor (separate from global Settings)
+- **Path pickers** — browse for folders and `.csproj` files in connection and settings forms
+
+## Phase 4
+
+- **Connection secret vault** — optional local vault for connection strings (kept out of `.efvibe-workspace` files)
+- **Keybinding profiles** — customize Run, Run Plan, explorer toggle, and save-query shortcuts in Settings
+- **Windows code signing** — release workflow signs MSI/NSIS when `WINDOWS_CERTIFICATE` secrets are configured
+
+## Phase 3
 
 - **Team panel** — git status and commit for `.efvibe-workspace` / `.efvibe-query` / `.efvibe-notebook` files
 - **Team packs** — export/import `.efvibe-pack` (queries, snippets, folders)
@@ -48,6 +62,16 @@ See [INSTALL.md](INSTALL.md) for release build instructions.
 - Resizable results dock
 
 See the full product plan in [my-ef-vibe/docs/efvibe-studio-plan.md](https://github.com/yeahbah/my-ef-vibe/blob/main/docs/efvibe-studio-plan.md).
+
+## Supported platforms
+
+| Platform | Support |
+|----------|---------|
+| Linux | x86_64 (`.deb`, `.rpm`, `.AppImage`) |
+| Windows | x86_64 (`.msi`, `.exe`) |
+| macOS | **Apple Silicon only** (`arm64`) — Intel Mac not supported |
+
+See [INSTALL.md](INSTALL.md) for release downloads and macOS Gatekeeper notes.
 
 ## Prerequisites
 

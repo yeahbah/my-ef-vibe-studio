@@ -1,3 +1,4 @@
+import type { KeybindingSettings } from "./keybindings";
 import type { AppTheme } from "./theme";
 
 export interface ConnectionSettings {
@@ -19,7 +20,12 @@ export interface AppSettings {
   preferredEditor: PreferredEditor;
   customEditorCommand: string;
   teamSyncDirectory: string;
+  /** Optional folder for cloud-backed query sync (Dropbox, iCloud Drive, etc.). */
+  cloudSyncDirectory?: string;
   theme?: AppTheme;
+  /** When true, connection strings are stored in the OS-backed vault instead of workspace files. */
+  vaultConnectionSecrets?: boolean;
+  keybindings?: Partial<KeybindingSettings>;
 }
 
 export const DEFAULT_APP_SETTINGS: AppSettings = {
@@ -28,6 +34,8 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   preferredEditor: "code",
   customEditorCommand: "",
   teamSyncDirectory: "",
+  cloudSyncDirectory: "",
+  vaultConnectionSecrets: true,
 };
 
 export interface ToolInvocation {
