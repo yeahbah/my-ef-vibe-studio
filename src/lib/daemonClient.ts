@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import type { ConnectionSettings, PrerequisiteCheckResult } from "../types/connection";
+import type { AboutJsonPayload } from "../types/about";
 import type { EvaluationJsonPayload } from "../types/evaluation";
 import { parseEvaluationJson } from "../types/evaluation";
 
@@ -61,6 +62,18 @@ export async function checkPrerequisites(
   dotnetFramework: string,
 ): Promise<PrerequisiteCheckResult> {
   return invoke<PrerequisiteCheckResult>("check_prerequisites", {
+    searchDirectory,
+    toolPath,
+    dotnetFramework,
+  });
+}
+
+export async function fetchAboutJson(
+  searchDirectory: string,
+  toolPath: string,
+  dotnetFramework: string,
+): Promise<AboutJsonPayload> {
+  return invoke<AboutJsonPayload>("about_json", {
     searchDirectory,
     toolPath,
     dotnetFramework,

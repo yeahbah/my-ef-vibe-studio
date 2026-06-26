@@ -1,7 +1,8 @@
-export type AppMainView = "query" | "notebook" | "repl";
+export type AppMainView = "query" | "diagram" | "notebook" | "repl";
 
 export const MAIN_VIEW_LABELS: Record<AppMainView, string> = {
   query: "Query",
+  diagram: "ER Diagram",
   notebook: "Notebook",
   repl: "REPL",
 };

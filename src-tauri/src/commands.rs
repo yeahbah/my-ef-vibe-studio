@@ -111,6 +111,72 @@ fn check_prerequisites_sync(
     result
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AboutJsonPayload {
+    pub tool_version: String,
+    pub command: String,
+    pub product_name: String,
+    pub description: String,
+    pub author: String,
+    pub license: String,
+    pub website: String,
+    pub repository: String,
+    pub nu_get: String,
+    pub runtime: String,
+}
+
+#[tauri::command]
+pub async fn about_json(
+    search_directory: String,
+    tool_path: String,
+    dotnet_framework: String,
+) -> Result<AboutJsonPayload, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        about_json_sync(search_directory, tool_path, dotnet_framework)
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}
+
+fn about_json_sync(
+    search_directory: String,
+    tool_path: String,
+    dotnet_framework: String,
+) -> Result<AboutJsonPayload, String> {
+    let invocation = resolve_tool_invocation(
+        Path::new(&search_directory),
+        &tool_path,
+        &dotnet_framework,
+    );
+
+    let mut args = invocation.prefix_args().to_vec();
+    args.push("--about-json".to_string());
+    args.push("--no-banner".to_string());
+
+    let output = Command::new(invocation.command())
+        .args(&args)
+        .output()
+        .map_err(|error| error.to_string())?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+        return Err(if stderr.is_empty() {
+            "efvibe --about-json failed.".to_string()
+        } else {
+            stderr
+        });
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let line = stdout
+        .lines()
+        .find(|line| !line.trim().is_empty())
+        .ok_or_else(|| "efvibe --about-json returned no output.".to_string())?;
+
+    serde_json::from_str(line.trim()).map_err(|error| error.to_string())
+}
+
 #[tauri::command]
 pub fn invalidate_efvibe_daemon() {
     invalidate_daemon();

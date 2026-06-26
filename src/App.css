@@ -184,16 +184,24 @@ textarea {
   min-height: 0;
   overflow: hidden;
   background: var(--bg-app);
-}
-
-.embedded-terminal-host {
-  flex: 1 1 auto;
-  min-height: 0;
   padding: 8px;
 }
 
+.embedded-terminal-host {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
 .embedded-terminal-host .xterm {
-  height: 100%;
+  position: absolute;
+  inset: 0;
+  height: auto !important;
+}
+
+.embedded-terminal-host .xterm-viewport {
+  overflow-y: auto;
 }
 
 .embedded-terminal-empty {
@@ -286,6 +294,12 @@ button:disabled {
   min-height: 0;
   min-width: 0;
   overflow: hidden;
+}
+
+.main-view-slot > .main-view {
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
 }
 
 .main-view-slot.main-view-hidden {
@@ -1493,9 +1507,139 @@ pre,
 }
 
 .settings-hint {
-  margin: 0.25rem 0 0;
-  font-size: 0.8rem;
-  color: var(--text-muted, #8b949e);
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.45;
+}
+
+.about-product-name {
+  margin: 0 0 4px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.about-studio-hero {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.about-logo {
+  flex-shrink: 0;
+  width: 72px;
+  height: 72px;
+  border-radius: 16px;
+  object-fit: cover;
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--border));
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--accent) 18%, transparent);
+}
+
+.about-studio-copy {
+  min-width: 0;
+}
+
+.about-studio-description {
+  margin: 0 0 8px;
+  line-height: 1.45;
+}
+
+.about-link-inline {
+  text-align: left;
+}
+
+.about-details,
+.help-shortcuts {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+}
+
+.about-details > div {
+  display: grid;
+  grid-template-columns: 7.5rem minmax(0, 1fr);
+  gap: 4px 16px;
+  align-items: start;
+}
+
+.help-shortcuts > div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: baseline;
+}
+
+.about-details dt,
+.help-shortcuts dt {
+  margin: 0;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.about-details dd {
+  margin: 0;
+  text-align: left;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.help-shortcuts dd {
+  margin: 0;
+  text-align: right;
+}
+
+.about-wrap-value {
+  text-align: left;
+  white-space: normal;
+  word-break: break-word;
+}
+
+.about-link-value {
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--accent);
+  font: inherit;
+  text-align: left;
+  text-decoration: underline;
+  cursor: pointer;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.about-link-value:hover {
+  color: var(--text);
+}
+
+.about-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.about-links button {
+  padding: 6px 10px;
+  font-size: 12px;
+}
+
+.help-list {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 8px;
+  line-height: 1.45;
+}
+
+.help-shortcuts kbd {
+  display: inline-block;
+  min-width: 5.5rem;
+  padding: 2px 8px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg-elevated);
+  font-family: inherit;
+  font-size: 12px;
+  text-align: center;
 }
 
 .path-input-row {
@@ -1889,7 +2033,8 @@ pre,
 .sql-to-linq-dialog,
 .db-info-dialog,
 .db-set-properties-dialog,
-.workspace-properties-dialog {
+.workspace-properties-dialog,
+.er-diagram-dialog {
   width: min(760px, 100%);
   max-height: calc(100vh - 48px);
   overflow: auto;
@@ -1897,6 +2042,202 @@ pre,
   border: 1px solid var(--border);
   border-radius: 10px;
   padding: 16px;
+}
+
+.er-diagram-dialog {
+  width: min(1120px, 100%);
+}
+
+.er-diagram-view-page {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+  padding: 12px 16px;
+  gap: 8px;
+}
+
+.er-diagram-view-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.er-diagram-view-title h2 {
+  margin: 0 0 4px;
+}
+
+.er-diagram-view-title p {
+  margin: 0;
+  font-size: 12px;
+}
+
+.er-diagram-view-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.er-diagram-table-filter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.er-diagram-table-filter select {
+  min-width: 220px;
+  max-width: 320px;
+}
+
+.er-diagram-status,
+.er-diagram-context {
+  margin: 0;
+}
+
+.er-diagram-viewport {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+
+.er-diagram-viewport-float-stack {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: stretch;
+  max-width: min(300px, calc(100% - 20px));
+}
+
+.er-diagram-viewport-toolbar,
+.er-diagram-viewport-info {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+}
+
+.er-diagram-viewport-toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+}
+
+.er-diagram-viewport-info {
+  padding: 8px 10px;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.er-diagram-viewport-info p {
+  margin: 0;
+}
+
+.er-diagram-viewport-info p + p {
+  margin-top: 4px;
+}
+
+.er-diagram-viewport-toolbar button {
+  min-width: 26px;
+  padding: 2px 6px;
+  font-size: 12px;
+  line-height: 1.2;
+}
+
+.er-diagram-zoom-controls,
+.er-diagram-pan-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+.er-diagram-control-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.er-diagram-zoom-value {
+  min-width: 42px;
+  text-align: center;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.er-diagram-pan-pad {
+  display: grid;
+  grid-template-columns: repeat(3, 26px);
+  grid-template-rows: repeat(3, 24px);
+  gap: 2px;
+}
+
+.er-diagram-pan-pad .pan-up {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+.er-diagram-pan-pad .pan-left {
+  grid-column: 1;
+  grid-row: 2;
+}
+
+.er-diagram-pan-pad .pan-center {
+  grid-column: 2;
+  grid-row: 2;
+}
+
+.er-diagram-pan-pad .pan-right {
+  grid-column: 3;
+  grid-row: 2;
+}
+
+.er-diagram-pan-pad .pan-down {
+  grid-column: 2;
+  grid-row: 3;
+}
+
+.er-diagram-canvas {
+  flex: 1;
+  width: 100%;
+  min-height: 320px;
+  overflow: hidden;
+  position: relative;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  cursor: grab;
+  touch-action: none;
+}
+
+.er-diagram-canvas.dragging {
+  cursor: grabbing;
+}
+
+.er-diagram-transform-layer {
+  transform-origin: 0 0;
+  display: inline-block;
+  padding: 24px;
+}
+
+.mermaid-status {
+  margin: 0 0 8px;
+  font-size: 12px;
+}
+
+.mermaid-canvas svg {
+  display: block;
+  max-width: none;
+  height: auto;
 }
 
 .charts-header {

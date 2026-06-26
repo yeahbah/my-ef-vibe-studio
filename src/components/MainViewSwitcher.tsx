@@ -5,7 +5,7 @@ interface MainViewSwitcherProps {
   onChange: (view: AppMainView) => void;
 }
 
-const VIEWS: AppMainView[] = ["query", "notebook", "repl"];
+const VIEWS: AppMainView[] = ["query", "diagram", "notebook", "repl"];
 
 export function MainViewSwitcher({ value, onChange }: MainViewSwitcherProps) {
   return (

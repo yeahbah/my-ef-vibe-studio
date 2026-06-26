@@ -27,7 +27,7 @@ import { REMOTE_SNIPPET_PACK_REGISTRY } from "../../lib/packRegistry";
 import { pushCloudSync, pullCloudSync } from "../../lib/cloudSync";
 import { InstallPackUrlDialog } from "../InstallPackUrlDialog";
 import type { EvaluationHistoryEntry } from "../../lib/history";
-import type { AppSettings, ConnectionSettings } from "../../types/connection";
+import type { AppSettings, ConnectionSettings, PrerequisiteCheckResult } from "../../types/connection";
 import type { QueryLibraryState } from "../../types/queryLibrary";
 import type { QueryTab } from "../../types/query";
 import type { SnippetDefinition } from "../../types/snippets";
@@ -38,7 +38,9 @@ import { ContextMenu } from "./ContextMenu";
 import { DbInfoDialog } from "../DbInfoDialog";
 import { DbSetPropertiesDialog } from "../DbSetPropertiesDialog";
 import { WorkspacePropertiesDialog } from "../WorkspacePropertiesDialog";
-import { IconMoon, IconNew, IconOpen, IconSave, IconSettings, IconSun } from "../icons";
+import { IconMoon, IconNew, IconOpen, IconSave, IconSettings, IconSun, IconAbout, IconHelp } from "../icons";
+import { AboutDialog } from "../AboutDialog";
+import { HelpDialog } from "../HelpDialog";
 import { TreeView } from "./TreeView";
 import type { AppTheme } from "../../types/theme";
 import type { ContextMenuItem, ExplorerNode } from "./types";
@@ -88,8 +90,14 @@ interface ExplorerSidebarProps {
   onRenameWorkspace: (name: string) => void;
   onUpdateWorkspace: (workspace: EfvibeWorkspace) => void;
   onOpenSettings: () => void;
+  prerequisites?: PrerequisiteCheckResult;
+  prerequisitesLoading?: boolean;
+  aboutSearchDirectory: string;
+  aboutToolPath: string;
+  aboutDotnetFramework: string;
   onRequestEngine?: () => void;
   onEngineBusyChange?: (delta: number) => void;
+  onOpenErDiagram?: (dbSet?: string) => void;
   theme: AppTheme;
   onToggleTheme: () => void;
 }
@@ -142,8 +150,14 @@ export function ExplorerSidebar(props: ExplorerSidebarProps) {
     onRenameWorkspace,
     onUpdateWorkspace,
     onOpenSettings,
+    prerequisites,
+    prerequisitesLoading,
+    aboutSearchDirectory,
+    aboutToolPath,
+    aboutDotnetFramework,
     onRequestEngine,
     onEngineBusyChange,
+    onOpenErDiagram,
     theme,
     onToggleTheme,
   } = props;
@@ -158,6 +172,8 @@ export function ExplorerSidebar(props: ExplorerSidebarProps) {
   const [menu, setMenu] = useState<{ x: number; y: number; items: ContextMenuItem[] } | undefined>();
   const [packUrlDialogOpen, setPackUrlDialogOpen] = useState(false);
   const [workspacePropertiesOpen, setWorkspacePropertiesOpen] = useState(false);
+  const [aboutOpen, setAboutOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
   const [fileManagerLabel, setFileManagerLabel] = useState("file manager");
   const [dbInfoDialog, setDbInfoDialog] = useState<
     | {
@@ -575,6 +591,7 @@ export function ExplorerSidebar(props: ExplorerSidebarProps) {
         activeConnectionId,
         refreshSchemaForConnection,
         loadDbInfoForConnection,
+        onOpenErDiagram,
         loadDbSetProperties,
         refreshGit,
         gitDirectory,
@@ -741,7 +758,7 @@ export function ExplorerSidebar(props: ExplorerSidebarProps) {
         onContextMenu={openContextMenu}
       />
 
-      <div className="sidebar-footer" role="toolbar" aria-label="Appearance and settings">
+      <div className="sidebar-footer" role="toolbar" aria-label="Appearance, help, and settings">
         <button
           type="button"
           className="sidebar-icon-btn"
@@ -750,6 +767,24 @@ export function ExplorerSidebar(props: ExplorerSidebarProps) {
           aria-label={theme === "dark" ? "Switch to light theme" : "Switch to dark theme"}
         >
           {theme === "dark" ? <IconSun /> : <IconMoon />}
+        </button>
+        <button
+          type="button"
+          className="sidebar-icon-btn"
+          onClick={() => setHelpOpen(true)}
+          title="Help"
+          aria-label="Help"
+        >
+          <IconHelp />
+        </button>
+        <button
+          type="button"
+          className="sidebar-icon-btn"
+          onClick={() => setAboutOpen(true)}
+          title="About"
+          aria-label="About"
+        >
+          <IconAbout />
         </button>
         <button
           type="button"
@@ -798,6 +833,18 @@ export function ExplorerSidebar(props: ExplorerSidebarProps) {
         onClose={() => setPackUrlDialogOpen(false)}
         onInstall={handleInstallPackFromUrl}
       />
+
+      <AboutDialog
+        open={aboutOpen}
+        searchDirectory={aboutSearchDirectory}
+        toolPath={aboutToolPath}
+        dotnetFramework={aboutDotnetFramework}
+        prerequisites={prerequisites}
+        prerequisitesLoading={prerequisitesLoading ?? false}
+        onClose={() => setAboutOpen(false)}
+      />
+
+      <HelpDialog open={helpOpen} settings={appSettings} onClose={() => setHelpOpen(false)} />
     </aside>
   );
 }
@@ -979,6 +1026,7 @@ function buildContextMenuItems(
     force?: boolean,
   ) => Promise<void>;
   const loadDbInfoForConnection = ctx.loadDbInfoForConnection as (connectionId: string) => Promise<void>;
+  const onOpenErDiagram = ctx.onOpenErDiagram as ((dbSet?: string) => void) | undefined;
   const loadDbSetProperties = ctx.loadDbSetProperties as (connectionId: string, dbSet: string) => Promise<void>;
   const refreshGit = ctx.refreshGit as () => Promise<void>;
   const gitDirectory = ctx.gitDirectory as string;
@@ -1045,6 +1093,16 @@ function buildContextMenuItems(
       { id: "select", label: "Activate", onClick: () => onSelectConnection(connectionId) },
       { id: "refresh", label: "Refresh", onClick: () => onRefreshConnection(connectionId) },
       { id: "db-info", label: "DB Info", onClick: () => void loadDbInfoForConnection(connectionId) },
+      {
+        id: "view-diagram",
+        label: "ER Diagram",
+        onClick: () => {
+          if (connectionId !== activeConnectionId) {
+            onSelectConnection(connectionId);
+          }
+          onOpenErDiagram?.();
+        },
+      },
       { id: "edit", label: "Edit…", onClick: () => onEditConnection(connectionId) },
       { id: "dup", label: "Duplicate", onClick: () => onDuplicateConnection(connectionId) },
       {
@@ -1063,6 +1121,16 @@ function buildContextMenuItems(
         id: "refresh-model",
         label: "Refresh model",
         onClick: () => void refreshSchemaForConnection(connectionId, true),
+      },
+      {
+        id: "view-diagram",
+        label: "ER Diagram",
+        onClick: () => {
+          if (connectionId !== activeConnectionId) {
+            onSelectConnection(connectionId);
+          }
+          onOpenErDiagram?.();
+        },
       },
     ];
   }
@@ -1083,6 +1151,16 @@ function buildContextMenuItems(
             onSelectConnection(connectionId);
           }
           onRunExpression(buildDbSetSampleExpression(dbSet));
+        },
+      },
+      {
+        id: "er-diagram",
+        label: "ER Diagram",
+        onClick: () => {
+          if (connectionId !== activeConnectionId) {
+            onSelectConnection(connectionId);
+          }
+          onOpenErDiagram?.(dbSet);
         },
       },
       {

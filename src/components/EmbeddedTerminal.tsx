@@ -11,16 +11,46 @@ interface EmbeddedTerminalProps {
   spawnSpec: ReplSpawnSpec | null;
   theme: AppTheme;
   className?: string;
+  active?: boolean;
   onExit?: (exitCode: number) => void;
 }
 
-export function EmbeddedTerminal({ spawnSpec, theme, className, onExit }: EmbeddedTerminalProps) {
+export function EmbeddedTerminal({
+  spawnSpec,
+  theme,
+  className,
+  active = true,
+  onExit,
+}: EmbeddedTerminalProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const onExitRef = useRef(onExit);
+  const fitRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     onExitRef.current = onExit;
   }, [onExit]);
+
+  useEffect(() => {
+    if (!active) {
+      return;
+    }
+
+    const scheduleFit = () => {
+      window.requestAnimationFrame(() => {
+        fitRef.current?.();
+        window.requestAnimationFrame(() => {
+          fitRef.current?.();
+        });
+      });
+    };
+
+    scheduleFit();
+    const timeoutId = window.setTimeout(scheduleFit, 120);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [active, spawnSpec ? replSpawnKey(spawnSpec) : ""]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -49,6 +79,8 @@ export function EmbeddedTerminal({ spawnSpec, theme, className, onExit }: Embedd
       pty?.resize(term.cols, term.rows);
     };
 
+    fitRef.current = fit;
+
     let pty: ReturnType<typeof spawn> | undefined;
     const resizeObserver = new ResizeObserver(() => {
       window.requestAnimationFrame(fit);
@@ -73,6 +105,7 @@ export function EmbeddedTerminal({ spawnSpec, theme, className, onExit }: Embedd
       fitAddon.fit();
       return () => {
         disposed = true;
+        fitRef.current = null;
         resizeObserver.disconnect();
         window.removeEventListener("resize", fit);
         term.dispose();
@@ -96,6 +129,7 @@ export function EmbeddedTerminal({ spawnSpec, theme, className, onExit }: Embedd
 
     return () => {
       disposed = true;
+      fitRef.current = null;
       dataDisposable.dispose();
       inputDisposable.dispose();
       exitDisposable.dispose();

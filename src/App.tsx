@@ -5,6 +5,7 @@ import { writeTextFile } from "@tauri-apps/plugin-fs";
 import { ConnectionPicker } from "./components/ConnectionPicker";
 import { SplashScreen } from "./components/SplashScreen";
 import { StatusBarBusy } from "./components/StatusBarBusy";
+import { ErDiagramView } from "./components/ErDiagramView";
 import { EditorToolPanel } from "./components/EditorToolPanel";
 import { EditorToolRail, type EditorToolId } from "./components/EditorToolRail";
 import { MainViewSwitcher } from "./components/MainViewSwitcher";
@@ -154,6 +155,10 @@ function App() {
   const [history, setHistory] = useState<EvaluationHistoryEntry[]>([]);
   const [mainView, setMainView] = useState<AppMainView>("query");
   const [replViewMounted, setReplViewMounted] = useState(false);
+  const [diagramViewMounted, setDiagramViewMounted] = useState(false);
+  const [diagramFocusRequest, setDiagramFocusRequest] = useState<{ dbSet?: string; nonce: number }>({
+    nonce: 0,
+  });
   const [notebookName, setNotebookName] = useState("Notebook");
   const [notebookPath, setNotebookPath] = useState("");
   const [notebookConnectionId, setNotebookConnectionId] = useState("");
@@ -475,6 +480,9 @@ function App() {
         setMainView(restoredMainView);
         if (restoredMainView === "repl") {
           setReplViewMounted(true);
+        }
+        if (restoredMainView === "diagram") {
+          setDiagramViewMounted(true);
         }
         if (restoredMainView === "notebook" || savedSession.notebookCells?.length) {
           setNotebookName(savedSession.notebookName ?? "Notebook");
@@ -1159,11 +1167,20 @@ function App() {
     if (view === "repl") {
       setReplViewMounted(true);
     }
+    if (view === "diagram") {
+      setDiagramViewMounted(true);
+    }
     if (view === "notebook" && notebookCells.length === 0) {
       setNotebookCells(createDefaultNotebook(activeConnectionId));
       setNotebookConnectionId(activeConnectionId);
     }
   }
+
+  const handleOpenErDiagram = useCallback((dbSet?: string) => {
+    setDiagramViewMounted(true);
+    setMainView("diagram");
+    setDiagramFocusRequest((previous) => ({ dbSet, nonce: previous.nonce + 1 }));
+  }, []);
 
   async function handleStartRepl() {
     if (!connectionSettings || !searchDirectory) {
@@ -1576,8 +1593,14 @@ function App() {
           }}
           onUpdateWorkspace={applyWorkspaceUpdate}
           onOpenSettings={() => setSettingsOpen(true)}
+          prerequisites={prerequisites}
+          prerequisitesLoading={prerequisitesLoading}
+          aboutSearchDirectory={searchDirectory || workspaceDirectory}
+          aboutToolPath={settings.toolPath}
+          aboutDotnetFramework={activeConnection?.dotnetFramework ?? ""}
           onRequestEngine={allowEngine}
           onEngineBusyChange={adjustEngineBusy}
+          onOpenErDiagram={handleOpenErDiagram}
           theme={settings.theme ?? "dark"}
           onToggleTheme={handleToggleTheme}
         />
@@ -1732,6 +1755,25 @@ function App() {
             </>
           ) : null}
 
+          {diagramViewMounted && connectionSettings ? (
+            <div
+              className={
+                mainView === "diagram" ? "main-view-slot" : "main-view-slot main-view-hidden"
+              }
+            >
+              <ErDiagramView
+                connectionName={connectionDisplayName(activeConnection)}
+                connectionSettings={connectionSettings}
+                searchDirectory={searchDirectory}
+                theme={settings.theme ?? "dark"}
+                focusRequest={diagramFocusRequest}
+                onStatus={setStatus}
+                onRequestEngine={allowEngine}
+                onEngineBusyChange={adjustEngineBusy}
+              />
+            </div>
+          ) : null}
+
           {mainView === "notebook" ? (
             <NotebookView
               name={notebookName}
@@ -1768,6 +1810,7 @@ function App() {
                 connectionSettings={connectionSettings}
                 searchDirectory={searchDirectory}
                 theme={settings.theme ?? "dark"}
+                active={mainView === "repl"}
                 onStatus={setStatus}
                 onOpenExternalTerminal={() => void handleStartRepl()}
                 onSessionExit={handleReplSessionExit}

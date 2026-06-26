@@ -35,3 +35,14 @@ export interface DbInfoJsonPayload {
   dbContext: string;
   entries: DbInfoJsonEntry[];
 }
+
+export interface DiagramJsonPayload {
+  success: boolean;
+  dbContext: string;
+  format: "mermaid";
+  dbSet?: string;
+  entityType?: string;
+  content?: string;
+  error?: string;
+  knownEntities?: string[];
+}

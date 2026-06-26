@@ -8,6 +8,7 @@ interface ReplViewProps {
   connectionSettings: ConnectionSettings | undefined;
   searchDirectory: string;
   theme: AppTheme;
+  active?: boolean;
   onStatus: (message: string) => void;
   onOpenExternalTerminal: () => void;
   onSessionExit?: (exitCode: number) => void;
@@ -17,6 +18,7 @@ export function ReplView({
   connectionSettings,
   searchDirectory,
   theme,
+  active = true,
   onStatus,
   onOpenExternalTerminal,
   onSessionExit,
@@ -72,6 +74,7 @@ export function ReplView({
       <EmbeddedTerminal
         spawnSpec={spawnSpec}
         theme={theme}
+        active={active}
         className="repl-view-terminal"
         onExit={onSessionExit}
       />

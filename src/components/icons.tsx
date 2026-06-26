@@ -51,6 +51,36 @@ export function IconSettings(props: IconProps) {
   );
 }
 
+export function IconAbout(props: IconProps) {
+  return (
+    <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" {...props}>
+      <circle cx="8" cy="8" r="5.75" fill="none" stroke="currentColor" strokeWidth="1.25" />
+      <path
+        d="M8 7.1V11M8 5.1h.01"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.35"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+export function IconHelp(props: IconProps) {
+  return (
+    <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" {...props}>
+      <path
+        d="M6.1 6.25A1.9 1.9 0 0 1 8 4.75c1.05 0 1.9.75 1.9 1.7 0 1.45-1.9 1.55-1.9 3.05M8 11.75h.01"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.25"
+        strokeLinecap="round"
+      />
+      <circle cx="8" cy="8" r="5.75" fill="none" stroke="currentColor" strokeWidth="1.25" />
+    </svg>
+  );
+}
+
 export function IconCharts(props: IconProps) {
   return (
     <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" {...props}>

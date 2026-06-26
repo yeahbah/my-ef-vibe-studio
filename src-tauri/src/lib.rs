@@ -38,6 +38,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             commands::check_prerequisites,
+            commands::about_json,
             commands::invalidate_efvibe_daemon,
             commands::daemon_eval,
             commands::daemon_request,
