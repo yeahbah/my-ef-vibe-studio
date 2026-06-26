@@ -1,6 +1,18 @@
 import { runExpressionViaDaemon } from "./daemonClient";
 import type { ConnectionSettings } from "../types/connection";
+import { fetchSqlToLinq } from "./sqlToLinq";
 import { looksLikeRawSql } from "./sqlDetect";
+import type { SqlToLinqResult } from "../types/sqlToLinq";
+
+export type EditorPreviewMode = "sql" | "linq";
+
+export interface LiveEditorPreview {
+  mode: EditorPreviewMode;
+  content?: string;
+  error?: string;
+  confidence?: SqlToLinqResult["confidence"];
+  unsupported?: string[];
+}
 
 const TERMINAL_SUFFIXES = [
   ".ToListAsync()",
@@ -407,6 +419,52 @@ function splitTopLevelCommaSeparated(argumentsText: string): string[] {
   }
 
   return parts;
+}
+
+export async function fetchLiveEditorPreview(
+  settings: ConnectionSettings,
+  searchDirectory: string,
+  expression: string,
+): Promise<LiveEditorPreview> {
+  const trimmed = expression.trim();
+  if (!trimmed) {
+    return { mode: "sql" };
+  }
+
+  if (looksLikeRawSql(trimmed)) {
+    const converted = await fetchSqlToLinq(settings, searchDirectory, searchDirectory, trimmed);
+
+    if (!converted) {
+      return { mode: "linq", error: "No SQL → LINQ payload returned from efvibe." };
+    }
+
+    if (!converted.linq.trim()) {
+      return {
+        mode: "linq",
+        confidence: converted.confidence,
+        unsupported: converted.unsupported,
+        error:
+          converted.unsupported.length > 0
+            ? `Could not draft LINQ: ${converted.unsupported.join("; ")}`
+            : "Could not draft LINQ from this SQL.",
+      };
+    }
+
+    return {
+      mode: "linq",
+      content: converted.linq,
+      confidence: converted.confidence,
+      unsupported: converted.unsupported,
+    };
+  }
+
+  const sqlPreview = await fetchLiveSqlPreview(settings, searchDirectory, expression);
+
+  return {
+    mode: "sql",
+    content: sqlPreview.sql,
+    error: sqlPreview.error,
+  };
 }
 
 export async function fetchLiveSqlPreview(

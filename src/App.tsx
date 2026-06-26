@@ -882,6 +882,8 @@ function App() {
         return;
       }
 
+      const updateExpression = expressionOverride === undefined;
+
       if (looksLikeRawSql(rawInput)) {
         await handleRunSql(rawInput, withPlan);
         return;
@@ -924,7 +926,7 @@ function App() {
           const nextTab: ResultsTab = withPlan ? "plan" : "result";
 
           updateQueryTab(activeQueryTab.id, {
-            expression: runExpression,
+            ...(updateExpression ? { expression: runExpression } : {}),
             lastPayload: result.payload,
             activeResultsTab: nextTab,
             resultRowsBaseline: result.payload.rows
@@ -954,7 +956,7 @@ function App() {
           );
         } else {
           updateQueryTab(activeQueryTab.id, {
-            expression: runExpression,
+            ...(updateExpression ? { expression: runExpression } : {}),
             lastPayload: {
               success: false,
               sql: [],
@@ -969,7 +971,7 @@ function App() {
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         updateQueryTab(activeQueryTab.id, {
-          expression: runExpression,
+          ...(updateExpression ? { expression: runExpression } : {}),
           lastPayload: {
             success: false,
             sql: [],
@@ -1547,6 +1549,24 @@ function App() {
               setStatus(`Refreshed ${connectionDisplayName(connection)}`);
             })();
           }}
+          onDisconnectConnection={(connectionId) => {
+            if (connectionId !== activeConnectionId) {
+              return;
+            }
+
+            const connection = document.workspace.connections.find(
+              (entry) => entry.id === connectionId,
+            );
+            if (!connection) {
+              return;
+            }
+
+            void (async () => {
+              await invalidateEfvibeDaemon();
+              setEngineAllowed(false);
+              setStatus(`Disconnected from ${connectionDisplayName(connection)}.`);
+            })();
+          }}
           onDeleteConnection={(connectionId) => {
             const remaining = document.workspace.connections.filter(
               (connection) => connection.id !== connectionId,
@@ -1690,7 +1710,7 @@ function App() {
                         running={running}
                         onEngineBusyChange={adjustEngineBusy}
                         onRequestEngine={allowEngine}
-                        onRunSql={(sql) => void handleRunSql(sql)}
+                        onRun={(text) => void handleRun(false, text)}
                         keybindings={keybindings}
                       />
                     }

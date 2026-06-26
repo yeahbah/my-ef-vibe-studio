@@ -33,7 +33,7 @@ interface QueryWorkspaceProps {
   running: boolean;
   onRequestEngine?: () => void;
   onEngineBusyChange?: (delta: number) => void;
-  onRunSql: (sql: string) => void;
+  onRun: (text: string) => void;
   keybindings?: KeybindingSettings;
 }
 
@@ -56,7 +56,7 @@ export const QueryWorkspace = forwardRef<QueryWorkspaceHandle, QueryWorkspacePro
       running,
       onRequestEngine,
       onEngineBusyChange,
-      onRunSql,
+      onRun,
       keybindings,
     },
     ref,
@@ -137,7 +137,7 @@ export const QueryWorkspace = forwardRef<QueryWorkspaceHandle, QueryWorkspacePro
             running={running}
             onRequestEngine={onRequestEngine}
             onEngineBusyChange={onEngineBusyChange}
-            onRunSql={onRunSql}
+            onRun={onRun}
           />
         }
       />

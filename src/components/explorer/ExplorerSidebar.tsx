@@ -66,6 +66,7 @@ interface ExplorerSidebarProps {
   onAddConnection: () => void;
   onDuplicateConnection: (connectionId: string) => void;
   onRefreshConnection: (connectionId: string) => void;
+  onDisconnectConnection: (connectionId: string) => void;
   onDeleteConnection: (connectionId: string) => void;
   onEditConnection: (connectionId: string) => void;
   onRunExpression: (expression: string) => void;
@@ -130,6 +131,7 @@ export function ExplorerSidebar(props: ExplorerSidebarProps) {
     onAddConnection,
     onDuplicateConnection,
     onRefreshConnection,
+    onDisconnectConnection,
     onDeleteConnection,
     onEditConnection,
     onRunExpression,
@@ -572,6 +574,7 @@ export function ExplorerSidebar(props: ExplorerSidebarProps) {
         onAddConnection,
         onDuplicateConnection,
         onRefreshConnection,
+        onDisconnectConnection,
         onDeleteConnection,
         onEditConnection,
         onRunExpression,
@@ -1002,6 +1005,7 @@ function buildContextMenuItems(
   const onAddConnection = ctx.onAddConnection as () => void;
   const onDuplicateConnection = ctx.onDuplicateConnection as (id: string) => void;
   const onRefreshConnection = ctx.onRefreshConnection as (id: string) => void;
+  const onDisconnectConnection = ctx.onDisconnectConnection as (id: string) => void;
   const onDeleteConnection = ctx.onDeleteConnection as (id: string) => void;
   const onEditConnection = ctx.onEditConnection as (id: string) => void;
   const onRunExpression = ctx.onRunExpression as (expr: string) => void;
@@ -1091,6 +1095,12 @@ function buildContextMenuItems(
     const connectionId = node.id.replace("connection:", "");
     return [
       { id: "select", label: "Activate", onClick: () => onSelectConnection(connectionId) },
+      {
+        id: "disconnect",
+        label: "Disconnect",
+        disabled: connectionId !== activeConnectionId,
+        onClick: () => onDisconnectConnection(connectionId),
+      },
       { id: "refresh", label: "Refresh", onClick: () => onRefreshConnection(connectionId) },
       { id: "db-info", label: "DB Info", onClick: () => void loadDbInfoForConnection(connectionId) },
       {

@@ -23,10 +23,21 @@ export function ResultRowsView({ rows, onSave }: ResultRowsViewProps) {
     setPage(0);
   }, [rowsKey, rows]);
 
-  const columns = useMemo(
-    () => [...new Set(draftRows.flatMap((row) => Object.keys(row)))],
-    [draftRows],
-  );
+  const columns = useMemo(() => {
+    const seen = new Set<string>();
+    const ordered: string[] = [];
+
+    for (const row of draftRows) {
+      for (const key of Object.keys(row)) {
+        if (!seen.has(key)) {
+          seen.add(key);
+          ordered.push(key);
+        }
+      }
+    }
+
+    return ordered;
+  }, [draftRows]);
 
   const pageCount = Math.max(1, Math.ceil(draftRows.length / PAGE_SIZE));
   const currentPage = Math.min(page, pageCount - 1);
