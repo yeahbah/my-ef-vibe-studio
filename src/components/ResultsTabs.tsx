@@ -6,6 +6,7 @@ import { normalizeResultsTab } from "../types/query";
 
 const RESULTS_TABS: Array<{ id: ResultsTab; label: string }> = [
   { id: "result", label: "Result" },
+  { id: "sql", label: "SQL" },
   { id: "plan", label: "Plan" },
   { id: "messages", label: "Messages" },
 ];
@@ -69,6 +70,7 @@ export function ResultsTabs({
         aria-labelledby={`results-tab-${resolvedTab}`}
       >
         {resolvedTab === "result" && <ResultBody payload={payload} onSaveRows={onSaveRows} />}
+        {resolvedTab === "sql" && <SqlBody payload={payload} />}
         {resolvedTab === "plan" && <PlanBody payload={payload} />}
         {resolvedTab === "messages" && <MessagesBody payload={payload} />}
       </div>
@@ -104,6 +106,29 @@ function ResultBody({
   }
 
   return <pre className="value-block">(null)</pre>;
+}
+
+function SqlBody({ payload }: { payload: EvaluationJsonPayload }) {
+  if (payload.sql.length === 0 && !payload.translatedSql) {
+    return <p className="muted">No SQL captured for this run.</p>;
+  }
+
+  return (
+    <div className="stack">
+      {payload.sql.map((sql, index) => (
+        <section key={index}>
+          <h3>{payload.sql.length > 1 ? `SQL ${index + 1}` : "SQL"}</h3>
+          <pre>{sql}</pre>
+        </section>
+      ))}
+      {payload.translatedSql ? (
+        <section>
+          <h3>Translated SQL</h3>
+          <pre>{payload.translatedSql}</pre>
+        </section>
+      ) : null}
+    </div>
+  );
 }
 
 function PlanBody({ payload }: { payload: EvaluationJsonPayload }) {

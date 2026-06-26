@@ -1,8 +1,13 @@
+import { useEffect, useState } from "react";
 import type { EvaluationHistoryEntry } from "../lib/history";
+import { formatFindingSummary, scanCodeToRunnableExpression } from "../lib/scan";
 import { BUILTIN_SNIPPETS } from "../types/snippets";
 import type { QueryTab } from "../types/query";
 import type { SnippetDefinition } from "../types/snippets";
+import type { ScanMode, ScanReviewItem } from "../types/scan";
+import type { AppTheme } from "../types/theme";
 import type { EditorToolId } from "./EditorToolRail";
+import { ReadOnlyCodeView } from "./ReadOnlyCodeView";
 
 interface EditorToolPanelProps {
   tool: EditorToolId;
@@ -11,6 +16,11 @@ interface EditorToolPanelProps {
   benchmark?: import("../lib/benchmark").BenchmarkResult;
   userSnippets: SnippetDefinition[];
   favoriteTabs: QueryTab[];
+  scanItems: ScanReviewItem[];
+  scanIndex: number;
+  scanLoading: boolean;
+  scanError?: string;
+  theme: AppTheme;
   onClose: () => void;
   onHistorySelect: (expression: string) => void;
   onInsertSnippet: (expression: string) => void;
@@ -18,6 +28,13 @@ interface EditorToolPanelProps {
   onRemoveSnippet: (id: string) => void;
   onOpenFavorite: (tab: QueryTab) => void;
   onToggleFavorite: (tabId: string) => void;
+  onRunScan: (mode: ScanMode) => void;
+  onScanIndexChange: (index: number) => void;
+  onGoToSource: (file: string, line: number) => void;
+  onRunQuery: (expression: string) => void;
+  onDismissFinding: (note?: string) => void;
+  onSaveFindingNote: (note: string) => void;
+  running?: boolean;
 }
 
 const TOOL_TITLES: Record<EditorToolId, string> = {
@@ -25,6 +42,7 @@ const TOOL_TITLES: Record<EditorToolId, string> = {
   history: "History",
   snippets: "Snippets",
   favorites: "Favorites",
+  scan: "Scan",
 };
 
 export function EditorToolPanel({
@@ -34,6 +52,11 @@ export function EditorToolPanel({
   benchmark,
   userSnippets,
   favoriteTabs,
+  scanItems,
+  scanIndex,
+  scanLoading,
+  scanError,
+  theme,
   onClose,
   onHistorySelect,
   onInsertSnippet,
@@ -41,6 +64,13 @@ export function EditorToolPanel({
   onRemoveSnippet,
   onOpenFavorite,
   onToggleFavorite,
+  onRunScan,
+  onScanIndexChange,
+  onGoToSource,
+  onRunQuery,
+  onDismissFinding,
+  onSaveFindingNote,
+  running = false,
 }: EditorToolPanelProps) {
   return (
     <aside className="editor-tool-panel" aria-label={TOOL_TITLES[tool]}>
@@ -74,6 +104,23 @@ export function EditorToolPanel({
             tabs={favoriteTabs}
             onOpen={onOpenFavorite}
             onToggleFavorite={onToggleFavorite}
+          />
+        ) : null}
+
+        {tool === "scan" ? (
+          <ScanToolView
+            items={scanItems}
+            index={scanIndex}
+            loading={scanLoading}
+            error={scanError}
+            theme={theme}
+            onRunScan={onRunScan}
+            onIndexChange={onScanIndexChange}
+            onGoToSource={onGoToSource}
+            onRunQuery={onRunQuery}
+            onDismissFinding={onDismissFinding}
+            onSaveFindingNote={onSaveFindingNote}
+            running={running}
           />
         ) : null}
       </div>
@@ -367,6 +414,137 @@ function FavoritesToolView({
         </li>
       ))}
     </ul>
+  );
+}
+
+function ScanToolView({
+  items,
+  index,
+  loading,
+  error,
+  theme,
+  onRunScan,
+  onIndexChange,
+  onGoToSource,
+  onRunQuery,
+  onDismissFinding,
+  onSaveFindingNote,
+  running = false,
+}: {
+  items: ScanReviewItem[];
+  index: number;
+  loading: boolean;
+  error?: string;
+  theme: AppTheme;
+  onRunScan: (mode: ScanMode) => void;
+  onIndexChange: (index: number) => void;
+  onGoToSource: (file: string, line: number) => void;
+  onRunQuery: (expression: string) => void;
+  onDismissFinding: (note?: string) => void;
+  onSaveFindingNote: (note: string) => void;
+  running?: boolean;
+}) {
+  const activeFinding = items[index];
+  const [noteDraft, setNoteDraft] = useState("");
+  const runnableExpression = activeFinding
+    ? scanCodeToRunnableExpression(activeFinding.finding.code)
+    : "";
+
+  useEffect(() => {
+    setNoteDraft(activeFinding?.finding.savedNote ?? "");
+  }, [activeFinding?.key, activeFinding?.finding.savedNote]);
+
+  function handleSaveNote() {
+    if (!noteDraft.trim()) {
+      return;
+    }
+
+    onSaveFindingNote(noteDraft);
+  }
+
+  function handleDismiss() {
+    onDismissFinding(noteDraft.trim() || undefined);
+  }
+
+  return (
+    <>
+      <div className="tool-panel-actions scan-actions">
+        <button type="button" disabled={loading} onClick={() => onRunScan("lite")}>
+          Run lite scan
+        </button>
+        <button type="button" disabled={loading} onClick={() => onRunScan("deep")}>
+          Run deep scan
+        </button>
+      </div>
+
+      {loading ? <p className="muted tool-panel-empty">Scanning…</p> : null}
+      {error ? <p className="error-text tool-panel-empty">{error}</p> : null}
+
+      {!loading && items.length === 0 && !error ? (
+        <p className="muted tool-panel-empty">Run a scan to review findings.</p>
+      ) : null}
+
+      {activeFinding ? (
+        <section className="tool-panel-section scan-review">
+          <div className="scan-queue-toolbar">
+            <button type="button" disabled={index <= 0} onClick={() => onIndexChange(index - 1)}>
+              ← Previous
+            </button>
+            <button
+              type="button"
+              disabled={index >= items.length - 1}
+              onClick={() => onIndexChange(index + 1)}
+            >
+              Next →
+            </button>
+            <span className="scan-queue-counter muted">
+              {index + 1} / {items.length}
+            </span>
+            <button
+              type="button"
+              disabled={running || !runnableExpression}
+              onClick={() => onRunQuery(runnableExpression)}
+            >
+              Run query
+            </button>
+            <button
+              type="button"
+              onClick={() => onGoToSource(activeFinding.finding.filePath, activeFinding.finding.line)}
+            >
+              Go to code
+            </button>
+          </div>
+          <p className="tool-list-item-meta">
+            {activeFinding.finding.filePath}:{activeFinding.finding.line}
+          </p>
+          <p className="tool-list-item-title">{formatFindingSummary(activeFinding.finding)}</p>
+          {activeFinding.finding.recommendation ? (
+            <p className="scan-recommendation muted">{activeFinding.finding.recommendation}</p>
+          ) : null}
+          <ReadOnlyCodeView code={activeFinding.finding.code} theme={theme} />
+          <label className="scan-note-field">
+            <span className="scan-note-label">Note</span>
+            <textarea
+              className="scan-note-input"
+              value={noteDraft}
+              placeholder="Team note for this finding (saved to myefvibe-scan-notes.json)"
+              onChange={(event) => setNoteDraft(event.target.value)}
+            />
+            <div className="scan-note-actions">
+              <button type="button" disabled={!noteDraft.trim()} onClick={handleSaveNote}>
+                Save note
+              </button>
+              <button type="button" className="scan-dismiss-btn" onClick={handleDismiss}>
+                Dismiss
+              </button>
+            </div>
+          </label>
+          <p className="scan-queue-hint muted">
+            Dismiss hides this finding on the next scan when respect dismissals is enabled.
+          </p>
+        </section>
+      ) : null}
+    </>
   );
 }
 

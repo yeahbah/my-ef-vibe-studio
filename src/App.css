@@ -322,15 +322,27 @@ button:disabled {
   align-self: stretch;
 }
 
+.editor-tool-panel-shell {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  min-height: 0;
+  min-width: 0;
+}
+
+.editor-tool-panel-shell.resizing {
+  cursor: col-resize;
+}
+
 .editor-tool-panel {
-  flex: 0 0 min(300px, 34vw);
-  width: min(300px, 34vw);
-  min-width: 240px;
-  max-width: 360px;
+  flex: 1 1 auto;
+  width: auto;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   min-height: 0;
-  border-right: 1px solid var(--border);
+  border-right: none;
   background: var(--bg-elevated);
 }
 
@@ -711,6 +723,76 @@ button:disabled {
   margin-top: 8px;
 }
 
+.scan-queue-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.scan-queue-counter {
+  font-size: 11px;
+  margin-right: 4px;
+}
+
+.scan-dismiss-btn {
+  background: var(--accent);
+  color: var(--bg-app);
+  border-color: var(--accent);
+}
+
+.scan-dismiss-btn:hover {
+  filter: brightness(1.05);
+}
+
+.scan-recommendation {
+  margin: 0 0 8px;
+  font-size: 12px;
+  line-height: 1.4;
+  white-space: pre-wrap;
+}
+
+.scan-note-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.scan-note-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.scan-note-input {
+  width: 100%;
+  min-height: 72px;
+  box-sizing: border-box;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-app);
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  resize: vertical;
+}
+
+.scan-note-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.scan-queue-hint {
+  margin: 8px 0 0;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
 .scan-nav {
   display: flex;
   align-items: center;
@@ -719,9 +801,24 @@ button:disabled {
 }
 
 .scan-code {
+  margin: 0;
   font-size: 11px;
-  max-height: 120px;
-  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.syntax-code-block {
+  margin-top: 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--bg-app);
+}
+
+.syntax-code-block .monaco-editor,
+.syntax-code-block .monaco-editor-background,
+.syntax-code-block .monaco-editor .margin {
+  background: transparent !important;
 }
 
 .error-text {
@@ -1471,6 +1568,11 @@ pre,
 
 .editor-workspace.resizing {
   cursor: col-resize;
+}
+
+.editor-tool-panel-shell.resizing .editor-tool-panel-body,
+.editor-tool-panel-shell.resizing .resize-handle.vertical {
+  pointer-events: none;
 }
 
 .editor-column {

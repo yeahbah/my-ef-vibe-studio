@@ -14,6 +14,10 @@ import { ReplView } from "./components/ReplView";
 import { PrerequisitesBanner } from "./components/PrerequisitesBanner";
 import { QueryTabBar } from "./components/QueryTabBar";
 import { ResizableResultsDock, DEFAULT_RESULTS_DOCK_HEIGHT } from "./components/ResizableResultsDock";
+import {
+  ResizableEditorToolPanel,
+  DEFAULT_EDITOR_TOOL_PANEL_WIDTH,
+} from "./components/ResizableEditorToolPanel";
 import { ResultsTabs } from "./components/ResultsTabs";
 import { ConnectionPanel } from "./components/ConnectionPanel";
 import { ConfirmDialog } from "./components/ConfirmDialog";
@@ -42,6 +46,14 @@ import {
 import { matchesKeybinding, resolveKeybindings } from "./lib/keybindings";
 import { buildExportContent } from "./lib/resultFormat";
 import { inferResultEntity, persistResultChanges } from "./lib/resultPersist";
+import { runScanJson } from "./lib/schema";
+import { findingsToReviewItems } from "./lib/scan";
+import {
+  dismissScanFinding,
+  getScanSessionDirectory,
+  loadSavedNotesMap,
+  saveScanFindingNote,
+} from "./lib/scanSession";
 import {
   getDefaultWorkspaceRoot,
   loadAppSettings,
@@ -66,6 +78,7 @@ import { createDefaultNotebook, type NotebookCell } from "./types/notebook";
 import { resolveSavedMainView, type AppMainView } from "./types/mainView";
 import { createQueryTab, normalizeResultsTab, type LegacyResultsTab, type QueryTab, type ResultsTab } from "./types/query";
 import { createUserSnippet, type SnippetDefinition } from "./types/snippets";
+import type { ScanMode, ScanReviewItem } from "./types/scan";
 import {
   createEmptyQueryLibrary,
   createQueryFolder,
@@ -149,6 +162,7 @@ function App() {
   const [engineAllowed, setEngineAllowed] = useState(false);
   const [sqlPaneOpen, setSqlPaneOpen] = useState(true);
   const [sqlPaneWidth, setSqlPaneWidth] = useState(360);
+  const [editorToolPanelWidth, setEditorToolPanelWidth] = useState(DEFAULT_EDITOR_TOOL_PANEL_WIDTH);
   const [lambdaMode, setLambdaMode] = useState(false);
   const [userSnippets, setUserSnippets] = useState<SnippetDefinition[]>([]);
   const [queryLibrary, setQueryLibrary] = useState<QueryLibraryState>(createEmptyQueryLibrary());
@@ -159,6 +173,10 @@ function App() {
   const [benchmarkConfirmOpen, setBenchmarkConfirmOpen] = useState(false);
   const [benchmarkIterations, setBenchmarkIterations] = useState(5);
   const [installedPackIds, setInstalledPackIds] = useState<string[]>([]);
+  const [scanItems, setScanItems] = useState<ScanReviewItem[]>([]);
+  const [scanIndex, setScanIndex] = useState(0);
+  const [scanLoading, setScanLoading] = useState(false);
+  const [scanError, setScanError] = useState<string | undefined>();
   const [splashExiting, setSplashExiting] = useState(false);
   const [splashDone, setSplashDone] = useState(false);
   const splashMountRef = useRef(Date.now());
@@ -272,6 +290,113 @@ function App() {
     setEngineBusyCount((count) => Math.max(0, count + delta));
   }, []);
 
+  const runScan = useCallback(
+    async (mode: ScanMode) => {
+      if (!connectionSettings || !searchDirectory) {
+        setScanError("Set search directory before scanning.");
+        return;
+      }
+
+      setScanLoading(true);
+      setScanError(undefined);
+      adjustEngineBusy(1);
+      await yieldToUi();
+      try {
+        const document = await runScanJson(connectionSettings, searchDirectory, searchDirectory, mode);
+        if (!document) {
+          setScanItems([]);
+          setScanError("Scan returned no payload.");
+          return;
+        }
+        const items = findingsToReviewItems(document, mode);
+        const sessionDirectory = getScanSessionDirectory(connectionSettings, mode);
+        const savedNotes = await loadSavedNotesMap(sessionDirectory);
+        const itemsWithNotes = items.map((item) => {
+          const savedNote = savedNotes[item.key];
+          if (!savedNote) {
+            return item;
+          }
+
+          return {
+            ...item,
+            finding: { ...item.finding, savedNote },
+          };
+        });
+        setScanItems(itemsWithNotes);
+        setScanIndex(0);
+        if (items.length === 0) {
+          setScanError("No findings reported.");
+        }
+      } catch (error) {
+        setScanError(error instanceof Error ? error.message : String(error));
+      } finally {
+        adjustEngineBusy(-1);
+        setScanLoading(false);
+      }
+    },
+    [adjustEngineBusy, connectionSettings, searchDirectory],
+  );
+
+  const handleDismissScanFinding = useCallback(
+    async (note?: string) => {
+      if (!connectionSettings) {
+        return;
+      }
+
+      const item = scanItems[scanIndex];
+      if (!item) {
+        return;
+      }
+
+      try {
+        const sessionDirectory = getScanSessionDirectory(connectionSettings, item.scanMode);
+        await dismissScanFinding(sessionDirectory, item.finding, note);
+        setScanItems((items) => {
+          const next = items.filter((_, index) => index !== scanIndex);
+          setScanIndex((current) => Math.min(current, Math.max(0, next.length - 1)));
+          return next;
+        });
+        setStatus(
+          note?.trim()
+            ? "Finding dismissed with note — it will be skipped in future scans."
+            : "Finding dismissed — it will be skipped in future scans.",
+        );
+      } catch (error) {
+        setStatus(error instanceof Error ? error.message : String(error));
+      }
+    },
+    [connectionSettings, scanIndex, scanItems],
+  );
+
+  const handleSaveScanFindingNote = useCallback(
+    async (note: string) => {
+      if (!connectionSettings) {
+        return;
+      }
+
+      const item = scanItems[scanIndex];
+      if (!item) {
+        return;
+      }
+
+      try {
+        const sessionDirectory = getScanSessionDirectory(connectionSettings, item.scanMode);
+        await saveScanFindingNote(sessionDirectory, item.finding, note);
+        setScanItems((items) =>
+          items.map((entry, index) =>
+            index === scanIndex
+              ? { ...entry, finding: { ...entry.finding, savedNote: note.trim() } }
+              : entry,
+          ),
+        );
+        setStatus("Scan note saved.");
+      } catch (error) {
+        setStatus(error instanceof Error ? error.message : String(error));
+      }
+    },
+    [connectionSettings, scanIndex, scanItems],
+  );
+
   const handleToggleTheme = useCallback(() => {
     setSettings((current) => {
       if (!current) {
@@ -364,6 +489,9 @@ function App() {
         }
         if (savedSession.sqlPaneWidth) {
           setSqlPaneWidth(savedSession.sqlPaneWidth);
+        }
+        if (savedSession.editorToolPanelWidth) {
+          setEditorToolPanelWidth(savedSession.editorToolPanelWidth);
         }
         if (savedSession.lambdaMode) {
           setLambdaMode(savedSession.lambdaMode);
@@ -476,6 +604,7 @@ function App() {
         liveSqlEnabled: sqlPaneOpen,
         sqlPaneOpen,
         sqlPaneWidth,
+        editorToolPanelWidth,
         lambdaMode,
         userSnippets,
         queryLibrary,
@@ -499,6 +628,7 @@ function App() {
       notebookCells,
       sqlPaneOpen,
       sqlPaneWidth,
+      editorToolPanelWidth,
       lambdaMode,
       userSnippets,
       queryLibrary,
@@ -1344,15 +1474,12 @@ function App() {
           onExpandedNodeIdsChange={setExplorerExpandedNodes}
           connections={document.workspace.connections}
           activeConnectionId={activeConnectionId}
-          connectionSettings={connectionSettings}
-          searchDirectory={searchDirectory}
           history={history}
           queryTabs={queryTabs}
           queryLibrary={queryLibrary}
           userSnippets={userSnippets}
           teamSyncDirectory={settings.teamSyncDirectory}
           cloudSyncDirectory={settings.cloudSyncDirectory ?? ""}
-          preferredEditor={settings.preferredEditor}
           installedPackIds={installedPackIds}
           onSelectConnection={(connectionId) => {
             setActiveConnectionId(connectionId);
@@ -1430,7 +1557,6 @@ function App() {
           onHistorySelect={(nextExpression) => {
             updateQueryTab(activeQueryTab.id, { expression: nextExpression });
           }}
-          onGoToSource={(file, line) => void handleGoToSource(file, line)}
           onOpenLibraryQuery={handleOpenLibraryQuery}
           onToggleFavorite={handleToggleFavorite}
           onAddFolder={handleAddFolder}
@@ -1481,23 +1607,43 @@ function App() {
                 />
 
                 {activeEditorTool ? (
-                  <EditorToolPanel
-                    tool={activeEditorTool}
-                    history={history}
-                    compareBaseline={compareBaseline}
-                    benchmark={benchmarkResult}
-                    userSnippets={userSnippets}
-                    favoriteTabs={favoriteTabs}
-                    onClose={() => setActiveEditorTool(undefined)}
-                    onHistorySelect={(nextExpression) => {
-                      updateQueryTab(activeQueryTab.id, { expression: nextExpression });
+                  <ResizableEditorToolPanel
+                    width={editorToolPanelWidth}
+                    onWidthChange={setEditorToolPanelWidth}
+                  >
+                    <EditorToolPanel
+                      tool={activeEditorTool}
+                      history={history}
+                      compareBaseline={compareBaseline}
+                      benchmark={benchmarkResult}
+                      userSnippets={userSnippets}
+                      favoriteTabs={favoriteTabs}
+                      scanItems={scanItems}
+                      scanIndex={scanIndex}
+                      scanLoading={scanLoading}
+                      scanError={scanError}
+                      theme={settings.theme ?? "dark"}
+                      onClose={() => setActiveEditorTool(undefined)}
+                      onHistorySelect={(nextExpression) => {
+                        updateQueryTab(activeQueryTab.id, { expression: nextExpression });
+                      }}
+                      onInsertSnippet={handleInsertSnippet}
+                      onAddSnippet={handleAddSnippet}
+                      onRemoveSnippet={handleRemoveSnippet}
+                      onOpenFavorite={(tab) => selectQueryTab(tab.id)}
+                      onToggleFavorite={handleToggleFavorite}
+                      onRunScan={(mode) => void runScan(mode)}
+                    onScanIndexChange={setScanIndex}
+                    onGoToSource={(file, line) => void handleGoToSource(file, line)}
+                    onRunQuery={(expression) => {
+                      updateQueryTab(activeQueryTab.id, { expression });
+                      void handleRun(false, expression);
                     }}
-                    onInsertSnippet={handleInsertSnippet}
-                    onAddSnippet={handleAddSnippet}
-                    onRemoveSnippet={handleRemoveSnippet}
-                    onOpenFavorite={(tab) => selectQueryTab(tab.id)}
-                    onToggleFavorite={handleToggleFavorite}
+                    onDismissFinding={(note) => void handleDismissScanFinding(note)}
+                    onSaveFindingNote={(note) => void handleSaveScanFindingNote(note)}
+                    running={running}
                   />
+                  </ResizableEditorToolPanel>
                 ) : null}
 
                 <div className="editor-shell-main">

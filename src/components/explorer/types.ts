@@ -6,7 +6,6 @@ export type ExplorerNodeKind =
   | "query"
   | "snippet"
   | "history"
-  | "scan-finding"
   | "git-file"
   | "pack"
   | "folder"

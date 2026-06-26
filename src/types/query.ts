@@ -1,11 +1,11 @@
 import type { EvaluationJsonPayload } from "./evaluation";
 
-export type ResultsTab = "result" | "plan" | "messages";
+export type ResultsTab = "result" | "sql" | "plan" | "messages";
 
-export type LegacyResultsTab = ResultsTab | "explorer" | "sql";
+export type LegacyResultsTab = ResultsTab | "explorer";
 
 export function normalizeResultsTab(tab: LegacyResultsTab | undefined): ResultsTab {
-  if (!tab || tab === "explorer" || tab === "sql") {
+  if (!tab || tab === "explorer") {
     return "result";
   }
 

@@ -9,13 +9,11 @@ import {
   readPackFromSyncDirectory,
   writePackToSyncDirectory,
 } from "../../lib/pack";
-import { findingsToReviewItems, formatFindingSummary } from "../../lib/scan";
 import {
   buildDbSetSampleExpression,
   fetchDbInfoJson,
   fetchDescribeJson,
   fetchTablesJson,
-  runScanJson,
 } from "../../lib/schema";
 import { yieldToUi } from "../../lib/yieldToUi";
 import {
@@ -29,12 +27,11 @@ import { REMOTE_SNIPPET_PACK_REGISTRY } from "../../lib/packRegistry";
 import { pushCloudSync, pullCloudSync } from "../../lib/cloudSync";
 import { InstallPackUrlDialog } from "../InstallPackUrlDialog";
 import type { EvaluationHistoryEntry } from "../../lib/history";
-import type { AppSettings, ConnectionSettings, PreferredEditor } from "../../types/connection";
+import type { AppSettings, ConnectionSettings } from "../../types/connection";
 import type { QueryLibraryState } from "../../types/queryLibrary";
 import type { QueryTab } from "../../types/query";
 import type { SnippetDefinition } from "../../types/snippets";
 import type { DbInfoJsonPayload, DescribeJsonPayload, TablesJsonPayload } from "../../types/schema";
-import type { ScanMode, ScanReviewItem } from "../../types/scan";
 import type { WorkspaceConnection, EfvibeWorkspace } from "../../types/workspace";
 import { resolveSearchDirectory, workspaceConnectionToSettings } from "../../types/workspace";
 import { ContextMenu } from "./ContextMenu";
@@ -54,15 +51,12 @@ interface ExplorerSidebarProps {
   appSettings: AppSettings;
   connections: WorkspaceConnection[];
   activeConnectionId: string;
-  connectionSettings: ConnectionSettings | undefined;
-  searchDirectory: string;
   history: EvaluationHistoryEntry[];
   queryTabs: QueryTab[];
   queryLibrary: QueryLibraryState;
   userSnippets: SnippetDefinition[];
   teamSyncDirectory: string;
   cloudSyncDirectory: string;
-  preferredEditor: PreferredEditor;
   installedPackIds: string[];
   expandedNodeIds: string[];
   onExpandedNodeIdsChange: (ids: string[]) => void;
@@ -74,7 +68,6 @@ interface ExplorerSidebarProps {
   onEditConnection: (connectionId: string) => void;
   onRunExpression: (expression: string) => void;
   onHistorySelect: (expression: string) => void;
-  onGoToSource: (file: string, line: number) => void;
   onOpenLibraryQuery: (expression: string, connectionId: string, name?: string) => void;
   onToggleFavorite: (tabId: string) => void;
   onAddFolder: (name: string) => void;
@@ -101,13 +94,6 @@ interface ExplorerSidebarProps {
   onToggleTheme: () => void;
 }
 
-const EDITOR_LABELS: Record<PreferredEditor, string> = {
-  code: "VS Code",
-  rider: "Rider",
-  devenv: "Visual Studio",
-  custom: "IDE",
-};
-
 interface ConnectionSchemaState {
   tables?: TablesJsonPayload;
   error?: string;
@@ -123,15 +109,12 @@ export function ExplorerSidebar(props: ExplorerSidebarProps) {
     appSettings,
     connections,
     activeConnectionId,
-    connectionSettings,
-    searchDirectory,
     history,
     queryTabs,
     queryLibrary,
     userSnippets,
     teamSyncDirectory,
     cloudSyncDirectory,
-    preferredEditor,
     installedPackIds,
     expandedNodeIds,
     onExpandedNodeIdsChange,
@@ -143,7 +126,6 @@ export function ExplorerSidebar(props: ExplorerSidebarProps) {
     onEditConnection,
     onRunExpression,
     onHistorySelect,
-    onGoToSource,
     onOpenLibraryQuery,
     onToggleFavorite,
     onAddFolder,
@@ -170,10 +152,6 @@ export function ExplorerSidebar(props: ExplorerSidebarProps) {
   const [schemaByConnection, setSchemaByConnection] = useState<Record<string, ConnectionSchemaState>>(
     {},
   );
-  const [scanItems, setScanItems] = useState<ScanReviewItem[]>([]);
-  const [scanIndex, setScanIndex] = useState(0);
-  const [scanLoading, setScanLoading] = useState(false);
-  const [scanError, setScanError] = useState<string | undefined>();
   const [gitStatus, setGitStatus] = useState<GitStatusResult | undefined>();
   const [gitLoading, setGitLoading] = useState(false);
   const [selectedGitFiles, setSelectedGitFiles] = useState<string[]>([]);
@@ -463,38 +441,6 @@ export function ExplorerSidebar(props: ExplorerSidebarProps) {
     ],
   );
 
-  async function runScan(mode: ScanMode) {
-    if (!connectionSettings || !searchDirectory) {
-      setScanError("Set search directory before scanning.");
-      return;
-    }
-
-    setScanLoading(true);
-    setScanError(undefined);
-    onEngineBusyChange?.(1);
-    await yieldToUi();
-    try {
-      const document = await runScanJson(connectionSettings, searchDirectory, searchDirectory, mode);
-      if (!document) {
-        setScanItems([]);
-        setScanError("Scan returned no payload.");
-        return;
-      }
-      const items = findingsToReviewItems(document, mode);
-      setScanItems(items);
-      setScanIndex(0);
-      onExpandedNodeIdsChange([...new Set([...expandedNodeIds, "scan"])]);
-      if (items.length === 0) {
-        setScanError("No findings reported.");
-      }
-    } catch (error) {
-      setScanError(error instanceof Error ? error.message : String(error));
-    } finally {
-      onEngineBusyChange?.(-1);
-      setScanLoading(false);
-    }
-  }
-
   const treeNodes = useMemo(
     () =>
       buildExplorerTree({
@@ -507,8 +453,6 @@ export function ExplorerSidebar(props: ExplorerSidebarProps) {
         queryLibrary,
         userSnippets,
         history,
-        scanItems,
-        scanIndex,
         gitStatus,
         gitLoading,
         selectedGitFiles,
@@ -524,8 +468,6 @@ export function ExplorerSidebar(props: ExplorerSidebarProps) {
       installedPackIds,
       queryLibrary,
       queryTabs,
-      scanIndex,
-      scanItems,
       schemaByConnection,
       selectedGitFiles,
       userSnippets,
@@ -585,11 +527,6 @@ export function ExplorerSidebar(props: ExplorerSidebarProps) {
       return;
     }
 
-    if (node.kind === "scan-finding") {
-      setScanIndex(Number(node.id.replace("scan:finding:", "")));
-      return;
-    }
-
     if (node.kind === "git-file") {
       const file = node.id.replace("team:git:file:", "");
       setSelectedGitFiles((current) =>
@@ -612,12 +549,8 @@ export function ExplorerSidebar(props: ExplorerSidebarProps) {
         queryLibrary,
         userSnippets,
         history,
-        scanItems,
-        scanIndex,
-        scanLoading,
         selectedGitFiles,
         installedPackIds,
-        preferredEditor,
         onExpandedNodeIdsChange,
         onSelectConnection,
         onAddConnection,
@@ -627,7 +560,6 @@ export function ExplorerSidebar(props: ExplorerSidebarProps) {
         onEditConnection,
         onRunExpression,
         onHistorySelect,
-        onGoToSource,
         onOpenLibraryQuery,
         onToggleFavorite,
         onAddFolder,
@@ -644,10 +576,8 @@ export function ExplorerSidebar(props: ExplorerSidebarProps) {
         refreshSchemaForConnection,
         loadDbInfoForConnection,
         loadDbSetProperties,
-        runScan,
         refreshGit,
         gitDirectory,
-        setScanIndex,
         handleExportPack,
         handleImportPack,
         handleSyncPush,
@@ -789,8 +719,6 @@ export function ExplorerSidebar(props: ExplorerSidebarProps) {
     onStatus(`Installed ${entry.name}`);
   }
 
-  const activeFinding = scanItems[scanIndex];
-
   return (
     <aside className="sidebar explorer-sidebar">
       <div className="sidebar-toolbar" role="toolbar" aria-label="Workspace">
@@ -812,15 +740,6 @@ export function ExplorerSidebar(props: ExplorerSidebarProps) {
         onActivate={activateNode}
         onContextMenu={openContextMenu}
       />
-
-      {scanError ? <p className="explorer-footnote error-text">{scanError}</p> : null}
-      {scanLoading ? <p className="explorer-footnote muted">Scanning…</p> : null}
-      {activeFinding ? (
-        <div className="explorer-detail">
-          <p className="explorer-detail-title">{formatFindingSummary(activeFinding.finding)}</p>
-          <pre className="explorer-detail-code">{activeFinding.finding.code}</pre>
-        </div>
-      ) : null}
 
       <div className="sidebar-footer" role="toolbar" aria-label="Appearance and settings">
         <button
@@ -893,8 +812,6 @@ function buildExplorerTree(input: {
   queryLibrary: QueryLibraryState;
   userSnippets: SnippetDefinition[];
   history: EvaluationHistoryEntry[];
-  scanItems: ScanReviewItem[];
-  scanIndex: number;
   gitStatus: GitStatusResult | undefined;
   gitLoading: boolean;
   selectedGitFiles: string[];
@@ -967,18 +884,6 @@ function buildExplorerTree(input: {
           ],
         },
         {
-          id: "scan",
-          label: "Scan",
-          kind: "section",
-          children: input.scanItems.map((item, index) => ({
-            id: `scan:finding:${index}`,
-            label: truncate(formatFindingSummary(item.finding), 48),
-            subtitle: `${index + 1}/${input.scanItems.length}`,
-            kind: "scan-finding" as const,
-            active: index === input.scanIndex,
-          })),
-        },
-        {
           id: "team",
           label: "Team",
           kind: "section",
@@ -1043,11 +948,8 @@ function buildContextMenuItems(
   const queryLibrary = ctx.queryLibrary as QueryLibraryState;
   const userSnippets = ctx.userSnippets as SnippetDefinition[];
   const history = ctx.history as EvaluationHistoryEntry[];
-  const scanItems = ctx.scanItems as ScanReviewItem[];
-  const scanLoading = ctx.scanLoading as boolean;
   const selectedGitFiles = ctx.selectedGitFiles as string[];
   const installedPackIds = ctx.installedPackIds as string[];
-  const preferredEditor = ctx.preferredEditor as PreferredEditor;
   const onExpandedNodeIdsChange = ctx.onExpandedNodeIdsChange as (ids: string[]) => void;
   const onSelectConnection = ctx.onSelectConnection as (id: string) => void;
   const onAddConnection = ctx.onAddConnection as () => void;
@@ -1057,7 +959,6 @@ function buildContextMenuItems(
   const onEditConnection = ctx.onEditConnection as (id: string) => void;
   const onRunExpression = ctx.onRunExpression as (expr: string) => void;
   const onHistorySelect = ctx.onHistorySelect as (expr: string) => void;
-  const onGoToSource = ctx.onGoToSource as (file: string, line: number) => void;
   const onOpenLibraryQuery = ctx.onOpenLibraryQuery as (
     expr: string,
     connectionId: string,
@@ -1079,10 +980,8 @@ function buildContextMenuItems(
   ) => Promise<void>;
   const loadDbInfoForConnection = ctx.loadDbInfoForConnection as (connectionId: string) => Promise<void>;
   const loadDbSetProperties = ctx.loadDbSetProperties as (connectionId: string, dbSet: string) => Promise<void>;
-  const runScan = ctx.runScan as (mode: ScanMode) => Promise<void>;
   const refreshGit = ctx.refreshGit as () => Promise<void>;
   const gitDirectory = ctx.gitDirectory as string;
-  const setScanIndex = ctx.setScanIndex as (index: number) => void;
   const handleExportPack = ctx.handleExportPack as () => Promise<void>;
   const handleImportPack = ctx.handleImportPack as () => Promise<void>;
   const handleSyncPush = ctx.handleSyncPush as () => Promise<void>;
@@ -1290,40 +1189,6 @@ function buildContextMenuItems(
       return [];
     }
     return [{ id: "restore", label: "Restore query", onClick: () => onHistorySelect(entry.expression) }];
-  }
-
-  if (node.id === "scan") {
-    return [
-      { id: "lite", label: "Run lite scan", disabled: scanLoading, onClick: () => void runScan("lite") },
-      { id: "deep", label: "Run deep scan", disabled: scanLoading, onClick: () => void runScan("deep") },
-    ];
-  }
-
-  if (node.kind === "scan-finding") {
-    const index = Number(node.id.replace("scan:finding:", ""));
-    const item = scanItems[index];
-    if (!item) {
-      return [];
-    }
-    return [
-      {
-        id: "open-ide",
-        label: `Open in ${EDITOR_LABELS[preferredEditor]}`,
-        onClick: () => onGoToSource(item.finding.filePath, item.finding.line),
-      },
-      {
-        id: "prev",
-        label: "Previous finding",
-        disabled: index <= 0,
-        onClick: () => setScanIndex(index - 1),
-      },
-      {
-        id: "next",
-        label: "Next finding",
-        disabled: index >= scanItems.length - 1,
-        onClick: () => setScanIndex(index + 1),
-      },
-    ];
   }
 
   if (node.id === "team:git") {
