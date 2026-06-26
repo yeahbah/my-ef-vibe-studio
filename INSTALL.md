@@ -59,7 +59,7 @@ You can also start a release manually from **Actions → Release → Run workflo
 
 Download builds from [GitHub Releases](https://github.com/yeahbah/my-ef-vibe-studio/releases).
 
-If no release appears after a workflow run, open the run’s **publish** job — older workflow versions could report success without uploading assets when no git tag existed yet.
+**CI note:** Release publishing needs `contents: write` for `GITHUB_TOKEN`. In the repo go to **Settings → Actions → General → Workflow permissions** and choose **Read and write permissions** (or keep read-only defaults and rely on the workflow `permissions` block in `.github/workflows/release.yml`).
 
 ## First run checklist
 

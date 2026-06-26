@@ -18,6 +18,7 @@ on:
 
 permissions:
   contents: write
+  actions: write
 
 concurrency:
   group: release-${{ github.workflow }}-${{ github.ref }}
@@ -67,6 +68,9 @@ jobs:
 
   build-tauri:
     needs: resolve-version
+    permissions:
+      contents: read
+      actions: write
     defaults:
       run:
         shell: bash
@@ -147,10 +151,33 @@ jobs:
       - resolve-version
       - build-tauri
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: read
 
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Ensure release tag exists
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          TAG: ${{ needs.resolve-version.outputs.tag }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            echo "Tag $TAG already exists locally"
+          else
+            git tag -a "$TAG" -m "Release $TAG"
+          fi
+          if git ls-remote --exit-code --tags origin "$TAG" >/dev/null 2>&1; then
+            echo "Tag $TAG already exists on remote"
+          else
+            git push origin "$TAG"
+          fi
 
       - name: Download all bundles
         uses: actions/download-artifact@v6
@@ -164,6 +191,8 @@ jobs:
 
       - name: Create GitHub release
         uses: softprops/action-gh-release@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tag_name: ${{ needs.resolve-version.outputs.tag }}
           name: efvibe Studio ${{ needs.resolve-version.outputs.tag }}
@@ -171,6 +200,7 @@ jobs:
           generate_release_notes: true
           draft: ${{ needs.resolve-version.outputs.draft == 'true' }}
           prerelease: false
+          make_latest: true
           files: artifacts/*
           body: |
             Desktop release for **efvibe Studio** ${{ needs.resolve-version.outputs.version }}.
