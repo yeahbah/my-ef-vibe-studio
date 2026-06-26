@@ -151,7 +151,11 @@ fn resolve_existing_cli_path(value: &str, base_directory: Option<&Path>) -> Stri
     String::new()
 }
 
-pub fn build_efvibe_args(settings: &ConnectionSettings, base_directory: Option<&Path>) -> Vec<String> {
+pub fn build_efvibe_args(
+    settings: &ConnectionSettings,
+    base_directory: Option<&Path>,
+    force_build: bool,
+) -> Vec<String> {
     let mut args = Vec::new();
 
     let workspace_root = resolve_cli_path(&settings.workspace_root, base_directory);
@@ -191,12 +195,20 @@ pub fn build_efvibe_args(settings: &ConnectionSettings, base_directory: Option<&
         args.push(settings.dotnet_framework.trim().to_string());
     }
 
+    if force_build {
+        args.push("--force-build".to_string());
+    }
+
     args
 }
 
-pub fn build_serve_args(settings: &ConnectionSettings, base_directory: Option<&Path>) -> Vec<String> {
+pub fn build_serve_args(
+    settings: &ConnectionSettings,
+    base_directory: Option<&Path>,
+    force_build: bool,
+) -> Vec<String> {
     let mut args = vec!["serve".to_string()];
-    args.extend(build_efvibe_args(settings, base_directory));
+    args.extend(build_efvibe_args(settings, base_directory, force_build));
     args
 }
 

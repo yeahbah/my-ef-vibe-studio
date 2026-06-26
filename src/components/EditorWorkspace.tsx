@@ -1,4 +1,12 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import {
+  forwardRef,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+  type Ref,
+} from "react";
 
 interface EditorWorkspaceProps {
   editor: ReactNode;
@@ -12,14 +20,33 @@ interface EditorWorkspaceProps {
 const MIN_SQL_PANE_WIDTH = 220;
 const MIN_EDITOR_WIDTH = 280;
 
-export function EditorWorkspace({
-  editor,
-  sqlPane,
-  sqlPaneOpen,
-  onSqlPaneOpenChange,
-  sqlPaneWidth,
-  onSqlPaneWidthChange,
-}: EditorWorkspaceProps) {
+function mergeRefs<T>(...refs: Array<Ref<T> | undefined>) {
+  return (value: T | null) => {
+    for (const ref of refs) {
+      if (!ref) {
+        continue;
+      }
+
+      if (typeof ref === "function") {
+        ref(value);
+      } else {
+        ref.current = value;
+      }
+    }
+  };
+}
+
+export const EditorWorkspace = forwardRef<HTMLDivElement, EditorWorkspaceProps>(function EditorWorkspace(
+  {
+    editor,
+    sqlPane,
+    sqlPaneOpen,
+    onSqlPaneOpenChange,
+    sqlPaneWidth,
+    onSqlPaneWidthChange,
+  },
+  ref,
+) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [dragging, setDragging] = useState(false);
 
@@ -63,7 +90,10 @@ export function EditorWorkspace({
   }, [dragging, onSqlPaneWidthChange]);
 
   return (
-    <div className={`editor-workspace${dragging ? " resizing" : ""}`} ref={containerRef}>
+    <div
+      className={`editor-workspace${dragging ? " resizing" : ""}`}
+      ref={mergeRefs(containerRef, ref)}
+    >
       <div className="editor-column">
         <section className="editor-main">{editor}</section>
         <aside className="editor-rail" role="toolbar" aria-label="Editor tools">
@@ -94,4 +124,4 @@ export function EditorWorkspace({
       ) : null}
     </div>
   );
-}
+});

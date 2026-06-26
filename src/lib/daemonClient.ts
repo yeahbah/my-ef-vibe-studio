@@ -15,6 +15,22 @@ export async function invalidateEfvibeDaemon(): Promise<void> {
   await invoke("invalidate_efvibe_daemon");
 }
 
+export async function rebuildEfvibeDaemon(
+  settings: ConnectionSettings,
+  searchDirectory: string,
+  cwd: string,
+): Promise<void> {
+  await invoke("rebuild_efvibe_daemon", {
+    settings,
+    searchDirectory,
+    cwd,
+  });
+}
+
+export async function cancelEfvibeDaemonRequest(): Promise<void> {
+  await invoke("cancel_efvibe_daemon_request");
+}
+
 export async function runExpressionViaDaemon(
   settings: ConnectionSettings,
   searchDirectory: string,

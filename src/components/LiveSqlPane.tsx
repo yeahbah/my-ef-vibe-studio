@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { resolveRunTextFromTextArea } from "../lib/editorRun";
 import { fetchLiveEditorPreview, type EditorPreviewMode } from "../lib/liveSql";
 import { looksLikeRawSql } from "../lib/sqlDetect";
 import { yieldToUi } from "../lib/yieldToUi";
 import type { ConnectionSettings } from "../types/connection";
+import type { KeybindingSettings } from "../types/keybindings";
 import type { SqlToLinqResult } from "../types/sqlToLinq";
+import type { AppTheme } from "../types/theme";
+import { MonacoEditor } from "./MonacoEditor";
 
 interface LiveSqlPaneProps {
   expression: string;
@@ -16,6 +18,8 @@ interface LiveSqlPaneProps {
   onRequestEngine?: () => void;
   onEngineBusyChange?: (delta: number) => void;
   onRun?: (text: string) => void;
+  theme?: AppTheme;
+  keybindings?: KeybindingSettings;
 }
 
 function formatPreviewStatus(input: {
@@ -49,6 +53,8 @@ export function LiveSqlPane({
   onRequestEngine,
   onEngineBusyChange,
   onRun,
+  theme = "dark",
+  keybindings,
 }: LiveSqlPaneProps) {
   const [previewText, setPreviewText] = useState("");
   const [previewMode, setPreviewMode] = useState<EditorPreviewMode>("sql");
@@ -149,10 +155,6 @@ export function LiveSqlPane({
   }
 
   const previewTitle = previewMode === "linq" ? "LINQ" : "SQL";
-  const previewPlaceholder =
-    previewMode === "linq"
-      ? "LINQ draft from SQL in the editor."
-      : "SQL preview from LINQ in the editor.";
 
   return (
     <section className="live-sql-pane">
@@ -163,22 +165,19 @@ export function LiveSqlPane({
         </span>
       </div>
 
-      <textarea
-        className="live-sql-editor"
-        value={previewText}
-        spellCheck={false}
-        placeholder={previewPlaceholder}
-        onChange={(event) => {
-          setPreviewText(event.target.value);
-          setDirty(true);
-        }}
-        onKeyDown={(event) => {
-          if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
-            event.preventDefault();
-            handleRun(resolveRunTextFromTextArea(event.currentTarget));
-          }
-        }}
-      />
+      <div className="live-sql-editor">
+        <MonacoEditor
+          value={previewText}
+          theme={theme}
+          language={previewMode === "sql" ? "sql" : "csharp"}
+          keybindings={keybindings}
+          enableRunShortcuts={false}
+          onChange={(next) => {
+            setPreviewText(next);
+            setDirty(true);
+          }}
+        />
+      </div>
 
       {error && !dirty ? <p className="error-text">{error}</p> : null}
       {unsupported.length > 0 && !dirty && !error ? (

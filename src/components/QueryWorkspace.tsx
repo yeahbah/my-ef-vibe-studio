@@ -6,15 +6,18 @@ import {
   useRef,
   useState,
 } from "react";
+import { dispatchRunPlan, dispatchRunQuery } from "../lib/editorRun";
+import { matchesKeybinding, resolveKeybindings } from "../lib/keybindings";
 import { EditorWorkspace } from "./EditorWorkspace";
 import { LiveSqlPane } from "./LiveSqlPane";
-import { MonacoEditor } from "./MonacoEditor";
+import { MonacoEditor, type MonacoEditorHandle } from "./MonacoEditor";
 import type { ConnectionSettings } from "../types/connection";
 import type { KeybindingSettings } from "../types/keybindings";
 import type { AppTheme } from "../types/theme";
 
 export interface QueryWorkspaceHandle {
   getDraft: () => string;
+  getRunText: () => string;
   flush: () => void;
 }
 
@@ -63,12 +66,46 @@ export const QueryWorkspace = forwardRef<QueryWorkspaceHandle, QueryWorkspacePro
   ) {
     const [draft, setDraft] = useState(expression);
     const draftRef = useRef(expression);
+    const editorRef = useRef<MonacoEditorHandle>(null);
+    const workspaceRef = useRef<HTMLDivElement>(null);
     const syncTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+    const resolvedKeybindings = resolveKeybindings(keybindings);
 
     useEffect(() => {
       setDraft(expression);
       draftRef.current = expression;
     }, [tabId, expression]);
+
+    useEffect(() => {
+      if (!sqlPaneOpen) {
+        editorRef.current?.focus();
+      }
+    }, [sqlPaneOpen]);
+
+    useEffect(() => {
+      const onKeyDown = (event: KeyboardEvent) => {
+        const target = event.target;
+        if (!(target instanceof Node) || !workspaceRef.current?.contains(target)) {
+          return;
+        }
+
+        if (matchesKeybinding(event, resolvedKeybindings.runQuery)) {
+          event.preventDefault();
+          event.stopImmediatePropagation();
+          dispatchRunQuery("");
+          return;
+        }
+
+        if (matchesKeybinding(event, resolvedKeybindings.runPlan)) {
+          event.preventDefault();
+          event.stopImmediatePropagation();
+          dispatchRunPlan("");
+        }
+      };
+
+      window.addEventListener("keydown", onKeyDown, true);
+      return () => window.removeEventListener("keydown", onKeyDown, true);
+    }, [resolvedKeybindings.runPlan, resolvedKeybindings.runQuery]);
 
     const flushDraft = useCallback(
       (tabIdToFlush: string, value: string) => {
@@ -86,6 +123,7 @@ export const QueryWorkspace = forwardRef<QueryWorkspaceHandle, QueryWorkspacePro
       ref,
       () => ({
         getDraft: () => draftRef.current,
+        getRunText: () => editorRef.current?.getRunText() ?? draftRef.current.trim(),
         flush: () => flushDraft(tabId, draftRef.current),
       }),
       [flushDraft, tabId],
@@ -122,11 +160,21 @@ export const QueryWorkspace = forwardRef<QueryWorkspaceHandle, QueryWorkspacePro
 
     return (
       <EditorWorkspace
+        ref={workspaceRef}
         sqlPaneOpen={sqlPaneOpen}
         onSqlPaneOpenChange={onSqlPaneOpenChange}
         sqlPaneWidth={sqlPaneWidth}
         onSqlPaneWidthChange={onSqlPaneWidthChange}
-        editor={<MonacoEditor value={draft} theme={theme} onChange={handleChange} keybindings={keybindings} />}
+        editor={
+          <MonacoEditor
+            ref={editorRef}
+            value={draft}
+            theme={theme}
+            onChange={handleChange}
+            keybindings={keybindings}
+            enableRunShortcuts={false}
+          />
+        }
         sqlPane={
           <LiveSqlPane
             expression={draft}
@@ -138,6 +186,8 @@ export const QueryWorkspace = forwardRef<QueryWorkspaceHandle, QueryWorkspacePro
             onRequestEngine={onRequestEngine}
             onEngineBusyChange={onEngineBusyChange}
             onRun={onRun}
+            theme={theme}
+            keybindings={keybindings}
           />
         }
       />

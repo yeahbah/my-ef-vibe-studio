@@ -1,4 +1,4 @@
-use crate::daemon::{invalidate_daemon, run_daemon_json, run_expression};
+use crate::daemon::{cancel_inflight_request, invalidate_daemon, rebuild_daemon, run_daemon_json, run_expression};
 use crate::tool::{
     build_efvibe_args, resolve_tool_invocation, ConnectionSettings, ToolInvocation,
 };
@@ -183,6 +183,24 @@ pub fn invalidate_efvibe_daemon() {
 }
 
 #[tauri::command]
+pub async fn rebuild_efvibe_daemon(
+    settings: ConnectionSettings,
+    search_directory: String,
+    cwd: String,
+) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        rebuild_daemon(settings, search_directory, cwd)
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
+pub fn cancel_efvibe_daemon_request() {
+    cancel_inflight_request();
+}
+
+#[tauri::command]
 pub async fn daemon_eval(
     settings: ConnectionSettings,
     search_directory: String,
@@ -287,7 +305,7 @@ fn build_repl_command_line(
     );
     let mut parts = vec![invocation.command().to_string()];
     parts.extend(invocation.prefix_args().iter().cloned());
-    parts.extend(build_efvibe_args(settings, Some(search_directory)));
+    parts.extend(build_efvibe_args(settings, Some(search_directory), false));
     parts.into_iter().map(|part| quote_shell_arg(&part)).collect::<Vec<_>>().join(" ")
 }
 
@@ -302,7 +320,7 @@ fn build_repl_spawn_spec(
         &settings.dotnet_framework,
     );
     let mut args = invocation.prefix_args().to_vec();
-    args.extend(build_efvibe_args(settings, Some(search_directory)));
+    args.extend(build_efvibe_args(settings, Some(search_directory), false));
 
     ReplSpawnSpec {
         program: invocation.command().to_string(),

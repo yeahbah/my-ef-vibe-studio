@@ -66,10 +66,11 @@ interface ExplorerSidebarProps {
   onAddConnection: () => void;
   onDuplicateConnection: (connectionId: string) => void;
   onRefreshConnection: (connectionId: string) => void;
+  onRebuildConnection: (connectionId: string) => void;
   onDisconnectConnection: (connectionId: string) => void;
   onDeleteConnection: (connectionId: string) => void;
   onEditConnection: (connectionId: string) => void;
-  onRunExpression: (expression: string) => void;
+  onOpenQueryTab: (expression: string, connectionId: string, name?: string) => void;
   onHistorySelect: (expression: string) => void;
   onOpenLibraryQuery: (expression: string, connectionId: string, name?: string) => void;
   onToggleFavorite: (tabId: string) => void;
@@ -131,10 +132,11 @@ export function ExplorerSidebar(props: ExplorerSidebarProps) {
     onAddConnection,
     onDuplicateConnection,
     onRefreshConnection,
+    onRebuildConnection,
     onDisconnectConnection,
     onDeleteConnection,
     onEditConnection,
-    onRunExpression,
+    onOpenQueryTab,
     onHistorySelect,
     onOpenLibraryQuery,
     onToggleFavorite,
@@ -574,10 +576,11 @@ export function ExplorerSidebar(props: ExplorerSidebarProps) {
         onAddConnection,
         onDuplicateConnection,
         onRefreshConnection,
+        onRebuildConnection,
         onDisconnectConnection,
         onDeleteConnection,
         onEditConnection,
-        onRunExpression,
+        onOpenQueryTab,
         onHistorySelect,
         onOpenLibraryQuery,
         onToggleFavorite,
@@ -1005,10 +1008,15 @@ function buildContextMenuItems(
   const onAddConnection = ctx.onAddConnection as () => void;
   const onDuplicateConnection = ctx.onDuplicateConnection as (id: string) => void;
   const onRefreshConnection = ctx.onRefreshConnection as (id: string) => void;
+  const onRebuildConnection = ctx.onRebuildConnection as (id: string) => void;
   const onDisconnectConnection = ctx.onDisconnectConnection as (id: string) => void;
   const onDeleteConnection = ctx.onDeleteConnection as (id: string) => void;
   const onEditConnection = ctx.onEditConnection as (id: string) => void;
-  const onRunExpression = ctx.onRunExpression as (expr: string) => void;
+  const onOpenQueryTab = ctx.onOpenQueryTab as (
+    expression: string,
+    connectionId: string,
+    name?: string,
+  ) => void;
   const onHistorySelect = ctx.onHistorySelect as (expr: string) => void;
   const onOpenLibraryQuery = ctx.onOpenLibraryQuery as (
     expr: string,
@@ -1102,6 +1110,7 @@ function buildContextMenuItems(
         onClick: () => onDisconnectConnection(connectionId),
       },
       { id: "refresh", label: "Refresh", onClick: () => onRefreshConnection(connectionId) },
+      { id: "rebuild", label: "Rebuild", onClick: () => onRebuildConnection(connectionId) },
       { id: "db-info", label: "DB Info", onClick: () => void loadDbInfoForConnection(connectionId) },
       {
         id: "view-diagram",
@@ -1160,7 +1169,7 @@ function buildContextMenuItems(
           if (connectionId !== activeConnectionId) {
             onSelectConnection(connectionId);
           }
-          onRunExpression(buildDbSetSampleExpression(dbSet));
+          onOpenQueryTab(buildDbSetSampleExpression(dbSet), connectionId, dbSet);
         },
       },
       {

@@ -2,6 +2,7 @@ use crate::tool::{build_serve_args, resolve_tool_invocation, settings_key, Conne
 use std::io::{BufRead, BufReader, Write};
 use std::path::Path;
 use std::process::{Child, Command, Stdio};
+use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::mpsc::{self, RecvTimeoutError};
 use std::sync::{Mutex, OnceLock};
 use std::thread;
@@ -18,6 +19,7 @@ struct DaemonState {
 
 static DAEMON: OnceLock<Mutex<Option<DaemonState>>> = OnceLock::new();
 static SESSION_GENERATION: Mutex<u64> = Mutex::new(0);
+static DAEMON_PID: AtomicU32 = AtomicU32::new(0);
 
 fn daemon_mutex() -> &'static Mutex<Option<DaemonState>> {
     DAEMON.get_or_init(|| Mutex::new(None))
@@ -33,12 +35,47 @@ fn current_generation() -> u64 {
     *SESSION_GENERATION.lock().expect("generation lock")
 }
 
-fn dispose_daemon() {
-    let mut guard = daemon_mutex().lock().expect("daemon lock");
+fn kill_process(pid: u32) {
+    if pid == 0 {
+        return;
+    }
+
+    #[cfg(unix)]
+    {
+        let _ = Command::new("kill")
+            .args(["-9", &pid.to_string()])
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status();
+    }
+
+    #[cfg(windows)]
+    {
+        let _ = Command::new("taskkill")
+            .args(["/PID", &pid.to_string(), "/F", "/T"])
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status();
+    }
+}
+
+fn clear_daemon_state_locked(guard: &mut Option<DaemonState>) {
     if let Some(mut state) = guard.take() {
         let _ = state.child.kill();
         let _ = state.child.wait();
     }
+
+    DAEMON_PID.store(0, Ordering::SeqCst);
+}
+
+fn shutdown_daemon() {
+    let mut guard = daemon_mutex().lock().expect("daemon lock");
+    clear_daemon_state_locked(&mut *guard);
+}
+
+fn dispose_daemon() {
+    bump_generation();
+    shutdown_daemon();
 }
 
 fn wait_for_line(rx: &mpsc::Receiver<String>, timeout: Duration) -> Result<String, String> {
@@ -94,6 +131,7 @@ fn ensure_daemon_ready(
     settings: &ConnectionSettings,
     search_directory: &Path,
     cwd: &Path,
+    force_build: bool,
 ) -> Result<(), String> {
     let key = settings_key(settings, search_directory, cwd);
     {
@@ -105,7 +143,7 @@ fn ensure_daemon_ready(
         }
     }
 
-    dispose_daemon();
+    shutdown_daemon();
 
     let invocation = resolve_tool_invocation(
         search_directory,
@@ -113,7 +151,7 @@ fn ensure_daemon_ready(
         &settings.dotnet_framework,
     );
     let mut args = invocation.prefix_args().to_vec();
-    args.extend(build_serve_args(settings, Some(search_directory)));
+    args.extend(build_serve_args(settings, Some(search_directory), force_build));
 
     let mut child = Command::new(invocation.command())
         .args(&args)
@@ -123,6 +161,8 @@ fn ensure_daemon_ready(
         .stderr(Stdio::piped())
         .spawn()
         .map_err(|error| format!("Failed to start efvibe serve: {error}"))?;
+
+    DAEMON_PID.store(child.id(), Ordering::SeqCst);
 
     let stdout = child
         .stdout
@@ -171,8 +211,24 @@ fn ensure_daemon_ready(
 }
 
 pub fn invalidate_daemon() {
-    bump_generation();
     dispose_daemon();
+}
+
+pub fn rebuild_daemon(
+    settings: ConnectionSettings,
+    search_directory: String,
+    cwd: String,
+) -> Result<(), String> {
+    dispose_daemon();
+
+    let search_path = Path::new(&search_directory);
+    let cwd_path = Path::new(&cwd);
+    ensure_daemon_ready(&settings, search_path, cwd_path, true)
+}
+
+pub fn cancel_inflight_request() {
+    bump_generation();
+    kill_process(DAEMON_PID.load(Ordering::SeqCst));
 }
 
 pub fn run_daemon_json(
@@ -182,16 +238,12 @@ pub fn run_daemon_json(
     request: serde_json::Value,
     timeout_ms: Option<u64>,
 ) -> Result<String, String> {
-    let generation = current_generation();
     let search_path = Path::new(&search_directory);
     let cwd_path = Path::new(&cwd);
     let timeout = Duration::from_millis(timeout_ms.unwrap_or(COMMAND_TIMEOUT.as_millis() as u64));
 
-    ensure_daemon_ready(&settings, search_path, cwd_path)?;
-
-    if generation != current_generation() {
-        return Err("efvibe daemon session invalidated.".to_string());
-    }
+    ensure_daemon_ready(&settings, search_path, cwd_path, false)?;
+    let generation = current_generation();
 
     let request_json =
         serde_json::to_string(&request).map_err(|error| error.to_string())?;
@@ -201,7 +253,27 @@ pub fn run_daemon_json(
         .as_mut()
         .ok_or_else(|| "efvibe daemon is not running.".to_string())?;
 
-    write_request_and_wait(&mut state.child, &state.line_rx, &request_json, timeout)
+    let result = write_request_and_wait(&mut state.child, &state.line_rx, &request_json, timeout);
+
+    if generation != current_generation() {
+        clear_daemon_state_locked(&mut *guard);
+        return Err("Query cancelled.".to_string());
+    }
+
+    match result {
+        Ok(line) => Ok(line),
+        Err(message) => {
+            if message.contains("daemon stopped") {
+                clear_daemon_state_locked(&mut *guard);
+            }
+
+            if generation != current_generation() {
+                Err("Query cancelled.".to_string())
+            } else {
+                Err(message)
+            }
+        }
+    }
 }
 
 pub fn run_expression(

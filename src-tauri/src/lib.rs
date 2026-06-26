@@ -40,6 +40,8 @@ pub fn run() {
             commands::check_prerequisites,
             commands::about_json,
             commands::invalidate_efvibe_daemon,
+            commands::rebuild_efvibe_daemon,
+            commands::cancel_efvibe_daemon_request,
             commands::daemon_eval,
             commands::daemon_request,
             commands::open_in_ide,

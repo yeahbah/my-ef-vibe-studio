@@ -27,8 +27,10 @@ import { ExplorerSidebar } from "./components/explorer/ExplorerSidebar";
 import { resolveExplorerExpandedNodes, normalizeExplorerExpandedNodes } from "./components/explorer/types";
 import { runBenchmark, type BenchmarkResult } from "./lib/benchmark";
 import {
+  cancelEfvibeDaemonRequest,
   checkPrerequisites,
   invalidateEfvibeDaemon,
+  rebuildEfvibeDaemon,
   openInIde,
   runExpressionViaDaemon,
   startRepl,
@@ -36,9 +38,10 @@ import {
 import { recordHistoryEntry, type EvaluationHistoryEntry } from "./lib/history";
 import { openNotebookFile, saveNotebookFile } from "./lib/notebook";
 import { openQueryFile, saveQueryFile } from "./lib/queryFile";
+import { isQueryCancelledMessage } from "./lib/queryCancel";
 import { runSqlViaDaemon } from "./lib/rawSql";
 import { looksLikeRawSql } from "./lib/sqlDetect";
-import { RUN_QUERY_EVENT, RUN_PLAN_EVENT, type RunQueryEventDetail } from "./lib/editorRun";
+import { RUN_QUERY_EVENT, RUN_PLAN_EVENT } from "./lib/editorRun";
 import {
   hydrateWorkspaceSecrets,
   stripConnectionSecretsForSave,
@@ -836,6 +839,10 @@ function App() {
         }
       } catch (error) {
         let message = error instanceof Error ? error.message : String(error);
+        if (isQueryCancelledMessage(message)) {
+          setStatus("Query cancelled.");
+          return;
+        }
         if (/unknown request type/i.test(message) && /executesql/i.test(message)) {
           message =
             "Raw SQL requires a recent efvibe build with executeSql support. Update the tool in Settings or rebuild the engine.";
@@ -876,7 +883,10 @@ function App() {
 
       queryWorkspaceRef.current?.flush();
       const rawInput = (
-        expressionOverride ?? queryWorkspaceRef.current?.getDraft() ?? activeQueryTab.expression
+        expressionOverride ??
+        queryWorkspaceRef.current?.getRunText() ??
+        queryWorkspaceRef.current?.getDraft() ??
+        activeQueryTab.expression
       ).trim();
       if (!rawInput) {
         return;
@@ -970,6 +980,10 @@ function App() {
         }
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
+        if (isQueryCancelledMessage(message)) {
+          setStatus("Query cancelled.");
+          return;
+        }
         updateQueryTab(activeQueryTab.id, {
           ...(updateExpression ? { expression: runExpression } : {}),
           lastPayload: {
@@ -1000,10 +1014,14 @@ function App() {
     ],
   );
 
+  const handleStopQuery = useCallback(() => {
+    void cancelEfvibeDaemonRequest();
+    setStatus("Stopping query…");
+  }, []);
+
   useEffect(() => {
-    const listener = (event: Event) => {
-      const text = (event as CustomEvent<RunQueryEventDetail>).detail?.text?.trim();
-      void handleRun(false, text || undefined);
+    const listener = () => {
+      void handleRun(false);
     };
 
     window.addEventListener(RUN_QUERY_EVENT, listener);
@@ -1011,9 +1029,8 @@ function App() {
   }, [handleRun]);
 
   useEffect(() => {
-    const listener = (event: Event) => {
-      const text = (event as CustomEvent<RunQueryEventDetail>).detail?.text?.trim();
-      void handleRun(true, text || undefined);
+    const listener = () => {
+      void handleRun(true);
     };
 
     window.addEventListener(RUN_PLAN_EVENT, listener);
@@ -1345,6 +1362,16 @@ function App() {
     );
   }
 
+  function handleOpenQueryInNewTab(expression: string, connectionId: string, name?: string) {
+    const tab = createQueryTab(connectionId, {
+      expression,
+      name: name ?? `Query ${queryTabs.length + 1}`,
+    });
+    setQueryTabs((tabs) => [...tabs, tab]);
+    setActiveQueryTabId(tab.id);
+    setActiveConnectionId(connectionId);
+  }
+
   function handleOpenLibraryQuery(expression: string, connectionId: string, name?: string) {
     if (!document) {
       return;
@@ -1454,6 +1481,14 @@ function App() {
           </button>
           <button
             type="button"
+            className="runbar-stop"
+            disabled={!running}
+            onClick={handleStopQuery}
+          >
+            Stop
+          </button>
+          <button
+            type="button"
             disabled={history.length === 0}
             onClick={() => {
               setCompareBaseline(history[0]);
@@ -1549,6 +1584,69 @@ function App() {
               setStatus(`Refreshed ${connectionDisplayName(connection)}`);
             })();
           }}
+          onRebuildConnection={(connectionId) => {
+            if (!settings) {
+              return;
+            }
+
+            const connection = document.workspace.connections.find(
+              (entry) => entry.id === connectionId,
+            );
+            if (!connection) {
+              return;
+            }
+
+            if (connectionId !== activeConnectionId) {
+              setActiveConnectionId(connectionId);
+              updateQueryTab(activeQueryTab.id, { connectionId });
+            }
+
+            const rebuildSettings = workspaceConnectionToSettings(
+              connection,
+              workspaceDirectory,
+              settings.toolPath,
+              settings.defaultWorkspaceRoot,
+            );
+            const rebuildSearchDirectory = resolveSearchDirectory(
+              connection,
+              workspaceDirectory,
+              rebuildSettings.project,
+            );
+
+            if (!rebuildSearchDirectory) {
+              setStatus("Set a search directory or EF project before rebuilding.");
+              return;
+            }
+
+            const rebuildCwd =
+              workspaceDirectory && workspaceDirectory !== "."
+                ? workspaceDirectory
+                : rebuildSearchDirectory;
+
+            void (async () => {
+              allowEngine();
+              adjustEngineBusy(1);
+              setStatus(`Rebuilding EF projects for ${connectionDisplayName(connection)}…`);
+              await yieldToUi();
+
+              try {
+                await rebuildEfvibeDaemon(
+                  rebuildSettings,
+                  rebuildSearchDirectory,
+                  rebuildCwd,
+                );
+                setStatus(`Rebuilt EF projects for ${connectionDisplayName(connection)}.`);
+              } catch (error) {
+                setStatus(
+                  error instanceof Error
+                    ? error.message
+                    : `Rebuild failed for ${connectionDisplayName(connection)}.`,
+                );
+              } finally {
+                adjustEngineBusy(-1);
+              }
+            })();
+          }}
           onDisconnectConnection={(connectionId) => {
             if (connectionId !== activeConnectionId) {
               return;
@@ -1587,10 +1685,7 @@ function App() {
           onEditConnection={(connectionId) => {
             setConnectionEditorId(connectionId);
           }}
-          onRunExpression={(nextExpression) => {
-            updateQueryTab(activeQueryTab.id, { expression: nextExpression });
-            void handleRun(false, nextExpression);
-          }}
+          onOpenQueryTab={handleOpenQueryInNewTab}
           onHistorySelect={(nextExpression) => {
             updateQueryTab(activeQueryTab.id, { expression: nextExpression });
           }}

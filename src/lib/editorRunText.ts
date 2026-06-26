@@ -1,3 +1,5 @@
+import { isQueryLanguageBoundary } from "./sqlDetect";
+
 export function resolveStatementAtLine(lines: string[], lineNumber: number): string {
   if (lines.length === 0) {
     return "";
@@ -14,7 +16,12 @@ export function resolveStatementAtLine(lines: string[], lineNumber: number): str
 
   while (startLine > 1) {
     const previous = lines[startLine - 2];
+    const current = lines[startLine - 1];
     if (!previous || previous.trim() === "") {
+      break;
+    }
+
+    if (isQueryLanguageBoundary(previous, current)) {
       break;
     }
 
@@ -22,8 +29,13 @@ export function resolveStatementAtLine(lines: string[], lineNumber: number): str
   }
 
   while (endLine < lines.length) {
+    const current = lines[endLine - 1];
     const next = lines[endLine];
     if (!next || next.trim() === "") {
+      break;
+    }
+
+    if (isQueryLanguageBoundary(current, next)) {
       break;
     }
 
