@@ -10,7 +10,6 @@ import {
 } from "../../lib/pack";
 import { findingsToReviewItems, formatFindingSummary } from "../../lib/scan";
 import {
-  buildDbSetCountExpression,
   buildDbSetSampleExpression,
   fetchDbInfoJson,
   fetchDescribeJson,
@@ -18,6 +17,11 @@ import {
   runScanJson,
 } from "../../lib/schema";
 import { yieldToUi } from "../../lib/yieldToUi";
+import {
+  formatShowInFileManagerLabel,
+  getFileManagerLabel,
+  showWorkspaceInFileManager,
+} from "../../lib/fileManager";
 import { BUILTIN_SNIPPETS } from "../../types/snippets";
 import { BUILTIN_SNIPPET_PACKS } from "../../types/snippetPacks";
 import type { EvaluationHistoryEntry } from "../../lib/history";
@@ -27,16 +31,19 @@ import type { QueryTab } from "../../types/query";
 import type { SnippetDefinition } from "../../types/snippets";
 import type { DbInfoJsonPayload, DescribeJsonPayload, TablesJsonPayload } from "../../types/schema";
 import type { ScanMode, ScanReviewItem } from "../../types/scan";
-import type { WorkspaceConnection } from "../../types/workspace";
+import type { WorkspaceConnection, EfvibeWorkspace } from "../../types/workspace";
 import { resolveSearchDirectory, workspaceConnectionToSettings } from "../../types/workspace";
 import { ContextMenu } from "./ContextMenu";
 import { DbInfoDialog } from "../DbInfoDialog";
+import { DbSetPropertiesDialog } from "../DbSetPropertiesDialog";
+import { WorkspacePropertiesDialog } from "../WorkspacePropertiesDialog";
 import { IconMoon, IconNew, IconOpen, IconSave, IconSettings, IconSun } from "../icons";
 import { TreeView } from "./TreeView";
 import type { AppTheme } from "../../types/theme";
 import type { ContextMenuItem, ExplorerNode } from "./types";
 
 interface ExplorerSidebarProps {
+  workspace: EfvibeWorkspace;
   workspaceName: string;
   documentPath: string;
   workspaceDirectory: string;
@@ -79,6 +86,8 @@ interface ExplorerSidebarProps {
   onNewWorkspace: () => void;
   onOpenWorkspace: () => void;
   onSaveWorkspace: () => void;
+  onRenameWorkspace: (name: string) => void;
+  onUpdateWorkspace: (workspace: EfvibeWorkspace) => void;
   onOpenSettings: () => void;
   onRequestEngine?: () => void;
   onEngineBusyChange?: (delta: number) => void;
@@ -101,6 +110,7 @@ interface ConnectionSchemaState {
 
 export function ExplorerSidebar(props: ExplorerSidebarProps) {
   const {
+    workspace,
     workspaceName,
     documentPath,
     workspaceDirectory,
@@ -139,6 +149,8 @@ export function ExplorerSidebar(props: ExplorerSidebarProps) {
     onNewWorkspace,
     onOpenWorkspace,
     onSaveWorkspace,
+    onRenameWorkspace,
+    onUpdateWorkspace,
     onOpenSettings,
     onRequestEngine,
     onEngineBusyChange,
@@ -150,7 +162,6 @@ export function ExplorerSidebar(props: ExplorerSidebarProps) {
   const [schemaByConnection, setSchemaByConnection] = useState<Record<string, ConnectionSchemaState>>(
     {},
   );
-  const [describeByDbSet, setDescribeByDbSet] = useState<Record<string, DescribeJsonPayload>>({});
   const [scanItems, setScanItems] = useState<ScanReviewItem[]>([]);
   const [scanIndex, setScanIndex] = useState(0);
   const [scanLoading, setScanLoading] = useState(false);
@@ -159,6 +170,8 @@ export function ExplorerSidebar(props: ExplorerSidebarProps) {
   const [gitLoading, setGitLoading] = useState(false);
   const [selectedGitFiles, setSelectedGitFiles] = useState<string[]>([]);
   const [menu, setMenu] = useState<{ x: number; y: number; items: ContextMenuItem[] } | undefined>();
+  const [workspacePropertiesOpen, setWorkspacePropertiesOpen] = useState(false);
+  const [fileManagerLabel, setFileManagerLabel] = useState("file manager");
   const [dbInfoDialog, setDbInfoDialog] = useState<
     | {
         connectionName: string;
@@ -168,9 +181,27 @@ export function ExplorerSidebar(props: ExplorerSidebarProps) {
       }
     | undefined
   >();
+  const [dbSetPropertiesDialog, setDbSetPropertiesDialog] = useState<
+    | {
+        dbSet: string;
+        connectionName: string;
+        loading: boolean;
+        error?: string;
+        payload?: DescribeJsonPayload;
+      }
+    | undefined
+  >();
 
   const gitDirectory =
     workspaceDirectory && workspaceDirectory !== "." ? workspaceDirectory : teamSyncDirectory || ".";
+
+  useEffect(() => {
+    void getFileManagerLabel()
+      .then(setFileManagerLabel)
+      .catch((error) => {
+        console.error("Failed to resolve file manager label:", error);
+      });
+  }, []);
 
   const schemaRefreshInFlight = useRef(new Set<string>());
 
@@ -344,28 +375,37 @@ export function ExplorerSidebar(props: ExplorerSidebarProps) {
     void refreshGit();
   }, [gitDirectory]);
 
-  const loadDescribe = useCallback(
+  const loadDbSetProperties = useCallback(
     async (connectionId: string, dbSet: string) => {
-      const describeKey = `${connectionId}:${dbSet}`;
-      if (describeByDbSet[describeKey]) {
-        return;
-      }
-
       const connection = connections.find((entry) => entry.id === connectionId);
       if (!connection) {
         return;
       }
 
+      const connectionName = connection.name || connection.context || "Connection";
       const { settings, searchDirectory: connectionSearchDirectory } = resolveConnectionSchemaContext(
         connection,
         workspaceDirectory,
         appSettings,
       );
 
+      setDbSetPropertiesDialog({
+        dbSet,
+        connectionName,
+        loading: true,
+      });
+
       if (!connectionSearchDirectory) {
+        setDbSetPropertiesDialog({
+          dbSet,
+          connectionName,
+          loading: false,
+          error: "Set search directory or EF project.",
+        });
         return;
       }
 
+      onRequestEngine?.();
       onEngineBusyChange?.(1);
       await yieldToUi();
 
@@ -376,14 +416,31 @@ export function ExplorerSidebar(props: ExplorerSidebarProps) {
           connectionSearchDirectory,
           dbSet,
         );
-        if (payload) {
-          setDescribeByDbSet((current) => ({ ...current, [describeKey]: payload }));
-          onExpandedNodeIdsChange([
-            ...new Set([...expandedNodeIds, `dbset:${connectionId}:${dbSet}`]),
-          ]);
+
+        if (!payload) {
+          setDbSetPropertiesDialog({
+            dbSet,
+            connectionName,
+            loading: false,
+            error: `Could not describe ${dbSet}.`,
+          });
+          return;
         }
-      } catch {
-        onStatus(`Could not describe ${dbSet}.`);
+
+        setDbSetPropertiesDialog({
+          dbSet,
+          connectionName,
+          loading: false,
+          payload,
+          error: payload.success === false ? payload.error ?? `Could not describe ${dbSet}.` : undefined,
+        });
+      } catch (error) {
+        setDbSetPropertiesDialog({
+          dbSet,
+          connectionName,
+          loading: false,
+          error: error instanceof Error ? error.message : String(error),
+        });
       } finally {
         onEngineBusyChange?.(-1);
       }
@@ -391,11 +448,8 @@ export function ExplorerSidebar(props: ExplorerSidebarProps) {
     [
       appSettings,
       connections,
-      describeByDbSet,
-      expandedNodeIds,
       onEngineBusyChange,
-      onExpandedNodeIdsChange,
-      onStatus,
+      onRequestEngine,
       workspaceDirectory,
     ],
   );
@@ -440,7 +494,6 @@ export function ExplorerSidebar(props: ExplorerSidebarProps) {
         connections,
         activeConnectionId,
         schemaByConnection,
-        describeByDbSet,
         queryTabs,
         queryLibrary,
         userSnippets,
@@ -455,7 +508,6 @@ export function ExplorerSidebar(props: ExplorerSidebarProps) {
     [
       activeConnectionId,
       connections,
-      describeByDbSet,
       documentPath,
       gitLoading,
       gitStatus,
@@ -543,6 +595,9 @@ export function ExplorerSidebar(props: ExplorerSidebarProps) {
       y,
       items: buildContextMenuItems(node, {
         treeNodes,
+        workspaceName,
+        documentPath,
+        fileManagerLabel,
         connections,
         queryTabs,
         queryLibrary,
@@ -573,10 +628,12 @@ export function ExplorerSidebar(props: ExplorerSidebarProps) {
         onImportPack,
         onInstallPackId,
         onStatus,
+        onRenameWorkspace,
+        onOpenWorkspaceProperties: () => setWorkspacePropertiesOpen(true),
         activeConnectionId,
         refreshSchemaForConnection,
         loadDbInfoForConnection,
-        loadDescribe,
+        loadDbSetProperties,
         runScan,
         refreshGit,
         gitDirectory,
@@ -713,6 +770,24 @@ export function ExplorerSidebar(props: ExplorerSidebarProps) {
         payload={dbInfoDialog?.payload}
         onClose={() => setDbInfoDialog(undefined)}
       />
+
+      <WorkspacePropertiesDialog
+        open={workspacePropertiesOpen}
+        workspace={workspace}
+        documentPath={documentPath}
+        onClose={() => setWorkspacePropertiesOpen(false)}
+        onApply={onUpdateWorkspace}
+      />
+
+      <DbSetPropertiesDialog
+        open={dbSetPropertiesDialog !== undefined}
+        dbSet={dbSetPropertiesDialog?.dbSet ?? ""}
+        connectionName={dbSetPropertiesDialog?.connectionName ?? ""}
+        loading={dbSetPropertiesDialog?.loading ?? false}
+        error={dbSetPropertiesDialog?.error}
+        payload={dbSetPropertiesDialog?.payload}
+        onClose={() => setDbSetPropertiesDialog(undefined)}
+      />
     </aside>
   );
 }
@@ -723,7 +798,6 @@ function buildExplorerTree(input: {
   connections: WorkspaceConnection[];
   activeConnectionId: string;
   schemaByConnection: Record<string, ConnectionSchemaState>;
-  describeByDbSet: Record<string, DescribeJsonPayload>;
   queryTabs: QueryTab[];
   queryLibrary: QueryLibraryState;
   userSnippets: SnippetDefinition[];
@@ -764,7 +838,6 @@ function buildExplorerTree(input: {
                     connection.id,
                     input.activeConnectionId,
                     schema,
-                    input.describeByDbSet,
                   ),
                 },
               ],
@@ -903,7 +976,7 @@ function buildContextMenuItems(
     force?: boolean,
   ) => Promise<void>;
   const loadDbInfoForConnection = ctx.loadDbInfoForConnection as (connectionId: string) => Promise<void>;
-  const loadDescribe = ctx.loadDescribe as (connectionId: string, dbSet: string) => Promise<void>;
+  const loadDbSetProperties = ctx.loadDbSetProperties as (connectionId: string, dbSet: string) => Promise<void>;
   const runScan = ctx.runScan as (mode: ScanMode) => Promise<void>;
   const refreshGit = ctx.refreshGit as () => Promise<void>;
   const gitDirectory = ctx.gitDirectory as string;
@@ -921,6 +994,39 @@ function buildContextMenuItems(
         onClick: () => onExpandedNodeIdsChange(collectExpandableIds(treeNodes)),
       },
       { id: "collapse-all", label: "Collapse all", onClick: () => onExpandedNodeIdsChange(["workspace"]) },
+    ];
+  }
+
+  if (node.id === "workspace") {
+    const workspaceName = ctx.workspaceName as string;
+    const documentPath = ctx.documentPath as string;
+    const fileManagerLabel = ctx.fileManagerLabel as string;
+    const onRenameWorkspace = ctx.onRenameWorkspace as (name: string) => void;
+    const onOpenWorkspaceProperties = ctx.onOpenWorkspaceProperties as () => void;
+    const onStatus = ctx.onStatus as (message: string) => void;
+
+    return [
+      { id: "properties", label: "Properties", onClick: onOpenWorkspaceProperties },
+      {
+        id: "rename",
+        label: "Rename",
+        onClick: () => {
+          const nextName = window.prompt("Workspace name", workspaceName);
+          if (nextName?.trim() && nextName.trim() !== workspaceName) {
+            onRenameWorkspace(nextName.trim());
+          }
+        },
+      },
+      {
+        id: "show-in-file-manager",
+        label: formatShowInFileManagerLabel(fileManagerLabel),
+        disabled: !documentPath,
+        onClick: () => {
+          void showWorkspaceInFileManager(documentPath).catch((error) => {
+            onStatus(error instanceof Error ? error.message : String(error));
+          });
+        },
+      },
     ];
   }
 
@@ -964,18 +1070,8 @@ function buildContextMenuItems(
     const { connectionId, dbSet } = parsed;
     return [
       {
-        id: "count",
-        label: "Count",
-        onClick: () => {
-          if (connectionId !== activeConnectionId) {
-            onSelectConnection(connectionId);
-          }
-          onRunExpression(buildDbSetCountExpression(dbSet));
-        },
-      },
-      {
-        id: "sample",
-        label: "Sample",
+        id: "query",
+        label: "Query",
         onClick: () => {
           if (connectionId !== activeConnectionId) {
             onSelectConnection(connectionId);
@@ -984,9 +1080,9 @@ function buildContextMenuItems(
         },
       },
       {
-        id: "describe",
-        label: "Describe",
-        onClick: () => void loadDescribe(connectionId, dbSet),
+        id: "properties",
+        label: "Properties",
+        onClick: () => void loadDbSetProperties(connectionId, dbSet),
       },
     ];
   }
@@ -1183,7 +1279,6 @@ function buildModelChildren(
   connectionId: string,
   activeConnectionId: string,
   schema: ConnectionSchemaState | undefined,
-  describeByDbSet: Record<string, DescribeJsonPayload>,
 ): ExplorerNode[] {
   if (!schema) {
     if (connectionId !== activeConnectionId) {
@@ -1222,26 +1317,12 @@ function buildModelChildren(
     return [{ id: `model:${connectionId}:error`, label: schema.error, kind: "info", muted: true }];
   }
 
-  return (schema.tables?.tables ?? []).map((entry) => {
-    const describeKey = `${connectionId}:${entry.dbSet}`;
-    const describe = describeByDbSet[describeKey];
-    const propertyChildren =
-      describe?.members?.map((member) => ({
-        id: `property:${connectionId}:${entry.dbSet}:${member.name}`,
-        label: member.name,
-        subtitle: member.type,
-        kind: "property" as const,
-        muted: true,
-      })) ?? [];
-
-    return {
-      id: `dbset:${connectionId}:${entry.dbSet}`,
-      label: entry.dbSet,
-      subtitle: entry.entityType,
-      kind: "dbset" as const,
-      children: propertyChildren.length > 0 ? propertyChildren : undefined,
-    };
-  });
+  return (schema.tables?.tables ?? []).map((entry) => ({
+    id: `dbset:${connectionId}:${entry.dbSet}`,
+    label: entry.dbSet,
+    subtitle: entry.entityType,
+    kind: "dbset" as const,
+  }));
 }
 
 function resolveConnectionSchemaContext(

@@ -65,6 +65,29 @@ export function IconCharts(props: IconProps) {
   );
 }
 
+export function IconBenchmark(props: IconProps) {
+  return (
+    <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" {...props}>
+      <circle cx="8" cy="8.75" r="5.25" fill="none" stroke="currentColor" strokeWidth="1.25" />
+      <path
+        d="M8 4.75V8.75l2.5 1.5"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.25"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M6.25 1.75h3.5"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.25"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
 export function IconHistory(props: IconProps) {
   return (
     <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" {...props}>

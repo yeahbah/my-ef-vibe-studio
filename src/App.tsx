@@ -7,14 +7,15 @@ import { SplashScreen } from "./components/SplashScreen";
 import { StatusBarBusy } from "./components/StatusBarBusy";
 import { EditorToolPanel } from "./components/EditorToolPanel";
 import { EditorToolRail, type EditorToolId } from "./components/EditorToolRail";
+import { MainViewSwitcher } from "./components/MainViewSwitcher";
+import { NotebookView } from "./components/NotebookView";
 import { QueryWorkspace, type QueryWorkspaceHandle } from "./components/QueryWorkspace";
-import { NotebookPanel } from "./components/NotebookPanel";
+import { ReplView } from "./components/ReplView";
 import { PrerequisitesBanner } from "./components/PrerequisitesBanner";
 import { QueryTabBar } from "./components/QueryTabBar";
 import { ResizableResultsDock, DEFAULT_RESULTS_DOCK_HEIGHT } from "./components/ResizableResultsDock";
 import { ResultsTabs } from "./components/ResultsTabs";
 import { SettingsPanel } from "./components/SettingsPanel";
-import { SqlToLinqDialog } from "./components/SqlToLinqDialog";
 import { ExplorerSidebar } from "./components/explorer/ExplorerSidebar";
 import { resolveExplorerExpandedNodes, normalizeExplorerExpandedNodes } from "./components/explorer/types";
 import { runBenchmark, type BenchmarkResult } from "./lib/benchmark";
@@ -32,6 +33,7 @@ import { runSqlViaDaemon } from "./lib/rawSql";
 import { looksLikeRawSql } from "./lib/sqlDetect";
 import { RUN_QUERY_EVENT, type RunQueryEventDetail } from "./lib/editorRun";
 import { buildExportContent } from "./lib/resultFormat";
+import { inferResultEntity, persistResultChanges } from "./lib/resultPersist";
 import {
   getDefaultWorkspaceRoot,
   loadAppSettings,
@@ -42,7 +44,7 @@ import {
 import { applyTheme, toggleTheme } from "./lib/theme";
 import { useDebouncedEffect } from "./lib/debounce";
 import { yieldToUi } from "./lib/yieldToUi";
-import { formatStudioWindowTitle, setWindowTitle } from "./lib/windowTitle";
+import { formatStudioWindowTitle, setWindowTitle, STUDIO_WINDOW_TITLE } from "./lib/windowTitle";
 import {
   createNewWorkspace,
   openWorkspaceFile,
@@ -53,6 +55,7 @@ import {
 import type { AppSettings, PrerequisiteCheckResult } from "./types/connection";
 import { emptyEvaluationPayload, type EvaluationJsonPayload } from "./types/evaluation";
 import { createDefaultNotebook, type NotebookCell } from "./types/notebook";
+import { resolveSavedMainView, type AppMainView } from "./types/mainView";
 import { createQueryTab, normalizeResultsTab, type LegacyResultsTab, type QueryTab, type ResultsTab } from "./types/query";
 import { createUserSnippet, type SnippetDefinition } from "./types/snippets";
 import {
@@ -121,7 +124,8 @@ function App() {
   );
   const [explorerOpen, setExplorerOpen] = useState(true);
   const [history, setHistory] = useState<EvaluationHistoryEntry[]>([]);
-  const [notebookOpen, setNotebookOpen] = useState(false);
+  const [mainView, setMainView] = useState<AppMainView>("query");
+  const [replViewMounted, setReplViewMounted] = useState(false);
   const [notebookName, setNotebookName] = useState("Notebook");
   const [notebookPath, setNotebookPath] = useState("");
   const [notebookConnectionId, setNotebookConnectionId] = useState("");
@@ -133,11 +137,8 @@ function App() {
   const [lambdaMode, setLambdaMode] = useState(false);
   const [userSnippets, setUserSnippets] = useState<SnippetDefinition[]>([]);
   const [queryLibrary, setQueryLibrary] = useState<QueryLibraryState>(createEmptyQueryLibrary());
-  const [compareBaseline, setCompareBaseline] = useState<EvaluationHistoryEntry | undefined>();
   const [activeEditorTool, setActiveEditorTool] = useState<EditorToolId | undefined>();
   const [benchmarkResult, setBenchmarkResult] = useState<BenchmarkResult | undefined>();
-  const [sqlToLinqOpen, setSqlToLinqOpen] = useState(false);
-  const [sqlToLinqInitial, setSqlToLinqInitial] = useState("");
   const [benchmarking, setBenchmarking] = useState(false);
   const [installedPackIds, setInstalledPackIds] = useState<string[]>([]);
   const [splashExiting, setSplashExiting] = useState(false);
@@ -219,6 +220,32 @@ function App() {
     setDocument((current) => (current ? { ...current, workspace } : current));
   }, []);
 
+  const applyWorkspaceUpdate = useCallback(
+    (workspace: EfvibeWorkspace) => {
+      updateWorkspace(workspace);
+      setActiveConnectionId((currentId) => {
+        if (workspace.connections.some((connection) => connection.id === currentId)) {
+          return currentId;
+        }
+
+        return workspace.connections[0]?.id ?? "";
+      });
+      setQueryTabs((tabs) =>
+        tabs.map((tab) => {
+          if (workspace.connections.some((connection) => connection.id === tab.connectionId)) {
+            return tab;
+          }
+
+          const fallbackId = workspace.connections[0]?.id ?? tab.connectionId;
+          return { ...tab, connectionId: fallbackId };
+        }),
+      );
+      void invalidateEfvibeDaemon();
+      setStatus(`Updated workspace ${workspace.name}`);
+    },
+    [updateWorkspace],
+  );
+
   const allowEngine = useCallback(() => {
     setEngineAllowed(true);
   }, []);
@@ -297,8 +324,12 @@ function App() {
         if (savedSession.history) {
           setHistory(savedSession.history);
         }
-        if (savedSession.notebookOpen) {
-          setNotebookOpen(true);
+        const restoredMainView = resolveSavedMainView(savedSession);
+        setMainView(restoredMainView);
+        if (restoredMainView === "repl") {
+          setReplViewMounted(true);
+        }
+        if (restoredMainView === "notebook" || savedSession.notebookCells?.length) {
           setNotebookName(savedSession.notebookName ?? "Notebook");
           setNotebookPath(savedSession.notebookPath ?? "");
           setNotebookConnectionId(savedSession.notebookConnectionId ?? connectionId);
@@ -320,9 +351,6 @@ function App() {
         }
         if (savedSession.queryLibrary) {
           setQueryLibrary(savedSession.queryLibrary);
-        }
-        if (savedSession.compareBaseline) {
-          setCompareBaseline(savedSession.compareBaseline);
         }
         if (savedSession.installedPackIds) {
           setInstalledPackIds(savedSession.installedPackIds);
@@ -416,7 +444,7 @@ function App() {
         resultsDockHeight,
         explorerExpandedNodes,
         history,
-        notebookOpen,
+        mainView,
         notebookName,
         notebookPath,
         notebookConnectionId,
@@ -427,7 +455,6 @@ function App() {
         lambdaMode,
         userSnippets,
         queryLibrary,
-        compareBaseline,
         installedPackIds,
         explorerOpen,
       });
@@ -441,7 +468,7 @@ function App() {
       resultsDockHeight,
       explorerExpandedNodes,
       history,
-      notebookOpen,
+      mainView,
       notebookName,
       notebookPath,
       notebookConnectionId,
@@ -451,7 +478,6 @@ function App() {
       lambdaMode,
       userSnippets,
       queryLibrary,
-      compareBaseline,
       installedPackIds,
       explorerOpen,
     ],
@@ -463,11 +489,9 @@ function App() {
   }, []);
 
   useEffect(() => {
-    if (!activeConnection) {
-      return;
-    }
-
-    const title = formatStudioWindowTitle(connectionDisplayName(activeConnection));
+    const title = activeConnection
+      ? formatStudioWindowTitle(connectionDisplayName(activeConnection))
+      : STUDIO_WINDOW_TITLE;
     void setWindowTitle(title).catch((error) => {
       console.error("Failed to set window title:", error);
     });
@@ -559,6 +583,10 @@ function App() {
           updateQueryTab(activeQueryTab.id, {
             lastPayload: result.payload,
             activeResultsTab: nextTab,
+            resultRowsBaseline: result.payload.rows
+              ? result.payload.rows.map((row) => ({ ...row }))
+              : undefined,
+            resultEntity: undefined,
           });
 
           if (result.payload.success) {
@@ -683,6 +711,13 @@ function App() {
             expression: runExpression,
             lastPayload: result.payload,
             activeResultsTab: nextTab,
+            resultRowsBaseline: result.payload.rows
+              ? result.payload.rows.map((row) => ({ ...row }))
+              : undefined,
+            resultEntity:
+              result.payload.rows && result.payload.rows.length > 0
+                ? inferResultEntity(runExpression)
+                : undefined,
           });
 
           if (result.payload.success) {
@@ -902,6 +937,27 @@ function App() {
     setStatus(`Exported to ${target}`);
   }
 
+  function handleReplSessionExit(exitCode: number) {
+    setMainView("query");
+    setReplViewMounted(false);
+    setStatus(exitCode === 0 ? "REPL session ended." : `REPL exited with code ${exitCode}.`);
+  }
+
+  function handleMainViewChange(view: AppMainView) {
+    if (view === mainView) {
+      return;
+    }
+
+    setMainView(view);
+    if (view === "repl") {
+      setReplViewMounted(true);
+    }
+    if (view === "notebook" && notebookCells.length === 0) {
+      setNotebookCells(createDefaultNotebook(activeConnectionId));
+      setNotebookConnectionId(activeConnectionId);
+    }
+  }
+
   async function handleStartRepl() {
     if (!connectionSettings || !searchDirectory) {
       setStatus("Configure a connection before starting REPL.");
@@ -943,21 +999,13 @@ function App() {
     void invalidateEfvibeDaemon();
   }
 
-  function openNotebook() {
-    setNotebookOpen(true);
-    if (notebookCells.length === 0) {
-      setNotebookCells(createDefaultNotebook(activeConnectionId));
-      setNotebookConnectionId(activeConnectionId);
-    }
-  }
-
   async function handleOpenNotebook() {
     const opened = await openNotebookFile(activeConnectionId);
     if (!opened) {
       return;
     }
 
-    setNotebookOpen(true);
+    setMainView("notebook");
     setNotebookName(opened.name);
     setNotebookPath(opened.path);
     setNotebookConnectionId(opened.connectionId);
@@ -1027,17 +1075,6 @@ function App() {
     }
   }
 
-  function handleSetCompareBaseline() {
-    const latest = history[0];
-    if (!latest) {
-      setStatus("Run a query before setting a compare baseline.");
-      return;
-    }
-
-    setCompareBaseline(latest);
-    setStatus("Compare baseline set.");
-  }
-
   function handleToggleFavorite(tabId: string) {
     setQueryTabs((tabs) =>
       tabs.map((tab) =>
@@ -1093,11 +1130,6 @@ function App() {
 
   function handleRemoveSnippet(id: string) {
     setUserSnippets((snippets) => snippets.filter((snippet) => snippet.id !== id));
-  }
-
-  function openSqlToLinq(sql = "") {
-    setSqlToLinqInitial(sql);
-    setSqlToLinqOpen(true);
   }
 
   function handleImportPack(
@@ -1162,14 +1194,8 @@ function App() {
             void invalidateEfvibeDaemon();
           }}
         />
-        <div className="menu">
-          <button type="button" onClick={openNotebook}>
-            Notebook
-          </button>
-          <button type="button" onClick={() => void handleStartRepl()}>
-            REPL
-          </button>
-        </div>
+        <MainViewSwitcher value={mainView} onChange={handleMainViewChange} />
+        {mainView === "query" ? (
         <div className="runbar">
           <button type="button" disabled={running} onClick={() => void handleRun(false)}>
             Run
@@ -1177,16 +1203,8 @@ function App() {
           <button type="button" disabled={running} onClick={() => void handleRun(true)}>
             Run Plan
           </button>
-          <button type="button" disabled={benchmarking || running} onClick={() => void handleBenchmark(5)}>
-            Benchmark
-          </button>
-          <button type="button" onClick={handleSetCompareBaseline}>
-            Set baseline
-          </button>
-          <button type="button" onClick={() => openSqlToLinq()}>
-            SQL → LINQ
-          </button>
         </div>
+        ) : null}
         <div
           className="status-bar"
           role="status"
@@ -1207,6 +1225,7 @@ function App() {
       <div className={explorerOpen ? "workspace" : "workspace explorer-hidden"}>
         {explorerOpen ? (
         <ExplorerSidebar
+          workspace={document.workspace}
           documentPath={document.path}
           workspaceDirectory={workspaceDirectory}
           appSettings={settings}
@@ -1296,6 +1315,11 @@ function App() {
           onNewWorkspace={() => void handleNewWorkspace()}
           onOpenWorkspace={() => void handleOpenWorkspace()}
           onSaveWorkspace={() => void handleSaveWorkspace()}
+          onRenameWorkspace={(name) => {
+            updateWorkspace({ ...document.workspace, name });
+            setStatus(`Renamed workspace to ${name}`);
+          }}
+          onUpdateWorkspace={applyWorkspaceUpdate}
           onOpenSettings={() => setSettingsOpen(true)}
           onRequestEngine={allowEngine}
           onEngineBusyChange={adjustEngineBusy}
@@ -1305,78 +1329,174 @@ function App() {
         ) : null}
 
         <div className="main-stack">
-          <QueryTabBar
-            tabs={queryTabs}
-            activeTabId={activeQueryTabId}
-            onSelect={selectQueryTab}
-            onAdd={addQueryTab}
-            onClose={closeQueryTab}
-            onOpen={() => void handleOpenQuery()}
-            onSave={() => void handleSaveQuery()}
-            onToggleFavorite={handleToggleFavorite}
-          />
-
-          <div className="editor-shell">
-            <EditorToolRail activeTool={activeEditorTool} onSelect={handleEditorTool} />
-
-            {activeEditorTool ? (
-              <EditorToolPanel
-                tool={activeEditorTool}
-                history={history}
-                baseline={compareBaseline}
-                benchmark={benchmarkResult}
-                userSnippets={userSnippets}
-                favoriteTabs={favoriteTabs}
-                onClose={() => setActiveEditorTool(undefined)}
-                onHistorySelect={(nextExpression) => {
-                  updateQueryTab(activeQueryTab.id, { expression: nextExpression });
-                }}
-                onInsertSnippet={handleInsertSnippet}
-                onAddSnippet={handleAddSnippet}
-                onRemoveSnippet={handleRemoveSnippet}
-                onOpenFavorite={(tab) => selectQueryTab(tab.id)}
+          {mainView === "query" ? (
+            <>
+              <QueryTabBar
+                tabs={queryTabs}
+                activeTabId={activeQueryTabId}
+                onSelect={selectQueryTab}
+                onAdd={addQueryTab}
+                onClose={closeQueryTab}
+                onOpen={() => void handleOpenQuery()}
+                onSave={() => void handleSaveQuery()}
                 onToggleFavorite={handleToggleFavorite}
               />
-            ) : null}
 
-            <div className="editor-shell-main">
-              <ResizableResultsDock
-                height={resultsDockHeight}
-                onHeightChange={setResultsDockHeight}
-                editor={
-                  <QueryWorkspace
-                    ref={queryWorkspaceRef}
-                    tabId={activeQueryTab.id}
-                    expression={expression}
-                    theme={settings.theme ?? "dark"}
-                    onExpressionChange={handleExpressionChange}
-                    sqlPaneOpen={sqlPaneOpen}
-                    onSqlPaneOpenChange={handleSqlPaneOpenChange}
-                    sqlPaneWidth={sqlPaneWidth}
-                    onSqlPaneWidthChange={setSqlPaneWidth}
-                    connectionSettings={connectionSettings}
-                    searchDirectory={searchDirectory}
-                    autoPreviewAllowed={engineAllowed}
-                    running={running}
-                    onEngineBusyChange={adjustEngineBusy}
-                    onRequestEngine={allowEngine}
-                    onRunSql={(sql) => void handleRunSql(sql)}
-                    onConvertSql={(sql) => openSqlToLinq(sql)}
+              <div className="editor-shell">
+                <EditorToolRail
+                  activeTool={activeEditorTool}
+                  onSelect={handleEditorTool}
+                  onBenchmark={() => void handleBenchmark(5)}
+                  benchmarking={benchmarking}
+                  running={running}
+                />
+
+                {activeEditorTool ? (
+                  <EditorToolPanel
+                    tool={activeEditorTool}
+                    history={history}
+                    benchmark={benchmarkResult}
+                    userSnippets={userSnippets}
+                    favoriteTabs={favoriteTabs}
+                    onClose={() => setActiveEditorTool(undefined)}
+                    onHistorySelect={(nextExpression) => {
+                      updateQueryTab(activeQueryTab.id, { expression: nextExpression });
+                    }}
+                    onInsertSnippet={handleInsertSnippet}
+                    onAddSnippet={handleAddSnippet}
+                    onRemoveSnippet={handleRemoveSnippet}
+                    onOpenFavorite={(tab) => selectQueryTab(tab.id)}
+                    onToggleFavorite={handleToggleFavorite}
                   />
-                }
-                results={
-                  <ResultsTabs
-                    payload={payload}
-                    activeTab={activeTab}
-                    onTabChange={(tab) =>
-                      updateQueryTab(activeQueryTab.id, { activeResultsTab: tab })
+                ) : null}
+
+                <div className="editor-shell-main">
+                  <ResizableResultsDock
+                    height={resultsDockHeight}
+                    onHeightChange={setResultsDockHeight}
+                    editor={
+                      <QueryWorkspace
+                        ref={queryWorkspaceRef}
+                        tabId={activeQueryTab.id}
+                        expression={expression}
+                        theme={settings.theme ?? "dark"}
+                        onExpressionChange={handleExpressionChange}
+                        sqlPaneOpen={sqlPaneOpen}
+                        onSqlPaneOpenChange={handleSqlPaneOpenChange}
+                        sqlPaneWidth={sqlPaneWidth}
+                        onSqlPaneWidthChange={setSqlPaneWidth}
+                        connectionSettings={connectionSettings}
+                        searchDirectory={searchDirectory}
+                        autoPreviewAllowed={engineAllowed}
+                        running={running}
+                        onEngineBusyChange={adjustEngineBusy}
+                        onRequestEngine={allowEngine}
+                        onRunSql={(sql) => void handleRunSql(sql)}
+                      />
                     }
-                    onExport={(format) => void handleExport(format)}
+                    results={
+                      <ResultsTabs
+                        payload={payload}
+                        activeTab={activeTab}
+                        onTabChange={(tab) =>
+                          updateQueryTab(activeQueryTab.id, { activeResultsTab: tab })
+                        }
+                        onExport={(format) => void handleExport(format)}
+                        onSaveRows={async (rows) => {
+                          if (!connectionSettings || !searchDirectory || !activeQueryTab?.lastPayload) {
+                            const message = "Configure a connection before saving result changes.";
+                            setStatus(message);
+                            throw new Error(message);
+                          }
+
+                          const baseline = activeQueryTab.resultRowsBaseline;
+                          const entity = activeQueryTab.resultEntity;
+
+                          if (!baseline || !entity) {
+                            const message =
+                              "These results cannot be saved to the database. Run a DbSet LINQ query (for example db.Products.Take(10).ToList()) that returns entity rows with primary keys.";
+                            setStatus(message);
+                            throw new Error(message);
+                          }
+
+                          try {
+                            const message = await persistResultChanges(
+                              connectionSettings,
+                              searchDirectory,
+                              searchDirectory,
+                              entity,
+                              baseline,
+                              rows,
+                            );
+
+                            updateQueryTab(activeQueryTab.id, {
+                              lastPayload: {
+                                ...activeQueryTab.lastPayload,
+                                rows: rows.map((row) => ({ ...row })),
+                                metrics: {
+                                  ...activeQueryTab.lastPayload.metrics,
+                                  rowCount: rows.length,
+                                },
+                              },
+                              resultRowsBaseline: rows.map((row) => ({ ...row })),
+                            });
+                            setStatus(message);
+                          } catch (error) {
+                            const message = error instanceof Error ? error.message : String(error);
+                            setStatus(message);
+                            throw error;
+                          }
+                        }}
+                      />
+                    }
                   />
-                }
+                </div>
+              </div>
+            </>
+          ) : null}
+
+          {mainView === "notebook" ? (
+            <NotebookView
+              name={notebookName}
+              cells={notebookCells}
+              running={notebookRunning}
+              onNameChange={setNotebookName}
+              onCellChange={(cellId, value) =>
+                setNotebookCells((cells) =>
+                  cells.map((cell) => (cell.id === cellId ? { ...cell, value } : cell)),
+                )
+              }
+              onAddCell={() =>
+                setNotebookCells((cells) => [
+                  ...cells,
+                  { id: crypto.randomUUID(), kind: "code", value: "" },
+                ])
+              }
+              onRemoveCell={(cellId) =>
+                setNotebookCells((cells) => cells.filter((cell) => cell.id !== cellId))
+              }
+              onOpen={() => void handleOpenNotebook()}
+              onSave={() => void handleSaveNotebook()}
+              onRunAll={() => void handleRunNotebook()}
+            />
+          ) : null}
+
+          {replViewMounted ? (
+            <div
+              className={
+                mainView === "repl" ? "main-view-slot" : "main-view-slot main-view-hidden"
+              }
+            >
+              <ReplView
+                connectionSettings={connectionSettings}
+                searchDirectory={searchDirectory}
+                theme={settings.theme ?? "dark"}
+                onStatus={setStatus}
+                onOpenExternalTerminal={() => void handleStartRepl()}
+                onSessionExit={handleReplSessionExit}
               />
             </div>
-          </div>
+          ) : null}
         </div>
       </div>
 
@@ -1392,44 +1512,6 @@ function App() {
         onConnectionChange={updateConnection}
       />
 
-      <NotebookPanel
-        open={notebookOpen}
-        name={notebookName}
-        cells={notebookCells}
-        running={notebookRunning}
-        onClose={() => setNotebookOpen(false)}
-        onNameChange={setNotebookName}
-        onCellChange={(cellId, value) =>
-          setNotebookCells((cells) =>
-            cells.map((cell) => (cell.id === cellId ? { ...cell, value } : cell)),
-          )
-        }
-        onAddCell={() =>
-          setNotebookCells((cells) => [
-            ...cells,
-            { id: crypto.randomUUID(), kind: "code", value: "" },
-          ])
-        }
-        onRemoveCell={(cellId) =>
-          setNotebookCells((cells) => cells.filter((cell) => cell.id !== cellId))
-        }
-        onOpen={() => void handleOpenNotebook()}
-        onSave={() => void handleSaveNotebook()}
-        onRunAll={() => void handleRunNotebook()}
-      />
-
-      <SqlToLinqDialog
-        open={sqlToLinqOpen}
-        initialSql={sqlToLinqInitial}
-        connectionSettings={connectionSettings}
-        searchDirectory={searchDirectory}
-        onClose={() => setSqlToLinqOpen(false)}
-        onInsert={(linq) => {
-          updateQueryTab(activeQueryTab.id, { expression: linq });
-          setSqlToLinqOpen(false);
-          setStatus("Inserted SQL → LINQ draft.");
-        }}
-      />
     </main>
   );
 }

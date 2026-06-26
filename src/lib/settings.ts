@@ -8,6 +8,7 @@ const store = new LazyStore("settings.json");
 
 import type { EvaluationHistoryEntry } from "./history";
 import type { QueryTab } from "../types/query";
+import type { AppMainView } from "../types/mainView";
 import type { NotebookCell } from "../types/notebook";
 import type { SnippetDefinition } from "../types/snippets";
 import type { QueryLibraryState } from "../types/queryLibrary";
@@ -32,6 +33,8 @@ export interface StudioSession {
   sidebarTab?: SidebarTab;
   explorerExpandedNodes?: string[];
   history?: EvaluationHistoryEntry[];
+  mainView?: AppMainView;
+  /** @deprecated Use mainView */
   notebookOpen?: boolean;
   notebookName?: string;
   notebookPath?: string;
@@ -43,7 +46,6 @@ export interface StudioSession {
   lambdaMode?: boolean;
   userSnippets?: SnippetDefinition[];
   queryLibrary?: QueryLibraryState;
-  compareBaseline?: EvaluationHistoryEntry;
   installedPackIds?: string[];
   explorerOpen?: boolean;
 }

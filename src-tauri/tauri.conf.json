@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "efvibe Studio",
+        "title": "My EF Vibe Studio",
         "width": 1200,
         "height": 720,
         "minWidth": 800,

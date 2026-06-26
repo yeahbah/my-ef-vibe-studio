@@ -17,6 +17,7 @@
     "fs:scope-download-recursive",
     "fs:scope-desktop-recursive",
     "opener:default",
+    "pty:default",
     "shell:default",
     "store:default"
   ]

@@ -33,7 +33,6 @@ interface QueryWorkspaceProps {
   onRequestEngine?: () => void;
   onEngineBusyChange?: (delta: number) => void;
   onRunSql: (sql: string) => void;
-  onConvertSql: (sql: string) => void;
 }
 
 const EXPRESSION_SYNC_MS = 400;
@@ -56,7 +55,6 @@ export const QueryWorkspace = forwardRef<QueryWorkspaceHandle, QueryWorkspacePro
       onRequestEngine,
       onEngineBusyChange,
       onRunSql,
-      onConvertSql,
     },
     ref,
   ) {
@@ -137,7 +135,6 @@ export const QueryWorkspace = forwardRef<QueryWorkspaceHandle, QueryWorkspacePro
             onRequestEngine={onRequestEngine}
             onEngineBusyChange={onEngineBusyChange}
             onRunSql={onRunSql}
-            onConvertSql={onConvertSql}
           />
         }
       />

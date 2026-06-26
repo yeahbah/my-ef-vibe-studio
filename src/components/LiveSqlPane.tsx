@@ -13,7 +13,6 @@ interface LiveSqlPaneProps {
   running?: boolean;
   onRequestEngine?: () => void;
   onEngineBusyChange?: (delta: number) => void;
-  onConvertSql?: (sql: string) => void;
   onRunSql?: (sql: string) => void;
 }
 
@@ -26,7 +25,6 @@ export function LiveSqlPane({
   running = false,
   onRequestEngine,
   onEngineBusyChange,
-  onConvertSql,
   onRunSql,
 }: LiveSqlPaneProps) {
   const [sql, setSql] = useState("");
@@ -162,11 +160,6 @@ export function LiveSqlPane({
         <button type="button" disabled={loading} onClick={() => void syncFromLinq()}>
           Sync from LINQ
         </button>
-        {onConvertSql && sql ? (
-          <button type="button" onClick={() => onConvertSql(sql)}>
-            SQL → LINQ
-          </button>
-        ) : null}
       </div>
     </section>
   );

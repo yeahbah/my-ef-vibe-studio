@@ -1,11 +1,11 @@
 import type { EvaluationJsonPayload } from "./evaluation";
 
-export type ResultsTab = "result" | "sql" | "plan" | "messages";
+export type ResultsTab = "result" | "plan" | "messages";
 
-export type LegacyResultsTab = ResultsTab | "explorer";
+export type LegacyResultsTab = ResultsTab | "explorer" | "sql";
 
 export function normalizeResultsTab(tab: LegacyResultsTab | undefined): ResultsTab {
-  if (!tab || tab === "explorer") {
+  if (!tab || tab === "explorer" || tab === "sql") {
     return "result";
   }
 
@@ -22,6 +22,10 @@ export interface QueryTab {
   folderId?: string;
   activeResultsTab: ResultsTab;
   lastPayload?: EvaluationJsonPayload;
+  /** Snapshot of result rows after the last successful query run (for grid save diffs). */
+  resultRowsBaseline?: Array<Record<string, string>>;
+  /** DbSet name inferred from the last LINQ query (e.g. Products from db.Products...). */
+  resultEntity?: string;
 }
 
 export interface EfvibeQueryFile {

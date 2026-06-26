@@ -8,7 +8,6 @@ import type { EditorToolId } from "./EditorToolRail";
 interface EditorToolPanelProps {
   tool: EditorToolId;
   history: EvaluationHistoryEntry[];
-  baseline?: EvaluationHistoryEntry;
   benchmark?: BenchmarkResult;
   userSnippets: SnippetDefinition[];
   favoriteTabs: QueryTab[];
@@ -31,7 +30,6 @@ const TOOL_TITLES: Record<EditorToolId, string> = {
 export function EditorToolPanel({
   tool,
   history,
-  baseline,
   benchmark,
   userSnippets,
   favoriteTabs,
@@ -54,7 +52,7 @@ export function EditorToolPanel({
 
       <div className="editor-tool-panel-body">
         {tool === "charts" ? (
-          <ChartsToolView history={history} baseline={baseline} benchmark={benchmark} />
+          <ChartsToolView history={history} benchmark={benchmark} />
         ) : null}
 
         {tool === "history" ? (
@@ -84,14 +82,11 @@ export function EditorToolPanel({
 
 function ChartsToolView({
   history,
-  baseline,
   benchmark,
 }: {
   history: EvaluationHistoryEntry[];
-  baseline?: EvaluationHistoryEntry;
   benchmark?: BenchmarkResult;
 }) {
-  const latest = history[0];
   const maxMs = Math.max(...history.map((entry) => entry.totalMs), benchmark?.maxMs ?? 0, 1);
 
   return (
@@ -128,28 +123,6 @@ function ChartsToolView({
               ))}
             </tbody>
           </table>
-        )}
-      </section>
-
-      <section className="tool-panel-section">
-        <h3>Compare baseline</h3>
-        {baseline && latest ? (
-          <table className="charts-table">
-            <tbody>
-              <tr>
-                <th>Total</th>
-                <td>{baseline.totalMs} ms</td>
-                <td>{latest.totalMs} ms</td>
-              </tr>
-              <tr>
-                <th>Rows</th>
-                <td>{baseline.rowCount ?? "—"}</td>
-                <td>{latest.rowCount ?? "—"}</td>
-              </tr>
-            </tbody>
-          </table>
-        ) : (
-          <p className="muted">Set a compare baseline from the run bar.</p>
         )}
       </section>
 

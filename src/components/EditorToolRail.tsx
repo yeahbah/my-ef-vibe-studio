@@ -1,10 +1,13 @@
-import { IconCharts, IconHistory, IconSnippets, IconStar } from "./icons";
+import { IconBenchmark, IconCharts, IconHistory, IconSnippets, IconStar } from "./icons";
 
 export type EditorToolId = "charts" | "history" | "snippets" | "favorites";
 
 interface EditorToolRailProps {
   activeTool?: EditorToolId;
   onSelect: (tool: EditorToolId) => void;
+  onBenchmark?: () => void;
+  benchmarking?: boolean;
+  running?: boolean;
 }
 
 const TOOLS: Array<{
@@ -18,7 +21,13 @@ const TOOLS: Array<{
   { id: "favorites", label: "Favorites", Icon: IconStar },
 ];
 
-export function EditorToolRail({ activeTool, onSelect }: EditorToolRailProps) {
+export function EditorToolRail({
+  activeTool,
+  onSelect,
+  onBenchmark,
+  benchmarking = false,
+  running = false,
+}: EditorToolRailProps) {
   return (
     <aside className="editor-tool-rail" role="toolbar" aria-label="Editor tools">
       {TOOLS.map(({ id, label, Icon }) => (
@@ -34,6 +43,18 @@ export function EditorToolRail({ activeTool, onSelect }: EditorToolRailProps) {
           <Icon />
         </button>
       ))}
+      {onBenchmark ? (
+        <button
+          type="button"
+          className="editor-tool-btn"
+          title="Benchmark"
+          aria-label="Benchmark"
+          disabled={benchmarking || running}
+          onClick={onBenchmark}
+        >
+          <IconBenchmark />
+        </button>
+      ) : null}
     </aside>
   );
 }

@@ -19,6 +19,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_pty::init())
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_store::Builder::default().build())
         .setup(|app| {
@@ -45,6 +46,8 @@ pub fn run() {
             commands::git_status,
             commands::git_commit_files,
             commands::set_window_title,
+            commands::file_manager_label,
+            commands::repl_spawn_spec,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

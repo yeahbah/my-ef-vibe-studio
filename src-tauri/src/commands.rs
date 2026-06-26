@@ -225,6 +225,45 @@ fn build_repl_command_line(
     parts.into_iter().map(|part| quote_shell_arg(&part)).collect::<Vec<_>>().join(" ")
 }
 
+fn build_repl_spawn_spec(
+    settings: &ConnectionSettings,
+    search_directory: &Path,
+    cwd: &Path,
+) -> ReplSpawnSpec {
+    let invocation = resolve_tool_invocation(
+        search_directory,
+        &settings.tool_path,
+        &settings.dotnet_framework,
+    );
+    let mut args = invocation.prefix_args().to_vec();
+    args.extend(build_efvibe_args(settings, Some(search_directory)));
+
+    ReplSpawnSpec {
+        program: invocation.command().to_string(),
+        args,
+        cwd: cwd.to_string_lossy().to_string(),
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ReplSpawnSpec {
+    pub program: String,
+    pub args: Vec<String>,
+    pub cwd: String,
+}
+
+#[tauri::command]
+pub fn repl_spawn_spec(
+    settings: ConnectionSettings,
+    search_directory: String,
+    cwd: String,
+) -> Result<ReplSpawnSpec, String> {
+    let search_path = Path::new(&search_directory);
+    let cwd_path = Path::new(&cwd);
+    Ok(build_repl_spawn_spec(&settings, search_path, cwd_path))
+}
+
 #[tauri::command]
 pub fn start_repl(
     settings: ConnectionSettings,
@@ -321,4 +360,27 @@ pub fn set_window_title(app: tauri::AppHandle, title: String) -> Result<(), Stri
     }
 
     Ok(())
+}
+
+#[tauri::command]
+pub fn file_manager_label() -> String {
+    #[cfg(target_os = "windows")]
+    {
+        return "Explorer".to_string();
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        return "Finder".to_string();
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        return "file manager".to_string();
+    }
+
+    #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
+    {
+        "file manager".to_string()
+    }
 }

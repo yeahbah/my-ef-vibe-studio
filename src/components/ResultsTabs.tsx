@@ -6,7 +6,6 @@ import { normalizeResultsTab } from "../types/query";
 
 const RESULTS_TABS: Array<{ id: ResultsTab; label: string }> = [
   { id: "result", label: "Result" },
-  { id: "sql", label: "SQL" },
   { id: "plan", label: "Plan" },
   { id: "messages", label: "Messages" },
 ];
@@ -16,6 +15,7 @@ interface ResultsTabsProps {
   activeTab: ResultsTab;
   onTabChange: (tab: ResultsTab) => void;
   onExport: (format: "csv" | "json") => void;
+  onSaveRows?: (rows: Array<Record<string, string>>) => Promise<void>;
 }
 
 export function ResultsTabs({
@@ -23,6 +23,7 @@ export function ResultsTabs({
   activeTab,
   onTabChange,
   onExport,
+  onSaveRows,
 }: ResultsTabsProps) {
   const exportEnabled = canExportPayload(payload);
   const messageCount = payload.warnings.length;
@@ -67,8 +68,7 @@ export function ResultsTabs({
         id={`results-panel-${resolvedTab}`}
         aria-labelledby={`results-tab-${resolvedTab}`}
       >
-        {resolvedTab === "result" && <ResultBody payload={payload} />}
-        {resolvedTab === "sql" && <SqlBody payload={payload} />}
+        {resolvedTab === "result" && <ResultBody payload={payload} onSaveRows={onSaveRows} />}
         {resolvedTab === "plan" && <PlanBody payload={payload} />}
         {resolvedTab === "messages" && <MessagesBody payload={payload} />}
       </div>
@@ -76,7 +76,13 @@ export function ResultsTabs({
   );
 }
 
-function ResultBody({ payload }: { payload: EvaluationJsonPayload }) {
+function ResultBody({
+  payload,
+  onSaveRows,
+}: {
+  payload: EvaluationJsonPayload;
+  onSaveRows?: (rows: Array<Record<string, string>>) => Promise<void>;
+}) {
   if (payload.metrics.resultKind === "pending") {
     return (
       <div className="welcome-state">
@@ -90,7 +96,7 @@ function ResultBody({ payload }: { payload: EvaluationJsonPayload }) {
   }
 
   if (payload.rows && payload.rows.length > 0) {
-    return <ResultRowsView rows={payload.rows} />;
+    return <ResultRowsView rows={payload.rows} onSave={onSaveRows} />;
   }
 
   if (payload.value) {
@@ -98,29 +104,6 @@ function ResultBody({ payload }: { payload: EvaluationJsonPayload }) {
   }
 
   return <pre className="value-block">(null)</pre>;
-}
-
-function SqlBody({ payload }: { payload: EvaluationJsonPayload }) {
-  if (payload.sql.length === 0) {
-    return <p className="muted">No SQL captured for this run.</p>;
-  }
-
-  return (
-    <div className="stack">
-      {payload.sql.map((sql, index) => (
-        <section key={index}>
-          <h3>{payload.sql.length > 1 ? `SQL ${index + 1}` : "SQL"}</h3>
-          <pre>{sql}</pre>
-        </section>
-      ))}
-      {payload.translatedSql && (
-        <section>
-          <h3>Translated SQL</h3>
-          <pre>{payload.translatedSql}</pre>
-        </section>
-      )}
-    </div>
-  );
 }
 
 function PlanBody({ payload }: { payload: EvaluationJsonPayload }) {
