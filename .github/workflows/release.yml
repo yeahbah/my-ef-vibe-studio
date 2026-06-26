@@ -67,6 +67,9 @@ jobs:
 
   build-tauri:
     needs: resolve-version
+    defaults:
+      run:
+        shell: bash
     strategy:
       fail-fast: false
       matrix:
@@ -136,7 +139,7 @@ jobs:
         uses: actions/upload-artifact@v5
         with:
           name: studio-${{ matrix.artifact }}-${{ needs.resolve-version.outputs.version }}
-          path: release-artifacts/*
+          path: release-artifacts/
           if-no-files-found: error
 
   publish:
