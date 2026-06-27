@@ -95,6 +95,38 @@ export function IconCharts(props: IconProps) {
   );
 }
 
+export function IconPlay(props: IconProps) {
+  return (
+    <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" {...props}>
+      <path d="M5.5 3.5 12.5 8 5.5 12.5V3.5Z" fill="currentColor" />
+    </svg>
+  );
+}
+
+export function IconRunAbove(props: IconProps) {
+  return (
+    <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" {...props}>
+      <path
+        d="M8 2.5 5.75 4.75h1.5V6h1.5V4.75h1.5L8 2.5Z"
+        fill="currentColor"
+      />
+      <path d="M5.5 8.25 10.5 8.25 8 11.75 5.5 8.25Z" fill="currentColor" />
+    </svg>
+  );
+}
+
+export function IconRunBelow(props: IconProps) {
+  return (
+    <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" {...props}>
+      <path d="M5.5 4.25 10.5 4.25 8 7.75 5.5 4.25Z" fill="currentColor" />
+      <path
+        d="M8 13.5 10.25 11.25H8.75V10H7.25v1.25H5.75L8 13.5Z"
+        fill="currentColor"
+      />
+    </svg>
+  );
+}
+
 export function IconStop(props: IconProps) {
   return (
     <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" {...props}>

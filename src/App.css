@@ -865,36 +865,336 @@ button:disabled {
   font-size: 12px;
 }
 
-.notebook-cell {
-  margin-bottom: 12px;
-}
-
-.notebook-cell-header {
+.notebook-view {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 4px;
-  font-size: 12px;
-  color: var(--text-muted);
+  flex-direction: column;
+  min-height: 0;
 }
 
 .notebook-toolbar {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 6px;
 }
 
-.notebook-cell textarea {
+.notebook-toolbar-divider {
+  width: 1px;
+  height: 20px;
+  background: var(--border);
+  margin: 0 2px;
+}
+
+.notebook-cell-row {
+  display: flex;
+  gap: 0;
+  margin-bottom: 12px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg-surface);
+  overflow: hidden;
+}
+
+.notebook-cell-row-running {
+  border-color: color-mix(in srgb, var(--accent) 50%, var(--border));
+}
+
+.notebook-cell-row-failed {
+  border-color: color-mix(in srgb, var(--error) 40%, var(--border));
+}
+
+.notebook-cell-gutter {
+  flex: 0 0 56px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 4px;
+  padding: 10px 0;
+  background: var(--bg-elevated);
+  border-right: 1px solid var(--border);
+}
+
+.notebook-cell-run-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.notebook-cell-gutter-spacer {
+  font-size: 11px;
+  color: var(--text-muted);
+  line-height: 1;
+}
+
+.notebook-cell-run {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.notebook-cell-run svg {
+  width: 22px;
+  height: 22px;
+}
+
+.notebook-cell-run-secondary {
+  width: 30px;
+  height: 30px;
+}
+
+.notebook-cell-run-secondary svg {
+  width: 20px;
+  height: 20px;
+}
+
+.notebook-cell-run:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  color: var(--accent);
+}
+
+.notebook-cell-run:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.notebook-cell-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid color-mix(in srgb, var(--accent) 30%, transparent);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: notebook-spin 0.8s linear infinite;
+}
+
+@keyframes notebook-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.notebook-cell-body {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.notebook-cell-input {
+  border-bottom: 1px solid var(--border);
+}
+
+.notebook-code-editor {
+  background: var(--bg-app);
+}
+
+.notebook-code-editor .monaco-editor,
+.notebook-code-editor .monaco-editor-background,
+.notebook-code-editor .monaco-editor .margin {
+  background: transparent !important;
+}
+
+.notebook-markdown-editor {
   width: 100%;
-  min-height: 90px;
+  min-height: 72px;
+  box-sizing: border-box;
+  padding: 12px 14px;
+  border: 0;
   background: var(--bg-app);
   color: var(--text);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 8px;
   font-family: ui-monospace, monospace;
   font-size: 13px;
+  line-height: 1.5;
   resize: vertical;
+}
+
+.notebook-markdown-render {
+  width: 100%;
+  padding: 12px 14px;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  cursor: text;
+}
+
+.notebook-markdown-render:hover {
+  background: color-mix(in srgb, var(--text) 3%, transparent);
+}
+
+.notebook-markdown-render h1,
+.notebook-markdown-render h2,
+.notebook-markdown-render h3,
+.notebook-output-markdown h1,
+.notebook-output-markdown h2,
+.notebook-output-markdown h3 {
+  margin: 0 0 8px;
+  font-size: 1.1em;
+  font-weight: 600;
+}
+
+.notebook-markdown-render p,
+.notebook-output-markdown p {
+  margin: 0 0 8px;
+}
+
+.notebook-markdown-render table,
+.notebook-output-markdown table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 8px 0;
+  font-size: 12px;
+}
+
+.notebook-markdown-render th,
+.notebook-markdown-render td,
+.notebook-output-markdown th,
+.notebook-output-markdown td {
+  border: 1px solid var(--border);
+  padding: 4px 8px;
+  text-align: left;
+}
+
+.notebook-markdown-render th,
+.notebook-output-markdown th {
+  background: var(--bg-elevated);
+}
+
+.notebook-cell-output-wrap {
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-app);
+  max-height: 420px;
+  overflow: auto;
+}
+
+.notebook-output {
+  padding: 10px 14px;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.notebook-output-summary {
+  margin: 0 0 8px;
+  color: var(--text-muted);
+}
+
+.notebook-output-ok {
+  color: var(--success, #3dd68c);
+}
+
+.notebook-output-fail {
+  color: var(--error);
+}
+
+.notebook-output-error,
+.notebook-output-error-block pre,
+.notebook-output-placeholder pre {
+  margin: 0;
+  color: var(--error);
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: ui-monospace, monospace;
+}
+
+.notebook-output-scalar {
+  margin: 0;
+  font-family: ui-monospace, monospace;
+}
+
+.notebook-output-table-wrap {
+  overflow: auto;
+  margin: 8px 0;
+}
+
+.notebook-output-table {
+  border-collapse: collapse;
+  width: max-content;
+  min-width: 100%;
+  font-size: 12px;
+}
+
+.notebook-output-table th,
+.notebook-output-table td {
+  border: 1px solid var(--border);
+  padding: 4px 8px;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.notebook-output-table th {
+  background: var(--bg-elevated);
+  position: sticky;
+  top: 0;
+}
+
+.notebook-output-section {
+  margin-top: 10px;
+}
+
+.notebook-output-section h4 {
+  margin: 0 0 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.notebook-output-section pre {
+  margin: 0 0 6px;
+  padding: 8px;
+  border-radius: 4px;
+  background: var(--bg-elevated);
+  overflow: auto;
+  font-size: 11px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.notebook-output-section ul {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.notebook-cell-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px;
+  font-size: 11px;
+  color: var(--text-muted);
+  background: var(--bg-elevated);
+}
+
+.notebook-cell-footer-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.notebook-cell-action {
+  padding: 2px 6px;
+  border: 0;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.notebook-cell-action:hover {
+  background: color-mix(in srgb, var(--text) 8%, transparent);
+  color: var(--text);
 }
 
 .main-column {

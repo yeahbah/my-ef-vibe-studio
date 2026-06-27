@@ -143,6 +143,27 @@ export function workspaceConnectionToSettings(
     dotnetFramework: connection.dotnetFramework ?? "",
     scriptSearchPath: resolvePath(connection.scriptSearchPath),
     scriptLoads: connection.scriptLoads ?? [],
-    scriptUsings: connection.scriptUsings ?? [],
+    scriptUsings: (connection.scriptUsings ?? []).map(normalizeScriptUsing),
   };
+}
+
+function normalizeScriptUsing(value: string): string {
+  let trimmed = value.trim();
+  if (!trimmed) {
+    return trimmed;
+  }
+
+  if (trimmed.endsWith(";")) {
+    trimmed = trimmed.slice(0, -1).trimEnd();
+  }
+
+  if (/^using\s+/iu.test(trimmed)) {
+    trimmed = trimmed.replace(/^using\s+/iu, "").trim();
+  }
+
+  if (/^global\s+using\s+/iu.test(trimmed)) {
+    trimmed = trimmed.replace(/^global\s+using\s+/iu, "").trim();
+  }
+
+  return trimmed;
 }

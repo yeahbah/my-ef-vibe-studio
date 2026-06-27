@@ -10,7 +10,7 @@ import { ErDiagramView } from "./components/ErDiagramView";
 import { EditorToolPanel } from "./components/EditorToolPanel";
 import { EditorToolRail, type EditorToolId } from "./components/EditorToolRail";
 import { MainViewSwitcher } from "./components/MainViewSwitcher";
-import { NotebookView } from "./components/NotebookView";
+import { NotebookView, type NotebookRunScope } from "./components/NotebookView";
 import { QueryWorkspace, type QueryWorkspaceHandle } from "./components/QueryWorkspace";
 import { ReplView } from "./components/ReplView";
 import { PrerequisitesBanner } from "./components/PrerequisitesBanner";
@@ -38,11 +38,12 @@ import {
 } from "./lib/daemonClient";
 import { recordHistoryEntry, type EvaluationHistoryEntry } from "./lib/history";
 import { openNotebookFile, saveNotebookFile } from "./lib/notebook";
+import { evaluateNotebookSource } from "./lib/notebookEvaluate";
 import { openQueryFile, saveQueryFile } from "./lib/queryFile";
 import { isQueryCancelledMessage } from "./lib/queryCancel";
 import { runSqlViaDaemon } from "./lib/rawSql";
 import { looksLikeRawSql } from "./lib/sqlDetect";
-import { RUN_QUERY_EVENT, RUN_PLAN_EVENT } from "./lib/editorRun";
+import { RUN_QUERY_EVENT, RUN_PLAN_EVENT, normalizeExpression } from "./lib/editorRun";
 import {
   hydrateWorkspaceSecrets,
   stripConnectionSecretsForSave,
@@ -79,7 +80,7 @@ import {
 } from "./lib/workspace";
 import type { AppSettings, PrerequisiteCheckResult } from "./types/connection";
 import { emptyEvaluationPayload, type EvaluationJsonPayload } from "./types/evaluation";
-import { createDefaultNotebook, type NotebookCell } from "./types/notebook";
+import { createDefaultNotebook, createNotebookCell, type NotebookCell } from "./types/notebook";
 import { resolveSavedMainView, type AppMainView } from "./types/mainView";
 import { createQueryTab, normalizeResultsTab, type LegacyResultsTab, type QueryTab, type ResultsTab } from "./types/query";
 import { createUserSnippet, type SnippetDefinition } from "./types/snippets";
@@ -101,19 +102,6 @@ import {
 } from "./types/workspace";
 import "./theme.css";
 import "./App.css";
-
-function normalizeExpression(expression: string, lambdaMode: boolean): string {
-  const trimmed = expression.trim();
-  if (!trimmed) {
-    return trimmed;
-  }
-
-  if (lambdaMode) {
-    return trimmed.replace(/;+\s*$/u, "");
-  }
-
-  return trimmed.endsWith(";") ? trimmed : `${trimmed};`;
-}
 
 function connectionForTab(
   workspace: EfvibeWorkspace,
@@ -168,6 +156,7 @@ function App() {
   const [notebookConnectionId, setNotebookConnectionId] = useState("");
   const [notebookCells, setNotebookCells] = useState<NotebookCell[]>([]);
   const [notebookRunning, setNotebookRunning] = useState(false);
+  const [runningNotebookCellId, setRunningNotebookCellId] = useState<string | undefined>();
   const [engineAllowed, setEngineAllowed] = useState(false);
   const [sqlPaneOpen, setSqlPaneOpen] = useState(true);
   const [sqlPaneWidth, setSqlPaneWidth] = useState(360);
@@ -188,6 +177,10 @@ function App() {
   const [splashExiting, setSplashExiting] = useState(false);
   const [splashDone, setSplashDone] = useState(false);
   const splashMountRef = useRef(Date.now());
+  const notebookCellsRef = useRef(notebookCells);
+  const notebookRunGenerationRef = useRef(0);
+
+  notebookCellsRef.current = notebookCells;
 
   const activeQueryTab = useMemo(
     () => queryTabs.find((tab) => tab.id === activeQueryTabId),
@@ -233,6 +226,44 @@ function App() {
       connectionSettings.project,
     );
   }, [activeConnection, connectionSettings, workspaceDirectory]);
+
+  const notebookConnection = useMemo(() => {
+    if (!document) {
+      return undefined;
+    }
+
+    const connectionId = notebookConnectionId || activeConnectionId;
+    if (!connectionId) {
+      return undefined;
+    }
+
+    return getActiveConnection(document.workspace, connectionId);
+  }, [document, notebookConnectionId, activeConnectionId]);
+
+  const notebookConnectionSettings = useMemo(() => {
+    if (!notebookConnection || !settings) {
+      return undefined;
+    }
+
+    return workspaceConnectionToSettings(
+      notebookConnection,
+      workspaceDirectory,
+      settings.toolPath,
+      settings.defaultWorkspaceRoot,
+    );
+  }, [notebookConnection, settings, workspaceDirectory]);
+
+  const notebookSearchDirectory = useMemo(() => {
+    if (!notebookConnection || !notebookConnectionSettings) {
+      return workspaceDirectory !== "." ? workspaceDirectory : "";
+    }
+
+    return resolveSearchDirectory(
+      notebookConnection,
+      workspaceDirectory,
+      notebookConnectionSettings.project,
+    );
+  }, [notebookConnection, notebookConnectionSettings, workspaceDirectory]);
 
   const payload = activeQueryTab?.lastPayload ?? emptyEvaluationPayload();
   const activeTab = activeQueryTab?.activeResultsTab ?? "result";
@@ -1283,20 +1314,236 @@ function App() {
   }
 
   async function handleRunNotebook() {
+    if (!notebookConnectionSettings || !settings || !document) {
+      setStatus("Configure a connection before running the notebook.");
+      return;
+    }
+
     setNotebookRunning(true);
     await yieldToUi();
+    const batchRunId = ++notebookRunGenerationRef.current;
     try {
-      for (const cell of notebookCells) {
+      for (const cell of notebookCellsRef.current) {
         if (cell.kind !== "code" || !cell.value.trim()) {
           continue;
         }
 
-        await handleRun(false, cell.value);
+        await runNotebookCell(cell.id, {
+          quiet: true,
+          runId: batchRunId,
+        });
       }
       setStatus("Notebook run complete.");
     } finally {
       setNotebookRunning(false);
+      if (batchRunId === notebookRunGenerationRef.current) {
+        setRunningNotebookCellId(undefined);
+      }
     }
+  }
+
+  const updateNotebookCell = useCallback((cellId: string, patch: Partial<NotebookCell>) => {
+    setNotebookCells((cells) =>
+      cells.map((cell) => (cell.id === cellId ? { ...cell, ...patch } : cell)),
+    );
+  }, []);
+
+  async function runNotebookCell(
+    cellId: string,
+    options?: { quiet?: boolean; runId?: number; source?: string },
+  ) {
+    const runId = options?.runId ?? ++notebookRunGenerationRef.current;
+    const cell = notebookCellsRef.current.find((entry) => entry.id === cellId);
+    if (!cell || cell.kind !== "code") {
+      return;
+    }
+
+    const source = (options?.source ?? cell.value).trim();
+    if (!source) {
+      return;
+    }
+
+    if (!notebookConnectionSettings || !settings || !document) {
+      setStatus("Configure a connection before running.");
+      return;
+    }
+
+    allowEngine();
+    setRunningNotebookCellId(cellId);
+    updateNotebookCell(cellId, {
+      executionStatus: "running",
+      lastPayload: undefined,
+      markdownOutput: undefined,
+      activeResultsTab: undefined,
+    });
+    if (!options?.quiet) {
+      setStatus("Running cell…");
+    }
+    await yieldToUi();
+
+    try {
+      const result = await evaluateNotebookSource(
+        source,
+        notebookConnectionSettings,
+        notebookSearchDirectory,
+        notebookSearchDirectory,
+        false,
+      );
+
+      if (runId !== notebookRunGenerationRef.current) {
+        return;
+      }
+
+      updateNotebookCell(cellId, {
+        lastPayload: result.payload,
+        activeResultsTab: result.activeResultsTab,
+        markdownOutput: result.markdownOutput,
+        executionStatus: result.payload.success ? "success" : "error",
+      });
+
+      if (result.payload.success) {
+        setHistory((current) =>
+          recordHistoryEntry(
+            current,
+            source,
+            result.payload,
+            notebookConnection?.name ?? "Connection",
+          ),
+        );
+      }
+
+      if (!options?.quiet) {
+        setStatus(
+          result.payload.success
+            ? `Cell done · ${result.payload.metrics.totalMs} ms`
+            : result.payload.error ?? "Cell evaluation failed.",
+        );
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (runId !== notebookRunGenerationRef.current) {
+        return;
+      }
+
+      if (isQueryCancelledMessage(message)) {
+        updateNotebookCell(cellId, { executionStatus: "idle" });
+        if (!options?.quiet) {
+          setStatus("Query cancelled.");
+        }
+        return;
+      }
+
+      updateNotebookCell(cellId, {
+        lastPayload: {
+          success: false,
+          sql: [],
+          metrics: { totalMs: 0, sqlCommandCount: 0, resultKind: "error" },
+          warnings: [],
+          error: message,
+        },
+        activeResultsTab: "messages",
+        markdownOutput: undefined,
+        executionStatus: "error",
+      });
+
+      if (!options?.quiet) {
+        setStatus(message);
+      }
+    } finally {
+      if (runId === notebookRunGenerationRef.current) {
+        setRunningNotebookCellId(undefined);
+      }
+    }
+  }
+
+  function handleRunNotebookCell(
+    cellId: string,
+    scope: NotebookRunScope = "cell",
+    source?: string,
+  ) {
+    void runNotebookCells(cellId, scope, source);
+  }
+
+  async function runNotebookCells(
+    cellId: string,
+    scope: NotebookRunScope,
+    sourceOverride?: string,
+  ) {
+    if (!notebookConnectionSettings || !settings || !document) {
+      setStatus("Configure a connection before running.");
+      return;
+    }
+
+    const cells = notebookCellsRef.current;
+    const index = cells.findIndex((entry) => entry.id === cellId);
+    if (index < 0) {
+      return;
+    }
+
+    const targets = cells.filter((cell, cellIndex) => {
+      if (cell.kind !== "code" || !cell.value.trim()) {
+        return false;
+      }
+
+      if (scope === "cell") {
+        return cell.id === cellId;
+      }
+
+      if (scope === "above") {
+        return cellIndex < index;
+      }
+
+      return cellIndex > index;
+    });
+
+    if (targets.length === 0) {
+      setStatus(
+        scope === "cell"
+          ? "Nothing to run in this cell."
+          : `No code cells ${scope} this cell.`,
+      );
+      return;
+    }
+
+    const batchRunId = ++notebookRunGenerationRef.current;
+
+    if (targets.length === 1 && scope === "cell") {
+      await runNotebookCell(targets[0]!.id, { source: sourceOverride, runId: batchRunId });
+      return;
+    }
+
+    setNotebookRunning(true);
+    await yieldToUi();
+    try {
+      for (const cell of targets) {
+        const source = cell.id === cellId ? sourceOverride : undefined;
+        await runNotebookCell(cell.id, { quiet: true, runId: batchRunId, source });
+      }
+      setStatus(`Ran ${targets.length} cells.`);
+    } finally {
+      setNotebookRunning(false);
+      if (batchRunId === notebookRunGenerationRef.current) {
+        setRunningNotebookCellId(undefined);
+      }
+    }
+  }
+
+  function handleMoveNotebookCell(cellId: string, direction: "up" | "down") {
+    setNotebookCells((cells) => {
+      const index = cells.findIndex((cell) => cell.id === cellId);
+      if (index < 0) {
+        return cells;
+      }
+
+      const target = direction === "up" ? index - 1 : index + 1;
+      if (target < 0 || target >= cells.length) {
+        return cells;
+      }
+
+      const next = [...cells];
+      [next[index], next[target]] = [next[target], next[index]];
+      return next;
+    });
   }
 
   function requestBenchmark(iterations = 5) {
@@ -1884,25 +2131,37 @@ function App() {
             <NotebookView
               name={notebookName}
               cells={notebookCells}
+              theme={settings?.theme ?? "dark"}
               running={notebookRunning}
+              runningCellId={runningNotebookCellId}
               onNameChange={setNotebookName}
               onCellChange={(cellId, value) =>
                 setNotebookCells((cells) =>
-                  cells.map((cell) => (cell.id === cellId ? { ...cell, value } : cell)),
+                  cells.map((cell) =>
+                    cell.id === cellId
+                      ? {
+                          ...cell,
+                          value,
+                          executionStatus: "idle",
+                          lastPayload: undefined,
+                          markdownOutput: undefined,
+                          activeResultsTab: undefined,
+                        }
+                      : cell,
+                  ),
                 )
               }
-              onAddCell={() =>
-                setNotebookCells((cells) => [
-                  ...cells,
-                  { id: crypto.randomUUID(), kind: "code", value: "" },
-                ])
+              onAddCell={(kind) =>
+                setNotebookCells((cells) => [...cells, createNotebookCell(kind)])
               }
               onRemoveCell={(cellId) =>
                 setNotebookCells((cells) => cells.filter((cell) => cell.id !== cellId))
               }
+              onMoveCell={handleMoveNotebookCell}
               onOpen={() => void handleOpenNotebook()}
               onSave={() => void handleSaveNotebook()}
               onRunAll={() => void handleRunNotebook()}
+              onRunCell={handleRunNotebookCell}
             />
           ) : null}
 

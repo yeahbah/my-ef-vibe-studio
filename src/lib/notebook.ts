@@ -1,6 +1,11 @@
 import { open, save } from "@tauri-apps/plugin-dialog";
 import { readTextFile, writeTextFile } from "@tauri-apps/plugin-fs";
-import { createDefaultNotebook, createNotebookCell, type NotebookCell } from "../types/notebook";
+import {
+  createDefaultNotebook,
+  createNotebookCell,
+  notebookCellFromFile,
+  type NotebookCell,
+} from "../types/notebook";
 import type { EfvibeNotebookFile } from "../types/notebook";
 
 export function splitLegacyNotebook(text: string): NotebookCell[] {
@@ -12,9 +17,7 @@ export function splitLegacyNotebook(text: string): NotebookCell[] {
   try {
     const parsed = JSON.parse(trimmed) as EfvibeNotebookFile;
     if (parsed.cells?.length) {
-      return parsed.cells.map((cell) =>
-        createNotebookCell(cell.kind, cell.value),
-      );
+      return parsed.cells.map((cell) => notebookCellFromFile(cell));
     }
   } catch {
     // Fall through to --- separated cells.
@@ -26,12 +29,15 @@ export function splitLegacyNotebook(text: string): NotebookCell[] {
     .filter((cell) => cell.value.length > 0);
 }
 
-export async function openNotebookFile(connectionId: string): Promise<{
-  name: string;
-  path: string;
-  cells: NotebookCell[];
-  connectionId: string;
-} | undefined> {
+export async function openNotebookFile(connectionId: string): Promise<
+  | {
+      name: string;
+      path: string;
+      cells: NotebookCell[];
+      connectionId: string;
+    }
+  | undefined
+> {
   const selected = await open({
     multiple: false,
     filters: [{ name: "efvibe Notebook", extensions: ["efvibe-notebook", "json"] }],
@@ -51,7 +57,7 @@ export async function openNotebookFile(connectionId: string): Promise<{
       path: selected,
       connectionId: parsed.connectionId || connectionId,
       cells: parsed.cells?.length
-        ? parsed.cells.map((cell) => createNotebookCell(cell.kind, cell.value))
+        ? parsed.cells.map((cell) => notebookCellFromFile(cell))
         : createDefaultNotebook(connectionId),
     };
   } catch {
@@ -88,6 +94,9 @@ export async function saveNotebookFile(
     cells: cells.map((cell) => ({
       kind: cell.kind,
       value: cell.value,
+      lastPayload: cell.lastPayload,
+      activeResultsTab: cell.activeResultsTab,
+      markdownOutput: cell.markdownOutput,
     })),
   };
 

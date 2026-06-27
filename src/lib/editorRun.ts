@@ -54,3 +54,28 @@ export function resolveRunTextFromTextArea(textarea: HTMLTextAreaElement): strin
   const cursorLine = before.split(/\r?\n/u).length;
   return resolveRunTextFromString(value, { cursorLine });
 }
+
+export function normalizeExpression(expression: string, lambdaMode: boolean): string {
+  const trimmed = expression.trim();
+  if (!trimmed) {
+    return trimmed;
+  }
+
+  if (looksLikeCSharpStatement(trimmed)) {
+    return trimmed.endsWith(";") ? trimmed : `${trimmed};`;
+  }
+
+  if (lambdaMode) {
+    return trimmed.replace(/;+\s*$/u, "");
+  }
+
+  return trimmed.endsWith(";") ? trimmed : `${trimmed};`;
+}
+
+function looksLikeCSharpStatement(expression: string): boolean {
+  const text = expression.replace(/;+\s*$/u, "").trimStart();
+
+  return /^(?:var|using|global using|return|if|else|for|foreach|while|do|switch|lock|try|catch|finally|throw|break|continue|goto|fixed|unsafe|checked|unchecked|namespace|class|record|interface|enum|struct|delegate|event|#)\b/u.test(
+    text,
+  );
+}
