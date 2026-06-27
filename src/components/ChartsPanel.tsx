@@ -1,4 +1,4 @@
-import type { EvaluationHistoryEntry } from "../lib/history";
+import { filterQueryHistory, type EvaluationHistoryEntry } from "../lib/history";
 import type { BenchmarkResult } from "../lib/benchmark";
 
 interface ChartsPanelProps {
@@ -22,7 +22,8 @@ export function ChartsPanel({
     return null;
   }
 
-  const maxMs = Math.max(...history.map((entry) => entry.totalMs), benchmark?.maxMs ?? 0, 1);
+  const chartHistory = filterQueryHistory(history);
+  const maxMs = Math.max(...chartHistory.map((entry) => entry.totalMs), benchmark?.maxMs ?? 0, 1);
 
   return (
     <div className="charts-overlay" onClick={onClose}>
@@ -36,7 +37,7 @@ export function ChartsPanel({
 
         <section>
           <h3>Recent timings</h3>
-          {history.length === 0 ? (
+          {chartHistory.length === 0 ? (
             <p className="muted">Run queries to populate session charts.</p>
           ) : (
             <table className="charts-table">
@@ -49,7 +50,7 @@ export function ChartsPanel({
                 </tr>
               </thead>
               <tbody>
-                {history.slice(0, 15).map((entry, index) => (
+                {chartHistory.slice(0, 15).map((entry, index) => (
                   <tr key={`${entry.timestamp}-${index}`}>
                     <td>{index + 1}</td>
                     <td>

@@ -81,6 +81,33 @@ textarea {
   flex-shrink: 0;
 }
 
+.topbar-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.topbar-icon-btn:hover {
+  background: var(--accent-faint);
+  border-color: var(--border);
+  color: var(--text);
+}
+
+.topbar-icon-btn.active {
+  background: var(--accent-subtle);
+  border-color: var(--border);
+  color: var(--accent);
+}
+
 .menu,
 .runbar,
 .main-view-switcher {

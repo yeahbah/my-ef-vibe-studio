@@ -12,7 +12,9 @@ This guide covers day-to-day use of the Studio app. For installation and release
 2. [First session](#first-session)
 3. [The workspace layout](#the-workspace-layout)
 4. [Connections](#connections)
+   - [Script session: loads, `#load`, and additional usings](#script-session-loads-load-and-additional-usings)
 5. [Query view](#query-view)
+   - [Three ways to write a query](#three-ways-to-write-a-query)
 6. [Editor tools](#editor-tools)
 7. [Explorer sidebar](#explorer-sidebar)
 8. [ER Diagram view](#er-diagram-view)
@@ -106,15 +108,131 @@ Open the connection editor by right-clicking a connection in the explorer and ch
 | .NET framework | | Target framework hint (e.g. `net10.0`) |
 | Show SQL in daemon logs | `--dblog` | Toggle executed SQL logging |
 
-### Script session (per connection)
+### Script session: loads, `#load`, and additional usings
 
-Optional helpers loaded into every evaluation for that connection:
+Every connection can preload C# script helpers into the efvibe Roslyn session. This is useful for shared filters, constants, extension methods, or `using` aliases you use in many queries.
 
-- **Script search path** — folder for `#load` resolution
-- **Script loads** — `.csx` files loaded at session start
-- **Additional usings** — extra namespaces imported into the scripting session
+Open **Connections → Edit…** and scroll to **Script session**.
 
-You can also use `#load` directly in a query tab for one-off scripts.
+| Field | Purpose |
+|-------|---------|
+| **Script search path** | Directory where relative `#load` paths and **Script loads** entries are resolved. Defaults to the connection **search directory** when empty. |
+| **Script loads** | One `.csx` path per line. Each file is `#load`ed automatically when the daemon starts for this connection. |
+| **Additional usings** | One namespace per line (with or without a `using` prefix). Imported into every evaluation for this connection. |
+
+After changing script settings, use **Refresh** on the connection in the explorer so Studio restarts the efvibe daemon with the new configuration.
+
+#### Example: shared query helpers
+
+Create a folder next to your workspace, for example `scripts/`:
+
+**`scripts/constants.csx`**
+
+```csharp
+const int DefaultTake = 25;
+const decimal MinListPrice = 0m;
+```
+
+**`scripts/product-filters.csx`**
+
+```csharp
+#load "constants.csx"
+
+IQueryable<Product> ActiveProducts() =>
+    db.Products.Where(p => !p.DiscontinuedDate.HasValue && p.ListPrice > MinListPrice);
+```
+
+In the connection editor:
+
+- **Script search path:** `./scripts` (or an absolute path)
+- **Script loads:**
+  ```
+  constants.csx
+  product-filters.csx
+  ```
+- **Additional usings:**
+  ```
+  MyApp.Domain.Entities
+  System.Globalization
+  ```
+
+Load order matters: `product-filters.csx` can `#load` files that were listed earlier in **Script loads**.
+
+Then run a query that uses the helpers:
+
+```csharp
+ActiveProducts()
+  .OrderBy(p => p.Name)
+  .Take(DefaultTake)
+  .Select(p => new { p.ProductId, p.Name, p.ListPrice })
+  .ToList();
+```
+
+#### Inline `#load` in a query tab
+
+For one-off scripts, put a `#load` directive at the top of a query tab (paths resolve against **Script search path**, then the search directory):
+
+```csharp
+#load "scripts/ad-hoc-probe.csx"
+
+db.Orders.Where(o => o.OrderDate >= ProbeStartDate).Take(10).ToList();
+```
+
+**`scripts/ad-hoc-probe.csx`**
+
+```csharp
+var ProbeStartDate = DateTime.UtcNow.AddDays(-30);
+```
+
+#### Additional usings examples
+
+**Connection editor (one namespace per line):**
+
+```
+MyApp.QueryHelpers
+MyApp.Domain.Enums
+global using System.Linq
+```
+
+Studio normalizes these before passing them to efvibe (the `using` / `global using` prefix is optional).
+
+**Typical use:** extension methods or static helpers from your solution assemblies, without qualifying types every time:
+
+```csharp
+// With MyApp.QueryHelpers imported:
+db.Products.WithDefaultIncludes().Take(10).ToList();
+```
+
+#### Workspace JSON example
+
+Script settings are stored on each connection inside `.efvibe-workspace`:
+
+```json
+{
+  "id": "aw-dev",
+  "name": "AW Dev",
+  "searchDirectory": "../AdventureWorks",
+  "efProject": "../AdventureWorks/src/Persistence/Persistence.csproj",
+  "startupProject": "../AdventureWorks/src/API/API.csproj",
+  "context": "AdventureWorksDbContext",
+  "scriptSearchPath": "../AdventureWorks/scripts",
+  "scriptLoads": [
+    "constants.csx",
+    "product-filters.csx"
+  ],
+  "scriptUsings": [
+    "AdventureWorks.Domain.Entities",
+    "System.Globalization"
+  ]
+}
+```
+
+#### Tips
+
+- Use **`.csx`** files for script loads; they are Roslyn script files, not full projects.
+- Prefer **Script loads** for helpers you always want available; use inline **`#load`** for experimental or tab-specific scripts.
+- If a helper is missing after editing a `.csx` file, **Refresh** or **Rebuild** the connection to restart the daemon.
+- Script variables from loaded files persist across runs in the same daemon session (like the REPL). Use `:reset` in the REPL view to clear script state without restarting.
 
 ### Connection secrets
 
@@ -147,13 +265,119 @@ When **Store connection strings in the local secret vault** is enabled in Settin
 | **Run Plan** | Run bar button or `Ctrl+Shift+Enter` |
 | **Stop** | Status bar stop button while a query is running |
 
-Write LINQ against the global **`db`** variable (your active `DbContext`). End statements with a semicolon when running full C# snippets, for example:
+Studio detects what kind of query you wrote and routes it accordingly. The editor switches between **C#** and **SQL** syntax highlighting based on the first meaningful line.
 
-```csharp
-db.Products.Where(p => p.Name.Contains("Helmet")).Take(10).ToList();
+### Three ways to write a query
+
+efvibe supports three query styles in the **Query** view and in notebook code cells (except `:command` cells).
+
+#### 1. Raw SQL
+
+Paste or write database SQL directly. Studio recognizes statements that start with keywords such as `SELECT`, `WITH`, `INSERT`, `UPDATE`, `DELETE`, `EXPLAIN`, and similar.
+
+```sql
+SELECT TOP 10
+  p.ProductID,
+  p.Name,
+  p.ListPrice
+FROM Products AS p
+WHERE p.ListPrice > 0
+ORDER BY p.Name;
 ```
 
-You can also paste repository-style code; efvibe normalizes common patterns (`await`, `DbContext` → `db`, async terminals, and similar) before evaluation.
+- The editor switches to **SQL** highlighting.
+- Results come from direct execution against the connection (not EF translation).
+- **Run Plan** works when the provider supports plans for the statement.
+- Leading `--` or `/* */` comments are ignored for detection.
+
+Use SQL when you already have a query from SSMS, pgAdmin, or a log file, or when you want to probe the database without going through LINQ.
+
+#### 2. LINQ method syntax (fluent)
+
+The most common style: chain extension methods on `db` DbSets.
+
+```csharp
+db.Products
+  .Where(p => p.Name.Contains("Helmet"))
+  .OrderBy(p => p.Name)
+  .Take(10)
+  .Select(p => new { p.ProductId, p.Name, p.ListPrice })
+  .ToList();
+```
+
+Other typical terminals:
+
+```csharp
+db.Orders.Count();
+
+db.Customers
+  .Include(c => c.Orders)
+  .FirstOrDefault(c => c.CustomerId == 42);
+
+// Preview translated SQL without executing
+db.Products.Where(p => p.ListPrice > 100).ToQueryString();
+```
+
+- End with a terminating call such as `.ToList()`, `.Count()`, `.FirstOrDefault()`, or `.ToQueryString()`.
+- A trailing semicolon is fine: `db.Products.Count();`
+- You can paste repository-style code; efvibe normalizes common patterns (`await`, `DbContext` → `db`, async terminals, and similar) before evaluation.
+
+#### 3. LINQ query syntax (comprehension)
+
+C# **query comprehension** syntax — the `from` / `where` / `select` form. This is equivalent to method syntax but reads like SQL.
+
+Single line:
+
+```csharp
+from product in db.Products
+where product.ListPrice > 0
+orderby product.Name
+select product;
+```
+
+Multi-line (works the same way):
+
+```csharp
+from order in db.Orders
+where order.OrderDate >= DateTime.UtcNow.AddYears(-1)
+join customer in db.Customers on order.CustomerId equals customer.CustomerId
+orderby order.OrderDate descending
+select new
+{
+  order.OrderId,
+  customer.LastName,
+  order.TotalDue
+};
+```
+
+Bare comprehension without a terminal (returns the `IQueryable` for further inspection):
+
+```csharp
+from item in db.Products
+select item;
+```
+
+For SQL preview on a bare comprehension, wrap it:
+
+```csharp
+(from item in db.Products where item.ListPrice > 10 select item).ToQueryString();
+```
+
+**Notes on query syntax:**
+
+- Use **`db.YourDbSet`** as the collection in the `from` clause (same as method syntax).
+- `join`, `group`, `let`, and `into` clauses are supported when EF can translate them.
+- Studio treats lines starting with `from … in` as C#/LINQ, not raw SQL.
+
+#### Quick comparison
+
+| Style | Example start | Editor language | Translated by EF |
+|-------|---------------|-----------------|----------------|
+| **Raw SQL** | `SELECT …` | SQL | No — executed directly |
+| **Method (fluent) LINQ** | `db.Products.Where(…)` | C# | Yes |
+| **Query syntax LINQ** | `from x in db.Products` | C# | Yes |
+
+All three styles work in **notebooks** as code cells. Command cells (`:dbinfo`, `:tables`) and markdown cells are separate.
 
 ### Results panel
 
@@ -255,10 +479,6 @@ Right-click a **DbSet**:
 | **Query** | Open a sample query tab for that DbSet |
 | **ER Diagram** | Open diagram filtered to that entity |
 | **Properties** | Show entity column and navigation details |
-
-### Queries
-
-Organize query tabs into **folders**. Right-click **Queries** to create a new folder. Right-click a query tab entry to open it, toggle favorite, or move it to a folder.
 
 ### Team
 
@@ -479,7 +699,9 @@ If the downloaded app is blocked, see [INSTALL.md](../INSTALL.md) for Gatekeeper
 
 ---
 
-## Quick reference: writing LINQ in Studio
+## Quick reference: query and script examples
+
+### Method syntax (fluent LINQ)
 
 ```csharp
 // Count rows
@@ -492,11 +714,44 @@ db.Orders
   .Take(20)
   .ToList();
 
-// Preview SQL without executing
-db.Products.Where(p => p.Id > 0).ToQueryString();
-
 // Include related data
 db.Orders.Include(o => o.Customer).Take(10).ToList();
+
+// Preview SQL without executing
+db.Products.Where(p => p.Id > 0).ToQueryString();
+```
+
+### Query syntax (comprehension)
+
+```csharp
+from p in db.Products
+where p.ListPrice > 100
+orderby p.Name
+select new { p.ProductId, p.Name, p.ListPrice };
+
+from o in db.Orders
+where o.OrderDate.Year == DateTime.UtcNow.Year
+select o;
+```
+
+### Raw SQL
+
+```sql
+SELECT ProductID, Name, ListPrice
+FROM Products
+WHERE ListPrice > 0
+ORDER BY Name
+OFFSET 0 ROWS FETCH NEXT 10 ROWS ONLY;
+```
+
+### Script helpers
+
+```csharp
+#load "scripts/constants.csx"
+
+from p in ActiveProducts()
+where p.Name.Contains("Chain")
+select p;
 ```
 
 For REPL-style exploration with charts, benchmarks, exports, and advanced diagnostics, switch to the **REPL** view and use `:help`.

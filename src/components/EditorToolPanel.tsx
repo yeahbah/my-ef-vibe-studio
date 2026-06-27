@@ -1,5 +1,9 @@
 import { useEffect, useRef, useState } from "react";
-import { groupHistoryByDate, type EvaluationHistoryEntry } from "../lib/history";
+import {
+  filterQueryHistory,
+  groupHistoryByDate,
+  type EvaluationHistoryEntry,
+} from "../lib/history";
 import { REMOTE_SNIPPET_PACK_REGISTRY } from "../lib/packRegistry";
 import { formatFindingSummary, scanCodeToRunnableExpression } from "../lib/scan";
 import { BUILTIN_SNIPPETS } from "../types/snippets";
@@ -148,8 +152,9 @@ function ChartsToolView({
   history: EvaluationHistoryEntry[];
   benchmark?: import("../lib/benchmark").BenchmarkResult;
 }) {
-  const latest = history[0];
-  const maxMs = Math.max(...history.map((entry) => entry.totalMs), benchmark?.maxMs ?? 0, 1);
+  const chartHistory = filterQueryHistory(history);
+  const latest = chartHistory[0];
+  const maxMs = Math.max(...chartHistory.map((entry) => entry.totalMs), benchmark?.maxMs ?? 0, 1);
   const appMs =
     latest && latest.databaseMs !== undefined
       ? Math.max(0, latest.totalMs - latest.databaseMs)
@@ -159,7 +164,7 @@ function ChartsToolView({
     <div className="tool-panel-sections">
       <section className="tool-panel-section">
         <h3>Recent timings</h3>
-        {history.length === 0 ? (
+        {chartHistory.length === 0 ? (
           <p className="muted">Run queries to populate session charts.</p>
         ) : (
           <table className="charts-table">
@@ -172,7 +177,7 @@ function ChartsToolView({
               </tr>
             </thead>
             <tbody>
-              {history.slice(0, 12).map((entry, index) => (
+              {chartHistory.slice(0, 12).map((entry, index) => (
                 <tr key={entry.id}>
                   <td>{index + 1}</td>
                   <td>

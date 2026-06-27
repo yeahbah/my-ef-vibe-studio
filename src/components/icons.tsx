@@ -230,6 +230,32 @@ export function IconStar(props: IconProps) {
   );
 }
 
+export function IconSidebar(props: IconProps) {
+  return (
+    <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" {...props}>
+      <rect
+        x="2.25"
+        y="3.25"
+        width="4.5"
+        height="9.5"
+        rx="1"
+        fill="currentColor"
+        opacity="0.85"
+      />
+      <rect
+        x="8.25"
+        y="3.25"
+        width="5.5"
+        height="9.5"
+        rx="1"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.25"
+      />
+    </svg>
+  );
+}
+
 export function IconNew(props: IconProps) {
   return (
     <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" {...props}>

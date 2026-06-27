@@ -1,11 +1,14 @@
 import { describe, expect, it } from "vitest";
 import {
+  filterQueryHistory,
   filterRecentHistory,
   formatHistoryDateLabel,
   groupHistoryByDate,
   localDateKey,
+  recordHistoryEntry,
   type EvaluationHistoryEntry,
 } from "./history";
+import type { EvaluationJsonPayload } from "../types/evaluation";
 
 function entry(timestamp: string, expression = "db.Products.Take(1)"): EvaluationHistoryEntry {
   return {
@@ -68,5 +71,42 @@ describe("groupHistoryByDate", () => {
     expect(groups.map((group) => group.label)).toEqual(["Today", "Yesterday"]);
     expect(groups[0]?.entries.map((item) => item.expression)).toEqual(["today-a", "today-b"]);
     expect(groups[1]?.entries.map((item) => item.expression)).toEqual(["yesterday-a"]);
+  });
+});
+
+describe("filterQueryHistory", () => {
+  it("excludes notebook-sourced and command entries", () => {
+    const history: EvaluationHistoryEntry[] = [
+      entry("2026-06-26T10:00:00.000Z", "db.Products.Take(1)"),
+      entry("2026-06-26T09:00:00.000Z", ":dbinfo"),
+      { ...entry("2026-06-26T08:00:00.000Z", ":tables"), source: "notebook" },
+    ];
+
+    expect(filterQueryHistory(history).map((item) => item.expression)).toEqual([
+      "db.Products.Take(1)",
+    ]);
+  });
+});
+
+describe("recordHistoryEntry", () => {
+  const payload: EvaluationJsonPayload = {
+    success: true,
+    sql: [],
+    metrics: {
+      totalMs: 42,
+      sqlCommandCount: 1,
+      resultKind: "Enumerable",
+    },
+    warnings: [],
+  };
+
+  it("skips notebook command entries", () => {
+    const next = recordHistoryEntry([], ":dbinfo", payload, "Default", "notebook");
+    expect(next).toHaveLength(0);
+  });
+
+  it("skips colon commands even when source is query", () => {
+    const next = recordHistoryEntry([], ":tables", payload, "Default", "query");
+    expect(next).toHaveLength(0);
   });
 });

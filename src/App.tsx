@@ -3,7 +3,7 @@ import { homeDir } from "@tauri-apps/api/path";
 import { save } from "@tauri-apps/plugin-dialog";
 import { writeTextFile } from "@tauri-apps/plugin-fs";
 import { ConnectionPicker } from "./components/ConnectionPicker";
-import { IconStop } from "./components/icons";
+import { IconSidebar, IconStop } from "./components/icons";
 import { SplashScreen } from "./components/SplashScreen";
 import { StatusBarBusy } from "./components/StatusBarBusy";
 import { ErDiagramView } from "./components/ErDiagramView";
@@ -36,7 +36,11 @@ import {
   runExpressionViaDaemon,
   startRepl,
 } from "./lib/daemonClient";
-import { recordHistoryEntry, type EvaluationHistoryEntry } from "./lib/history";
+import {
+  filterQueryHistory,
+  recordHistoryEntry,
+  type EvaluationHistoryEntry,
+} from "./lib/history";
 import {
   installBuiltinSnippetPack,
   installRemoteSnippetPack,
@@ -54,7 +58,7 @@ import {
   stripConnectionSecretsForSave,
   syncConnectionSecretToVault,
 } from "./lib/connectionVault";
-import { matchesKeybinding, resolveKeybindings } from "./lib/keybindings";
+import { keybindingLabel, matchesKeybinding, resolveKeybindings } from "./lib/keybindings";
 import { buildExportContent } from "./lib/resultFormat";
 import { inferResultEntity, persistResultChanges } from "./lib/resultPersist";
 import { runScanJson } from "./lib/schema";
@@ -513,7 +517,7 @@ function App() {
           ),
         );
         if (savedSession.history) {
-          setHistory(savedSession.history);
+          setHistory(filterQueryHistory(savedSession.history));
         }
         const restoredMainView = resolveSavedMainView(savedSession);
         setMainView(restoredMainView);
@@ -1724,6 +1728,16 @@ function App() {
   return (
     <main className="app">
       <header className="topbar">
+        <button
+          type="button"
+          className={`topbar-icon-btn explorer-toggle-btn${explorerOpen ? " active" : ""}`}
+          title={`${explorerOpen ? "Hide" : "Show"} explorer (${keybindingLabel(keybindings.toggleExplorer)})`}
+          aria-label={`${explorerOpen ? "Hide" : "Show"} explorer`}
+          aria-pressed={explorerOpen}
+          onClick={toggleExplorer}
+        >
+          <IconSidebar />
+        </button>
         <ConnectionPicker
           connections={document.workspace.connections}
           activeConnectionId={activeConnectionId}

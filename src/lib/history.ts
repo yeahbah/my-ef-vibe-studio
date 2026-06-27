@@ -1,5 +1,7 @@
 import type { EvaluationJsonPayload } from "../types/evaluation";
 
+export type EvaluationHistorySource = "query" | "notebook";
+
 export interface EvaluationHistoryEntry {
   id: string;
   expression: string;
@@ -10,6 +12,19 @@ export interface EvaluationHistoryEntry {
   resultKind: string;
   timestamp: string;
   connectionName: string;
+  source?: EvaluationHistorySource;
+}
+
+export function isQueryHistoryEntry(entry: EvaluationHistoryEntry): boolean {
+  if (entry.source === "notebook") {
+    return false;
+  }
+
+  return !entry.expression.trim().startsWith(":");
+}
+
+export function filterQueryHistory(history: EvaluationHistoryEntry[]): EvaluationHistoryEntry[] {
+  return history.filter(isQueryHistoryEntry);
 }
 
 export interface HistoryDateGroup {
@@ -74,7 +89,7 @@ export function groupHistoryByDate(
 ): HistoryDateGroup[] {
   const groups = new Map<string, EvaluationHistoryEntry[]>();
 
-  for (const entry of filterRecentHistory(history, now)) {
+  for (const entry of filterRecentHistory(filterQueryHistory(history), now)) {
     const dateKey = localDateKey(new Date(entry.timestamp));
     const bucket = groups.get(dateKey) ?? [];
     bucket.push(entry);
@@ -95,7 +110,12 @@ export function recordHistoryEntry(
   expression: string,
   payload: EvaluationJsonPayload,
   connectionName: string,
+  source: EvaluationHistorySource = "query",
 ): EvaluationHistoryEntry[] {
+  if (source !== "query" || expression.trim().startsWith(":")) {
+    return history;
+  }
+
   const entry: EvaluationHistoryEntry = {
     id: crypto.randomUUID(),
     expression,
@@ -106,6 +126,7 @@ export function recordHistoryEntry(
     resultKind: payload.metrics.resultKind,
     timestamp: new Date().toISOString(),
     connectionName,
+    source,
   };
 
   return [entry, ...history].slice(0, MAX_ENTRIES);
