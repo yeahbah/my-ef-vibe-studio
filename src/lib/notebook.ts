@@ -75,13 +75,16 @@ export async function saveNotebookFile(
   path: string,
   connectionId: string,
   cells: NotebookCell[],
+  options?: { saveAs?: boolean },
 ): Promise<string> {
+  const defaultPath = path || `${name || "notebook"}.efvibe-notebook`;
   const targetPath =
-    path ||
-    (await save({
-      filters: [{ name: "efvibe Notebook", extensions: ["efvibe-notebook"] }],
-      defaultPath: `${name || "notebook"}.efvibe-notebook`,
-    }));
+    path && !options?.saveAs
+      ? path
+      : (await save({
+          filters: [{ name: "efvibe Notebook", extensions: ["efvibe-notebook"] }],
+          defaultPath,
+        }));
 
   if (!targetPath || Array.isArray(targetPath)) {
     throw new Error("Save cancelled.");

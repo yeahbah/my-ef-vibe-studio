@@ -32,7 +32,6 @@ export interface ContextMenuItem {
 export const DEFAULT_EXPLORER_EXPANDED = [
   "workspace",
   "connections",
-  "queries",
 ];
 
 export function normalizeExplorerExpandedNodes(

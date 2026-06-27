@@ -37,6 +37,11 @@ import {
   startRepl,
 } from "./lib/daemonClient";
 import { recordHistoryEntry, type EvaluationHistoryEntry } from "./lib/history";
+import {
+  installBuiltinSnippetPack,
+  installRemoteSnippetPack,
+  installSnippetPackFromUrl,
+} from "./lib/snippetPackInstall";
 import { openNotebookFile, saveNotebookFile } from "./lib/notebook";
 import { evaluateNotebookSource } from "./lib/notebookEvaluate";
 import { openQueryFile, saveQueryFile } from "./lib/queryFile";
@@ -1295,16 +1300,19 @@ function App() {
     setStatus(`Opened notebook ${opened.name}`);
   }
 
-  async function handleSaveNotebook() {
+  async function handleSaveNotebook(options?: { saveAs?: boolean }) {
     try {
       const savedPath = await saveNotebookFile(
         notebookName,
         notebookPath,
         notebookConnectionId,
         notebookCells,
+        options,
       );
       setNotebookPath(savedPath);
-      setStatus(`Saved notebook ${savedPath}`);
+      setStatus(
+        options?.saveAs ? `Saved notebook as ${savedPath}` : `Saved notebook ${savedPath}`,
+      );
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       if (message !== "Save cancelled.") {
@@ -1400,17 +1408,6 @@ function App() {
         markdownOutput: result.markdownOutput,
         executionStatus: result.payload.success ? "success" : "error",
       });
-
-      if (result.payload.success) {
-        setHistory((current) =>
-          recordHistoryEntry(
-            current,
-            source,
-            result.payload,
-            notebookConnection?.name ?? "Connection",
-          ),
-        );
-      }
 
       if (!options?.quiet) {
         setStatus(
@@ -1528,6 +1525,20 @@ function App() {
     }
   }
 
+  function handleInsertNotebookCell(cellId: string, position: "above" | "below") {
+    setNotebookCells((cells) => {
+      const index = cells.findIndex((cell) => cell.id === cellId);
+      if (index < 0) {
+        return cells;
+      }
+
+      const insertAt = position === "above" ? index : index + 1;
+      const next = [...cells];
+      next.splice(insertAt, 0, createNotebookCell(cells[index].kind));
+      return next;
+    });
+  }
+
   function handleMoveNotebookCell(cellId: string, direction: "up" | "down") {
     setNotebookCells((cells) => {
       const index = cells.findIndex((cell) => cell.id === cellId);
@@ -1593,19 +1604,6 @@ function App() {
       tabs.map((tab) =>
         tab.id === tabId ? { ...tab, favorite: !tab.favorite } : tab,
       ),
-    );
-  }
-
-  function handleAddFolder(name: string) {
-    setQueryLibrary((library) => ({
-      ...library,
-      folders: [...library.folders, createQueryFolder(name)],
-    }));
-  }
-
-  function handleAssignFolder(tabId: string, folderId?: string) {
-    setQueryTabs((tabs) =>
-      tabs.map((tab) => (tab.id === tabId ? { ...tab, folderId } : tab)),
     );
   }
 
@@ -1683,6 +1681,24 @@ function App() {
     setInstalledPackIds((current) =>
       current.includes(packId) ? current : [...current, packId],
     );
+  }
+
+  const snippetPackCallbacks = {
+    onImportPack: handleImportPack,
+    onInstallPackId: handleInstallPackId,
+    onStatus: setStatus,
+  };
+
+  async function handleInstallBuiltinPack(packId: string) {
+    await installBuiltinSnippetPack(packId, activeConnectionId, snippetPackCallbacks);
+  }
+
+  async function handleInstallRemotePack(packId: string) {
+    await installRemoteSnippetPack(packId, activeConnectionId, snippetPackCallbacks);
+  }
+
+  async function handleInstallSnippetPackFromUrl(url: string) {
+    await installSnippetPackFromUrl(url, activeConnectionId, snippetPackCallbacks);
   }
 
   const connectionEditorConnection =
@@ -1773,7 +1789,6 @@ function App() {
           userSnippets={userSnippets}
           teamSyncDirectory={settings.teamSyncDirectory}
           cloudSyncDirectory={settings.cloudSyncDirectory ?? ""}
-          installedPackIds={installedPackIds}
           onSelectConnection={(connectionId) => {
             setActiveConnectionId(connectionId);
             updateQueryTab(activeQueryTab.id, { connectionId });
@@ -1929,14 +1944,9 @@ function App() {
             updateQueryTab(activeQueryTab.id, { expression: nextExpression });
           }}
           onOpenLibraryQuery={handleOpenLibraryQuery}
-          onToggleFavorite={handleToggleFavorite}
-          onAddFolder={handleAddFolder}
-          onAssignFolder={handleAssignFolder}
           onInsertSnippet={handleInsertSnippet}
-          onAddSnippet={handleAddSnippet}
           onRemoveSnippet={handleRemoveSnippet}
           onImportPack={handleImportPack}
-          onInstallPackId={handleInstallPackId}
           onStatus={setStatus}
           onNewWorkspace={() => void handleNewWorkspace()}
           onOpenWorkspace={() => void handleOpenWorkspace()}
@@ -2006,6 +2016,10 @@ function App() {
                       onInsertSnippet={handleInsertSnippet}
                       onAddSnippet={handleAddSnippet}
                       onRemoveSnippet={handleRemoveSnippet}
+                      installedPackIds={installedPackIds}
+                      onInstallBuiltinPack={(packId) => void handleInstallBuiltinPack(packId)}
+                      onInstallRemotePack={(packId) => void handleInstallRemotePack(packId)}
+                      onInstallPackFromUrl={handleInstallSnippetPackFromUrl}
                       onOpenFavorite={(tab) => selectQueryTab(tab.id)}
                       onToggleFavorite={handleToggleFavorite}
                       onRunScan={(mode) => void runScan(mode)}
@@ -2154,12 +2168,14 @@ function App() {
               onAddCell={(kind) =>
                 setNotebookCells((cells) => [...cells, createNotebookCell(kind)])
               }
+              onInsertCell={handleInsertNotebookCell}
               onRemoveCell={(cellId) =>
                 setNotebookCells((cells) => cells.filter((cell) => cell.id !== cellId))
               }
               onMoveCell={handleMoveNotebookCell}
               onOpen={() => void handleOpenNotebook()}
               onSave={() => void handleSaveNotebook()}
+              onSaveAs={() => void handleSaveNotebook({ saveAs: true })}
               onRunAll={() => void handleRunNotebook()}
               onRunCell={handleRunNotebookCell}
             />

@@ -3,6 +3,9 @@ import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent } 
 const DEFAULT_COL_WIDTH = 120;
 const MIN_COL_WIDTH = 56;
 const MAX_COL_WIDTH = 480;
+const ROWNUM_COLUMN = "__rownum__";
+const ACTIONS_COLUMN = "__actions__";
+const ROWNUM_WIDTH = 44;
 
 interface GridCellCoord {
   rowIndex: number;
@@ -24,7 +27,23 @@ interface ResultGridProps {
   onDeleteRow?: (rowIndex: number) => void;
 }
 
+function columnKey(column: string): string {
+  if (!column) {
+    return ACTIONS_COLUMN;
+  }
+
+  return column;
+}
+
 function defaultWidthForColumn(column: string): number {
+  if (column === ROWNUM_COLUMN) {
+    return ROWNUM_WIDTH;
+  }
+
+  if (!column) {
+    return ROWNUM_WIDTH;
+  }
+
   return Math.min(MAX_COL_WIDTH, Math.max(DEFAULT_COL_WIDTH, column.length * 7 + 28));
 }
 
@@ -37,14 +56,13 @@ export function ResultGrid({
   onCellChange,
   onDeleteRow,
 }: ResultGridProps) {
-  const displayColumns = editable ? ["", ...columns] : columns;
-  const columnsKey = displayColumns.join("\0");
+  const displayColumns = editable
+    ? [ROWNUM_COLUMN, "", ...columns]
+    : [ROWNUM_COLUMN, ...columns];
+  const columnsKey = displayColumns.map(columnKey).join("\0");
   const [columnWidths, setColumnWidths] = useState<Record<string, number>>(() =>
     Object.fromEntries(
-      displayColumns.map((column) => [
-        column || "__actions__",
-        column ? defaultWidthForColumn(column) : 44,
-      ]),
+      displayColumns.map((column) => [columnKey(column), defaultWidthForColumn(column)]),
     ),
   );
   const resizeRef = useRef<
@@ -68,9 +86,8 @@ export function ResultGrid({
     setColumnWidths((current) => {
       const next: Record<string, number> = {};
       for (const column of displayColumns) {
-        const key = column || "__actions__";
-        next[key] =
-          current[key] ?? (column ? defaultWidthForColumn(column) : 44);
+        const key = columnKey(column);
+        next[key] = current[key] ?? defaultWidthForColumn(column);
       }
       return next;
     });
@@ -79,8 +96,7 @@ export function ResultGrid({
   const tableWidth = useMemo(
     () =>
       displayColumns.reduce(
-        (total, column) =>
-          total + (columnWidths[column || "__actions__"] ?? DEFAULT_COL_WIDTH),
+        (total, column) => total + (columnWidths[columnKey(column)] ?? DEFAULT_COL_WIDTH),
         0,
       ),
     [columnWidths, displayColumns],
@@ -142,15 +158,36 @@ export function ResultGrid({
         <colgroup>
           {displayColumns.map((column) => (
             <col
-              key={column || "__actions__"}
-              style={{ width: columnWidths[column || "__actions__"] ?? DEFAULT_COL_WIDTH }}
+              key={columnKey(column)}
+              style={{ width: columnWidths[columnKey(column)] ?? DEFAULT_COL_WIDTH }}
             />
           ))}
         </colgroup>
         <thead>
           <tr>
-            {displayColumns.map((column) =>
-              column ? (
+            {displayColumns.map((column) => {
+              if (column === ROWNUM_COLUMN) {
+                return (
+                  <th
+                    key={ROWNUM_COLUMN}
+                    className="result-table-header result-table-rownum-header"
+                    aria-label="Row number"
+                  >
+                    #
+                  </th>
+                );
+              }
+
+              if (!column) {
+                return (
+                  <th
+                    key={ACTIONS_COLUMN}
+                    className="result-table-header result-table-actions-header"
+                  />
+                );
+              }
+
+              return (
                 <th key={column} className="result-table-header">
                   <span className="result-table-header-label" title={column}>
                     {column}
@@ -166,10 +203,8 @@ export function ResultGrid({
                     onPointerCancel={onResizePointerUp}
                   />
                 </th>
-              ) : (
-                <th key="__actions__" className="result-table-header result-table-actions-header" />
-              ),
-            )}
+              );
+            })}
           </tr>
         </thead>
         <tbody>
@@ -177,20 +212,31 @@ export function ResultGrid({
             const absoluteRowIndex = rowOffset + rowIndex;
             return (
               <tr key={absoluteRowIndex}>
-                {editable ? (
-                  <td className="result-table-actions-cell">
-                    <button
-                      type="button"
-                      className="result-table-delete-btn"
-                      aria-label={`Delete row ${absoluteRowIndex + 1}`}
-                      title="Delete row"
-                      onClick={() => onDeleteRow?.(absoluteRowIndex)}
-                    >
-                      ×
-                    </button>
-                  </td>
-                ) : null}
-                {columns.map((column) => {
+                {displayColumns.map((column) => {
+                  if (column === ROWNUM_COLUMN) {
+                    return (
+                      <td key={ROWNUM_COLUMN} className="result-table-rownum-cell">
+                        {absoluteRowIndex + 1}
+                      </td>
+                    );
+                  }
+
+                  if (!column) {
+                    return (
+                      <td key={ACTIONS_COLUMN} className="result-table-actions-cell">
+                        <button
+                          type="button"
+                          className="result-table-delete-btn"
+                          aria-label={`Delete row ${absoluteRowIndex + 1}`}
+                          title="Delete row"
+                          onClick={() => onDeleteRow?.(absoluteRowIndex)}
+                        >
+                          ×
+                        </button>
+                      </td>
+                    );
+                  }
+
                   const value = row[column] ?? "";
                   const cell: GridCellCoord = { rowIndex: absoluteRowIndex, column };
                   const isSelected = sameCell(selectedCell, cell);

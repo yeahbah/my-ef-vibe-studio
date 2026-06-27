@@ -29,6 +29,8 @@ Built with **Tauri 2** + **React** + **Monaco**. The [efvibe](https://github.com
 
 See [INSTALL.md](INSTALL.md) for release build instructions.
 
+See [docs/USER_GUIDE.md](docs/USER_GUIDE.md) for a full user guide (workspaces, queries, notebooks, sync, and troubleshooting).
+
 ## Phase 2
 
 - **Result explorer** — Dump-style nested object tree (Explorer tab) with grid/tree toggle

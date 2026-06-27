@@ -1,13 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { commitGitFiles, fetchGitStatus, type GitStatusResult } from "../../lib/gitClient";
 import {
-  applyImportedPack,
   buildPackFromStudio,
   exportTeamPack,
-  fetchPackFromUrl,
   importTeamPack,
   readPackFromSyncDirectory,
   writePackToSyncDirectory,
+  applyImportedPack,
 } from "../../lib/pack";
 import {
   buildDbSetSampleExpression,
@@ -22,10 +21,7 @@ import {
   showWorkspaceInFileManager,
 } from "../../lib/fileManager";
 import { BUILTIN_SNIPPETS } from "../../types/snippets";
-import { BUILTIN_SNIPPET_PACKS } from "../../types/snippetPacks";
-import { REMOTE_SNIPPET_PACK_REGISTRY } from "../../lib/packRegistry";
 import { pushCloudSync, pullCloudSync } from "../../lib/cloudSync";
-import { InstallPackUrlDialog } from "../InstallPackUrlDialog";
 import type { EvaluationHistoryEntry } from "../../lib/history";
 import type { AppSettings, ConnectionSettings, PrerequisiteCheckResult } from "../../types/connection";
 import type { QueryLibraryState } from "../../types/queryLibrary";
@@ -59,7 +55,6 @@ interface ExplorerSidebarProps {
   userSnippets: SnippetDefinition[];
   teamSyncDirectory: string;
   cloudSyncDirectory: string;
-  installedPackIds: string[];
   expandedNodeIds: string[];
   onExpandedNodeIdsChange: (ids: string[]) => void;
   onSelectConnection: (connectionId: string) => void;
@@ -73,18 +68,13 @@ interface ExplorerSidebarProps {
   onOpenQueryTab: (expression: string, connectionId: string, name?: string) => void;
   onHistorySelect: (expression: string) => void;
   onOpenLibraryQuery: (expression: string, connectionId: string, name?: string) => void;
-  onToggleFavorite: (tabId: string) => void;
-  onAddFolder: (name: string) => void;
-  onAssignFolder: (tabId: string, folderId?: string) => void;
   onInsertSnippet: (expression: string) => void;
-  onAddSnippet: (title: string, expression: string) => void;
   onRemoveSnippet: (id: string) => void;
   onImportPack: (
     snippets: SnippetDefinition[],
     queries: Array<{ name: string; expression: string; connectionId: string }>,
     folderNames: string[],
   ) => void;
-  onInstallPackId: (packId: string) => void;
   onStatus: (message: string) => void;
   onNewWorkspace: () => void;
   onOpenWorkspace: () => void;
@@ -125,7 +115,6 @@ export function ExplorerSidebar(props: ExplorerSidebarProps) {
     userSnippets,
     teamSyncDirectory,
     cloudSyncDirectory,
-    installedPackIds,
     expandedNodeIds,
     onExpandedNodeIdsChange,
     onSelectConnection,
@@ -139,14 +128,9 @@ export function ExplorerSidebar(props: ExplorerSidebarProps) {
     onOpenQueryTab,
     onHistorySelect,
     onOpenLibraryQuery,
-    onToggleFavorite,
-    onAddFolder,
-    onAssignFolder,
     onInsertSnippet,
-    onAddSnippet,
     onRemoveSnippet,
     onImportPack,
-    onInstallPackId,
     onStatus,
     onNewWorkspace,
     onOpenWorkspace,
@@ -174,7 +158,6 @@ export function ExplorerSidebar(props: ExplorerSidebarProps) {
   const [gitLoading, setGitLoading] = useState(false);
   const [selectedGitFiles, setSelectedGitFiles] = useState<string[]>([]);
   const [menu, setMenu] = useState<{ x: number; y: number; items: ContextMenuItem[] } | undefined>();
-  const [packUrlDialogOpen, setPackUrlDialogOpen] = useState(false);
   const [workspacePropertiesOpen, setWorkspacePropertiesOpen] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
@@ -470,13 +453,11 @@ export function ExplorerSidebar(props: ExplorerSidebarProps) {
         activeConnectionId,
         schemaByConnection,
         queryTabs,
-        queryLibrary,
         userSnippets,
         history,
         gitStatus,
         gitLoading,
         selectedGitFiles,
-        installedPackIds,
       }),
     [
       activeConnectionId,
@@ -485,8 +466,6 @@ export function ExplorerSidebar(props: ExplorerSidebarProps) {
       gitLoading,
       gitStatus,
       history,
-      installedPackIds,
-      queryLibrary,
       queryTabs,
       schemaByConnection,
       selectedGitFiles,
@@ -517,15 +496,6 @@ export function ExplorerSidebar(props: ExplorerSidebarProps) {
       onExpandedNodeIdsChange([
         ...new Set([...expandedNodeIds, node.id, `model:${connectionId}`]),
       ]);
-      return;
-    }
-
-    if (node.kind === "query") {
-      const tabId = node.id.replace("query:", "");
-      const tab = queryTabs.find((entry) => entry.id === tabId);
-      if (tab) {
-        onOpenLibraryQuery(tab.expression, tab.connectionId, tab.name);
-      }
       return;
     }
 
@@ -565,12 +535,9 @@ export function ExplorerSidebar(props: ExplorerSidebarProps) {
         documentPath,
         fileManagerLabel,
         connections,
-        queryTabs,
-        queryLibrary,
         userSnippets,
         history,
         selectedGitFiles,
-        installedPackIds,
         onExpandedNodeIdsChange,
         onSelectConnection,
         onAddConnection,
@@ -582,15 +549,9 @@ export function ExplorerSidebar(props: ExplorerSidebarProps) {
         onEditConnection,
         onOpenQueryTab,
         onHistorySelect,
-        onOpenLibraryQuery,
-        onToggleFavorite,
-        onAddFolder,
-        onAssignFolder,
         onInsertSnippet,
-        onAddSnippet,
         onRemoveSnippet,
         onImportPack,
-        onInstallPackId,
         onStatus,
         onRenameWorkspace,
         onOpenWorkspaceProperties: () => setWorkspacePropertiesOpen(true),
@@ -607,8 +568,6 @@ export function ExplorerSidebar(props: ExplorerSidebarProps) {
         handleSyncPull,
         handleCloudPush,
         handleCloudPull,
-        handleInstallRemotePack,
-        openPackUrlDialog: () => setPackUrlDialogOpen(true),
       }),
     });
   }
@@ -721,27 +680,6 @@ export function ExplorerSidebar(props: ExplorerSidebarProps) {
     }
   }
 
-  async function handleInstallPackFromUrl(url: string) {
-    const pack = await fetchPackFromUrl(url);
-    const applied = applyImportedPack(pack, activeConnectionId);
-    onImportPack(applied.snippets, applied.queries, applied.folderNames);
-    onInstallPackId(`url:${url}`);
-    onStatus(`Installed ${pack.name}`);
-  }
-
-  async function handleInstallRemotePack(packId: string) {
-    const entry = REMOTE_SNIPPET_PACK_REGISTRY.find((pack) => pack.id === packId);
-    if (!entry) {
-      return;
-    }
-
-    const pack = await fetchPackFromUrl(entry.url);
-    const applied = applyImportedPack(pack, activeConnectionId);
-    onImportPack(applied.snippets, applied.queries, applied.folderNames);
-    onInstallPackId(entry.id);
-    onStatus(`Installed ${entry.name}`);
-  }
-
   return (
     <aside className="sidebar explorer-sidebar">
       <div className="sidebar-toolbar" role="toolbar" aria-label="Workspace">
@@ -834,12 +772,6 @@ export function ExplorerSidebar(props: ExplorerSidebarProps) {
         onClose={() => setDbSetPropertiesDialog(undefined)}
       />
 
-      <InstallPackUrlDialog
-        open={packUrlDialogOpen}
-        onClose={() => setPackUrlDialogOpen(false)}
-        onInstall={handleInstallPackFromUrl}
-      />
-
       <AboutDialog
         open={aboutOpen}
         searchDirectory={aboutSearchDirectory}
@@ -862,13 +794,11 @@ function buildExplorerTree(input: {
   activeConnectionId: string;
   schemaByConnection: Record<string, ConnectionSchemaState>;
   queryTabs: QueryTab[];
-  queryLibrary: QueryLibraryState;
   userSnippets: SnippetDefinition[];
   history: EvaluationHistoryEntry[];
   gitStatus: GitStatusResult | undefined;
   gitLoading: boolean;
   selectedGitFiles: string[];
-  installedPackIds: string[];
 }): ExplorerNode[] {
   return [
     {
@@ -906,37 +836,6 @@ function buildExplorerTree(input: {
           }),
         },
         {
-          id: "queries",
-          label: "Queries",
-          kind: "section",
-          children: [
-            ...input.queryLibrary.folders.map((folder) => ({
-              id: `folder:${folder.id}`,
-              label: folder.name,
-              kind: "folder" as const,
-              children: input.queryTabs
-                .filter((tab) => tab.folderId === folder.id)
-                .map((tab) => ({
-                  id: `query:${tab.id}`,
-                  label: tab.name,
-                  subtitle: tab.favorite ? "★" : undefined,
-                  kind: "query" as const,
-                })),
-            })),
-            {
-              id: "queries:tabs",
-              label: "Open tabs",
-              kind: "folder",
-              children: input.queryTabs.map((tab) => ({
-                id: `query:${tab.id}`,
-                label: tab.name,
-                subtitle: tab.favorite ? "★" : tab.filePath ? undefined : "*",
-                kind: "query" as const,
-              })),
-            },
-          ],
-        },
-        {
           id: "team",
           label: "Team",
           kind: "section",
@@ -963,27 +862,6 @@ function buildExplorerTree(input: {
                     },
                   ],
             },
-            {
-              id: "team:packs",
-              label: "Snippet packs",
-              kind: "folder",
-              children: [
-                ...BUILTIN_SNIPPET_PACKS.map((pack) => ({
-                  id: `team:pack:${pack.id}`,
-                  label: pack.name,
-                  subtitle: input.installedPackIds.includes(pack.id) ? "installed" : undefined,
-                  kind: "pack" as const,
-                })),
-                ...REMOTE_SNIPPET_PACK_REGISTRY.map((pack) => ({
-                  id: `team:remote-pack:${pack.id}`,
-                  label: pack.name,
-                  subtitle: input.installedPackIds.includes(pack.id)
-                    ? "installed"
-                    : "registry",
-                  kind: "pack" as const,
-                })),
-              ],
-            },
           ],
         },
       ],
@@ -997,12 +875,9 @@ function buildContextMenuItems(
 ): ContextMenuItem[] {
   const treeNodes = ctx.treeNodes as ExplorerNode[];
   const connections = ctx.connections as WorkspaceConnection[];
-  const queryTabs = ctx.queryTabs as QueryTab[];
-  const queryLibrary = ctx.queryLibrary as QueryLibraryState;
   const userSnippets = ctx.userSnippets as SnippetDefinition[];
   const history = ctx.history as EvaluationHistoryEntry[];
   const selectedGitFiles = ctx.selectedGitFiles as string[];
-  const installedPackIds = ctx.installedPackIds as string[];
   const onExpandedNodeIdsChange = ctx.onExpandedNodeIdsChange as (ids: string[]) => void;
   const onSelectConnection = ctx.onSelectConnection as (id: string) => void;
   const onAddConnection = ctx.onAddConnection as () => void;
@@ -1018,19 +893,8 @@ function buildContextMenuItems(
     name?: string,
   ) => void;
   const onHistorySelect = ctx.onHistorySelect as (expr: string) => void;
-  const onOpenLibraryQuery = ctx.onOpenLibraryQuery as (
-    expr: string,
-    connectionId: string,
-    name?: string,
-  ) => void;
-  const onToggleFavorite = ctx.onToggleFavorite as (tabId: string) => void;
-  const onAddFolder = ctx.onAddFolder as (name: string) => void;
-  const onAssignFolder = ctx.onAssignFolder as (tabId: string, folderId?: string) => void;
   const onInsertSnippet = ctx.onInsertSnippet as (expr: string) => void;
-  const onAddSnippet = ctx.onAddSnippet as (title: string, expr: string) => void;
   const onRemoveSnippet = ctx.onRemoveSnippet as (id: string) => void;
-  const onImportPack = ctx.onImportPack as ExplorerSidebarProps["onImportPack"];
-  const onInstallPackId = ctx.onInstallPackId as (id: string) => void;
   const onStatus = ctx.onStatus as (message: string) => void;
   const activeConnectionId = ctx.activeConnectionId as string;
   const refreshSchemaForConnection = ctx.refreshSchemaForConnection as (
@@ -1048,8 +912,6 @@ function buildContextMenuItems(
   const handleSyncPull = ctx.handleSyncPull as () => Promise<void>;
   const handleCloudPush = ctx.handleCloudPush as () => Promise<void>;
   const handleCloudPull = ctx.handleCloudPull as () => Promise<void>;
-  const handleInstallRemotePack = ctx.handleInstallRemotePack as (packId: string) => Promise<void>;
-  const openPackUrlDialog = ctx.openPackUrlDialog as () => void;
 
   if (!node) {
     return [
@@ -1190,72 +1052,6 @@ function buildContextMenuItems(
     ];
   }
 
-  if (node.id === "queries") {
-    return [
-      {
-        id: "new-folder",
-        label: "New folder…",
-        onClick: () => {
-          const name = window.prompt("Folder name");
-          if (name?.trim()) {
-            onAddFolder(name.trim());
-          }
-        },
-      },
-    ];
-  }
-
-  if (node.kind === "query") {
-    const tabId = node.id.replace("query:", "");
-    const tab = queryTabs.find((entry) => entry.id === tabId);
-    if (!tab) {
-      return [];
-    }
-
-    return [
-      {
-        id: "open",
-        label: "Open in editor",
-        onClick: () => onOpenLibraryQuery(tab.expression, tab.connectionId, tab.name),
-      },
-      {
-        id: "favorite",
-        label: tab.favorite ? "Remove favorite" : "Add favorite",
-        onClick: () => onToggleFavorite(tabId),
-      },
-      ...queryLibrary.folders.map((folder) => ({
-        id: `move-${folder.id}`,
-        label: `Move to ${folder.name}`,
-        onClick: () => onAssignFolder(tabId, folder.id),
-      })),
-      {
-        id: "clear-folder",
-        label: "Remove from folder",
-        disabled: !tab.folderId,
-        onClick: () => onAssignFolder(tabId, undefined),
-      },
-    ];
-  }
-
-  if (node.id === "snippets") {
-    return [
-      {
-        id: "add-snippet",
-        label: "Add snippet…",
-        onClick: () => {
-          const title = window.prompt("Snippet title");
-          if (!title?.trim()) {
-            return;
-          }
-          const expression = window.prompt("Snippet expression");
-          if (expression?.trim()) {
-            onAddSnippet(title.trim(), expression.trim());
-          }
-        },
-      },
-    ];
-  }
-
   if (node.kind === "snippet") {
     const snippetId = node.id.replace("snippet:", "");
     const custom = userSnippets.find((entry) => entry.id === snippetId);
@@ -1315,49 +1111,10 @@ function buildContextMenuItems(
     return [
       { id: "export-pack", label: "Export team pack", onClick: () => void handleExportPack() },
       { id: "import-pack", label: "Import team pack", onClick: () => void handleImportPack() },
-      { id: "install-pack-url", label: "Install pack from URL…", onClick: openPackUrlDialog },
       { id: "sync-push", label: "Push favorites to sync folder", onClick: () => void handleSyncPush() },
       { id: "sync-pull", label: "Pull pack from sync folder", onClick: () => void handleSyncPull() },
       { id: "cloud-push", label: "Push to cloud sync", onClick: () => void handleCloudPush() },
       { id: "cloud-pull", label: "Pull from cloud sync", onClick: () => void handleCloudPull() },
-    ];
-  }
-
-  if (node.id === "team:packs") {
-    return [
-      { id: "install-pack-url", label: "Install pack from URL…", onClick: openPackUrlDialog },
-    ];
-  }
-
-  if (node.kind === "pack") {
-    const packId = node.id.replace(/^team:(?:remote-)?pack:/, "");
-    const isRemote = node.id.startsWith("team:remote-pack:");
-    const manifest = isRemote
-      ? REMOTE_SNIPPET_PACK_REGISTRY.find((entry) => entry.id === packId)
-      : BUILTIN_SNIPPET_PACKS.find((entry) => entry.id === packId);
-    if (!manifest) {
-      return [];
-    }
-    return [
-      {
-        id: "install-pack",
-        label: installedPackIds.includes(packId) ? "Already installed" : "Install pack",
-        disabled: installedPackIds.includes(packId),
-        onClick: () => {
-          if (isRemote) {
-            void handleInstallRemotePack(packId);
-            return;
-          }
-
-          const applied = applyImportedPack(
-            (manifest as (typeof BUILTIN_SNIPPET_PACKS)[number]).pack,
-            queryTabs[0]?.connectionId ?? activeConnectionId,
-          );
-          onImportPack(applied.snippets, applied.queries, applied.folderNames);
-          onInstallPackId(packId);
-          onStatus(`Installed ${manifest.name}`);
-        },
-      },
     ];
   }
 

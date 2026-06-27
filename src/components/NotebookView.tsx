@@ -17,10 +17,12 @@ interface NotebookViewProps {
   onNameChange: (name: string) => void;
   onCellChange: (cellId: string, value: string) => void;
   onAddCell: (kind: "code" | "markdown") => void;
+  onInsertCell: (cellId: string, position: "above" | "below") => void;
   onRemoveCell: (cellId: string) => void;
   onMoveCell: (cellId: string, direction: "up" | "down") => void;
   onOpen: () => void;
   onSave: () => void;
+  onSaveAs: () => void;
   onRunAll: () => void;
   onRunCell: (cellId: string, scope: NotebookRunScope, source?: string) => void;
 }
@@ -34,10 +36,12 @@ export function NotebookView({
   onNameChange,
   onCellChange,
   onAddCell,
+  onInsertCell,
   onRemoveCell,
   onMoveCell,
   onOpen,
   onSave,
+  onSaveAs,
   onRunAll,
   onRunCell,
 }: NotebookViewProps) {
@@ -71,6 +75,9 @@ export function NotebookView({
           <button type="button" onClick={onSave}>
             Save
           </button>
+          <button type="button" onClick={onSaveAs}>
+            Save as…
+          </button>
         </div>
       </header>
 
@@ -93,6 +100,7 @@ export function NotebookView({
             onStopEditMarkdown={() => setEditingMarkdownId(undefined)}
             onValueChange={(value) => onCellChange(cell.id, value)}
             onRemove={() => onRemoveCell(cell.id)}
+            onInsert={(position) => onInsertCell(cell.id, position)}
             onMove={(direction) => onMoveCell(cell.id, direction)}
             onRun={(scope, source) => onRunCell(cell.id, scope, source)}
           />
@@ -132,6 +140,7 @@ function NotebookCellRow({
   onStopEditMarkdown,
   onValueChange,
   onRemove,
+  onInsert,
   onMove,
   onRun,
 }: {
@@ -150,6 +159,7 @@ function NotebookCellRow({
   onStopEditMarkdown: () => void;
   onValueChange: (value: string) => void;
   onRemove: () => void;
+  onInsert: (position: "above" | "below") => void;
   onMove: (direction: "up" | "down") => void;
   onRun: (scope: NotebookRunScope, source?: string) => void;
 }) {
@@ -265,6 +275,12 @@ function NotebookCellRow({
             {isCode ? (isCommand ? "efvibe" : "C#") : "Markdown"}
           </span>
           <div className="notebook-cell-footer-actions">
+            <button type="button" className="notebook-cell-action" onClick={() => onInsert("above")}>
+              Add above
+            </button>
+            <button type="button" className="notebook-cell-action" onClick={() => onInsert("below")}>
+              Add below
+            </button>
             {canMoveUp ? (
               <button type="button" className="notebook-cell-action" onClick={() => onMove("up")}>
                 Move up

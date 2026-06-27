@@ -108,6 +108,9 @@ export function HelpDialog({ open, settings, onClose }: HelpDialogProps) {
         <section>
           <h3>Documentation</h3>
           <div className="about-links">
+            <button type="button" onClick={() => void openExternal(`${STUDIO_REPOSITORY}/blob/main/docs/USER_GUIDE.md`)}>
+              User guide
+            </button>
             <button type="button" onClick={() => void openExternal(STUDIO_REPOSITORY)}>
               Studio README
             </button>

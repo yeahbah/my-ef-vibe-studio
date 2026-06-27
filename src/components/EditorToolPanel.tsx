@@ -1,7 +1,10 @@
-import { useEffect, useState } from "react";
-import type { EvaluationHistoryEntry } from "../lib/history";
+import { useEffect, useRef, useState } from "react";
+import { groupHistoryByDate, type EvaluationHistoryEntry } from "../lib/history";
+import { REMOTE_SNIPPET_PACK_REGISTRY } from "../lib/packRegistry";
 import { formatFindingSummary, scanCodeToRunnableExpression } from "../lib/scan";
 import { BUILTIN_SNIPPETS } from "../types/snippets";
+import { BUILTIN_SNIPPET_PACKS } from "../types/snippetPacks";
+import { InstallPackUrlDialog } from "./InstallPackUrlDialog";
 import type { QueryTab } from "../types/query";
 import type { SnippetDefinition } from "../types/snippets";
 import type { ScanMode, ScanReviewItem } from "../types/scan";
@@ -25,6 +28,10 @@ interface EditorToolPanelProps {
   onInsertSnippet: (expression: string) => void;
   onAddSnippet: (title: string, expression: string) => void;
   onRemoveSnippet: (id: string) => void;
+  installedPackIds: string[];
+  onInstallBuiltinPack: (packId: string) => void;
+  onInstallRemotePack: (packId: string) => void;
+  onInstallPackFromUrl: (url: string) => Promise<void>;
   onOpenFavorite: (tab: QueryTab) => void;
   onToggleFavorite: (tabId: string) => void;
   onRunScan: (mode: ScanMode) => void;
@@ -60,6 +67,10 @@ export function EditorToolPanel({
   onInsertSnippet,
   onAddSnippet,
   onRemoveSnippet,
+  installedPackIds,
+  onInstallBuiltinPack,
+  onInstallRemotePack,
+  onInstallPackFromUrl,
   onOpenFavorite,
   onToggleFavorite,
   onRunScan,
@@ -91,9 +102,13 @@ export function EditorToolPanel({
         {tool === "snippets" ? (
           <SnippetsToolView
             userSnippets={userSnippets}
+            installedPackIds={installedPackIds}
             onInsert={onInsertSnippet}
             onAdd={onAddSnippet}
             onRemove={onRemoveSnippet}
+            onInstallBuiltinPack={onInstallBuiltinPack}
+            onInstallRemotePack={onInstallRemotePack}
+            onInstallPackFromUrl={onInstallPackFromUrl}
           />
         ) : null}
 
@@ -263,38 +278,127 @@ function HistoryToolView({
   history: EvaluationHistoryEntry[];
   onSelect: (expression: string) => void;
 }) {
+  const groups = groupHistoryByDate(history);
+  const [expandedKeys, setExpandedKeys] = useState<Set<string>>(() => new Set());
+  const defaultExpandedRef = useRef(false);
+
+  useEffect(() => {
+    if (defaultExpandedRef.current) {
+      return;
+    }
+
+    const todayGroup = groups.find((group) => group.label === "Today");
+    if (!todayGroup) {
+      return;
+    }
+
+    defaultExpandedRef.current = true;
+    setExpandedKeys(new Set([todayGroup.dateKey]));
+  }, [groups]);
+
+  function togglePanel(dateKey: string) {
+    setExpandedKeys((current) => {
+      const next = new Set(current);
+      if (next.has(dateKey)) {
+        next.delete(dateKey);
+      } else {
+        next.add(dateKey);
+      }
+      return next;
+    });
+  }
+
   if (history.length === 0) {
     return <p className="muted tool-panel-empty">Run a query to build history.</p>;
   }
 
+  if (groups.length === 0) {
+    return <p className="muted tool-panel-empty">No queries in the last 7 days.</p>;
+  }
+
   return (
-    <ul className="tool-item-list">
-      {history.map((entry) => (
-        <li key={entry.id}>
-          <button type="button" className="tool-list-item" onClick={() => onSelect(entry.expression)}>
-            <span className="tool-list-item-title">{truncate(entry.expression, 56)}</span>
-            <span className="tool-list-item-meta">
-              {entry.totalMs} ms · {entry.connectionName}
-            </span>
-          </button>
-        </li>
-      ))}
-    </ul>
+    <div className="history-expansion-panels">
+      {groups.map((group) => {
+        const expanded = expandedKeys.has(group.dateKey);
+
+        return (
+          <section
+            key={group.dateKey}
+            className={`history-expansion-panel ${expanded ? "expanded" : "collapsed"}`}
+          >
+            <button
+              type="button"
+              className="history-expansion-header"
+              aria-expanded={expanded}
+              onClick={() => togglePanel(group.dateKey)}
+            >
+              <span className="history-expansion-chevron" aria-hidden="true">
+                {expanded ? "▾" : "▸"}
+              </span>
+              <span className="history-expansion-title">{group.label}</span>
+              <span className="history-expansion-count">{group.entries.length}</span>
+            </button>
+            {expanded ? (
+              <ul className="tool-item-list history-expansion-body">
+                {group.entries.map((entry) => (
+                  <li key={entry.id}>
+                    <button
+                      type="button"
+                      className="tool-list-item"
+                      onClick={() => onSelect(entry.expression)}
+                    >
+                      <span className="tool-list-item-title">{truncate(entry.expression, 56)}</span>
+                      <span className="tool-list-item-meta">
+                        {entry.totalMs} ms · {entry.connectionName}
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+          </section>
+        );
+      })}
+    </div>
   );
 }
 
 function SnippetsToolView({
   userSnippets,
+  installedPackIds,
   onInsert,
   onAdd,
   onRemove,
+  onInstallBuiltinPack,
+  onInstallRemotePack,
+  onInstallPackFromUrl,
 }: {
   userSnippets: SnippetDefinition[];
+  installedPackIds: string[];
   onInsert: (expression: string) => void;
   onAdd: (title: string, expression: string) => void;
   onRemove: (id: string) => void;
+  onInstallBuiltinPack: (packId: string) => void;
+  onInstallRemotePack: (packId: string) => void;
+  onInstallPackFromUrl: (url: string) => Promise<void>;
 }) {
   const snippets = [...BUILTIN_SNIPPETS, ...userSnippets];
+  const [packUrlDialogOpen, setPackUrlDialogOpen] = useState(false);
+  const [expandedPanels, setExpandedPanels] = useState<Set<string>>(
+    () => new Set(["snippets"]),
+  );
+
+  function togglePanel(panelId: string) {
+    setExpandedPanels((current) => {
+      const next = new Set(current);
+      if (next.has(panelId)) {
+        next.delete(panelId);
+      } else {
+        next.add(panelId);
+      }
+      return next;
+    });
+  }
 
   function handleAddSnippet() {
     const title = window.prompt("Snippet title");
@@ -308,38 +412,130 @@ function SnippetsToolView({
     }
   }
 
+  const packEntries = [
+    ...BUILTIN_SNIPPET_PACKS.map((pack) => ({
+      id: pack.id,
+      name: pack.name,
+      description: pack.description,
+      source: "built-in" as const,
+      installed: installedPackIds.includes(pack.id),
+      onInstall: () => onInstallBuiltinPack(pack.id),
+    })),
+    ...REMOTE_SNIPPET_PACK_REGISTRY.map((pack) => ({
+      id: pack.id,
+      name: pack.name,
+      description: pack.description,
+      source: "registry" as const,
+      installed: installedPackIds.includes(pack.id),
+      onInstall: () => onInstallRemotePack(pack.id),
+    })),
+  ];
+
   return (
     <>
-      <div className="tool-panel-actions">
+      <div className="tool-panel-actions snippet-panel-actions">
         <button type="button" onClick={handleAddSnippet}>
           Add snippet…
         </button>
+        <button type="button" onClick={() => setPackUrlDialogOpen(true)}>
+          Install from URL…
+        </button>
       </div>
-      <ul className="tool-item-list">
-        {snippets.map((snippet) => {
-          const custom = userSnippets.some((entry) => entry.id === snippet.id);
-          return (
-            <li key={snippet.id} className="tool-list-item-row">
-              <button type="button" className="tool-list-item" onClick={() => onInsert(snippet.expression)}>
-                <span className="tool-list-item-title">{snippet.title}</span>
-                <span className="tool-list-item-meta">
-                  {snippet.builtin ? "built-in" : "custom"} · {truncate(snippet.expression, 42)}
-                </span>
-              </button>
-              {custom ? (
-                <button
-                  type="button"
-                  className="tool-list-item-remove"
-                  aria-label={`Remove ${snippet.title}`}
-                  onClick={() => onRemove(snippet.id)}
-                >
-                  ×
-                </button>
-              ) : null}
-            </li>
-          );
-        })}
-      </ul>
+
+      <div className="history-expansion-panels snippet-expansion-panels">
+        <section
+          className={`history-expansion-panel ${expandedPanels.has("snippets") ? "expanded" : "collapsed"}`}
+        >
+          <button
+            type="button"
+            className="history-expansion-header"
+            aria-expanded={expandedPanels.has("snippets")}
+            onClick={() => togglePanel("snippets")}
+          >
+            <span className="history-expansion-chevron" aria-hidden="true">
+              {expandedPanels.has("snippets") ? "▾" : "▸"}
+            </span>
+            <span className="history-expansion-title">Snippets</span>
+            <span className="history-expansion-count">{snippets.length}</span>
+          </button>
+          {expandedPanels.has("snippets") ? (
+            <ul className="tool-item-list history-expansion-body">
+              {snippets.map((snippet) => {
+                const custom = userSnippets.some((entry) => entry.id === snippet.id);
+                return (
+                  <li key={snippet.id} className="tool-list-item-row">
+                    <button
+                      type="button"
+                      className="tool-list-item"
+                      onClick={() => onInsert(snippet.expression)}
+                    >
+                      <span className="tool-list-item-title">{snippet.title}</span>
+                      <span className="tool-list-item-meta">
+                        {snippet.builtin ? "built-in" : "custom"} · {truncate(snippet.expression, 42)}
+                      </span>
+                    </button>
+                    {custom ? (
+                      <button
+                        type="button"
+                        className="tool-list-item-remove"
+                        aria-label={`Remove ${snippet.title}`}
+                        onClick={() => onRemove(snippet.id)}
+                      >
+                        ×
+                      </button>
+                    ) : null}
+                  </li>
+                );
+              })}
+            </ul>
+          ) : null}
+        </section>
+
+        <section
+          className={`history-expansion-panel ${expandedPanels.has("packs") ? "expanded" : "collapsed"}`}
+        >
+          <button
+            type="button"
+            className="history-expansion-header"
+            aria-expanded={expandedPanels.has("packs")}
+            onClick={() => togglePanel("packs")}
+          >
+            <span className="history-expansion-chevron" aria-hidden="true">
+              {expandedPanels.has("packs") ? "▾" : "▸"}
+            </span>
+            <span className="history-expansion-title">Snippet packs</span>
+            <span className="history-expansion-count">{packEntries.length}</span>
+          </button>
+          {expandedPanels.has("packs") ? (
+            <ul className="tool-item-list history-expansion-body">
+              {packEntries.map((pack) => (
+                <li key={pack.id} className="snippet-pack-row">
+                  <div className="snippet-pack-copy">
+                    <span className="tool-list-item-title">{pack.name}</span>
+                    <span className="tool-list-item-meta">
+                      {pack.source} · {truncate(pack.description, 48)}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    className={`snippet-pack-install ${pack.installed ? "installed" : ""}`}
+                    disabled={pack.installed}
+                    onClick={pack.onInstall}
+                  >
+                    {pack.installed ? "Installed" : "Install"}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </section>
+      </div>
+
+      <InstallPackUrlDialog
+        open={packUrlDialogOpen}
+        onClose={() => setPackUrlDialogOpen(false)}
+        onInstall={onInstallPackFromUrl}
+      />
     </>
   );
 }

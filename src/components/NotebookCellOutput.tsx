@@ -50,6 +50,7 @@ export function NotebookCellOutput({ payload, markdown = false }: NotebookCellOu
           <table className="notebook-output-table">
             <thead>
               <tr>
+                <th className="notebook-output-rownum">#</th>
                 {Object.keys(rows[0] ?? {}).map((column) => (
                   <th key={column}>{column}</th>
                 ))}
@@ -58,6 +59,7 @@ export function NotebookCellOutput({ payload, markdown = false }: NotebookCellOu
             <tbody>
               {rows.map((row, rowIndex) => (
                 <tr key={rowIndex}>
+                  <td className="notebook-output-rownum">{rowIndex + 1}</td>
                   {Object.keys(rows[0] ?? {}).map((column) => (
                     <td key={column}>{row[column] ?? ""}</td>
                   ))}
