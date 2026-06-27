@@ -119,12 +119,16 @@ fn write_request_and_wait(
         .map_err(|error| error.to_string())?;
     stdin.flush().map_err(|error| error.to_string())?;
 
-    let line = wait_for_line(rx, timeout)?;
-    if let Some(error) = parse_serve_error(&line) {
-        return Err(error);
-    }
+    loop {
+        let line = wait_for_line(rx, timeout)?;
+        if line.starts_with('{') {
+            if let Some(error) = parse_serve_error(&line) {
+                return Err(error);
+            }
 
-    Ok(line)
+            return Ok(line);
+        }
+    }
 }
 
 fn ensure_daemon_ready(
@@ -290,4 +294,27 @@ pub fn run_expression(
     });
 
     run_daemon_json(settings, search_directory, cwd, request, None)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::parse_serve_error;
+
+    #[test]
+    fn parse_serve_error_extracts_message() {
+        let error = parse_serve_error(r#"{"type":"error","message":"eval failed"}"#);
+        assert_eq!(error.as_deref(), Some("eval failed"));
+    }
+
+    #[test]
+    fn parse_serve_error_ignores_success_payloads() {
+        let error = parse_serve_error(r#"{"success":true,"value":"42"}"#);
+        assert!(error.is_none());
+    }
+
+    #[test]
+    fn parse_serve_error_ignores_non_json() {
+        let error = parse_serve_error("Product Name");
+        assert!(error.is_none());
+    }
 }
