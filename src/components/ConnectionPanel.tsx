@@ -150,7 +150,7 @@ export function ConnectionPanel({
               onChange={(scriptSearchPath) =>
                 onConnectionChange({ ...connection, scriptSearchPath })
               }
-              placeholder="Defaults to search directory"
+              placeholder="scripts (relative to workspace file)"
             />
           </label>
           <label>

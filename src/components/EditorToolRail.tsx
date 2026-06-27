@@ -1,6 +1,6 @@
-import { IconBenchmark, IconCharts, IconHistory, IconScan, IconSnippets, IconStar } from "./icons";
+import { IconBenchmark, IconCharts, IconHistory, IconScan, IconScripts, IconSnippets, IconStar } from "./icons";
 
-export type EditorToolId = "charts" | "history" | "snippets" | "favorites" | "scan";
+export type EditorToolId = "charts" | "history" | "snippets" | "scripts" | "favorites" | "scan";
 
 interface EditorToolRailProps {
   activeTool?: EditorToolId;
@@ -18,6 +18,7 @@ const TOOLS: Array<{
   { id: "charts", label: "Charts", Icon: IconCharts },
   { id: "history", label: "History", Icon: IconHistory },
   { id: "snippets", label: "Snippets", Icon: IconSnippets },
+  { id: "scripts", label: "Scripts", Icon: IconScripts },
   { id: "favorites", label: "Favorites", Icon: IconStar },
   { id: "scan", label: "Scan", Icon: IconScan },
 ];

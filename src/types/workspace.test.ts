@@ -94,4 +94,15 @@ describe("workspaceConnectionToSettings", () => {
     expect(settings.scriptSearchPath).toBe("/workspace/scripts");
     expect(settings.scriptLoads).toEqual(["helpers.csx"]);
   });
+
+  it("defaults script search path to scripts beside the workspace file", () => {
+    const settings = workspaceConnectionToSettings(
+      createSampleConnection(),
+      "/workspace",
+      "efvibe",
+      "/workspace",
+    );
+
+    expect(settings.scriptSearchPath).toBe("/workspace/scripts");
+  });
 });

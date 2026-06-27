@@ -13,7 +13,7 @@ export interface WorkspaceConnection {
   connectionString?: string;
   dotnetFramework?: string;
   dbLog?: boolean;
-  /** Optional directory for resolving #load paths (defaults to search directory). */
+  /** Optional directory for resolving #load paths (defaults to `scripts` beside the workspace file). */
   scriptSearchPath?: string;
   /** Script files to load when the session starts (workspace-relative or absolute). */
   scriptLoads?: string[];
@@ -77,23 +77,39 @@ export function connectionDisplayName(connection: WorkspaceConnection): string {
   return "Unnamed";
 }
 
+/** Default folder for `.csx` helpers, relative to the workspace file directory. */
+export const DEFAULT_SCRIPT_SEARCH_PATH = "scripts";
+
+function resolveWorkspaceRelativePath(
+  value: string | undefined,
+  workspaceDirectory: string,
+): string {
+  if (!value?.trim()) {
+    return "";
+  }
+
+  if (value.startsWith("/") || /^[A-Za-z]:[\\/]/.test(value)) {
+    return value;
+  }
+
+  return `${workspaceDirectory.replace(/\/$/, "")}/${value.replace(/^\.\//, "")}`;
+}
+
+export function resolveScriptSearchPath(
+  connection: WorkspaceConnection,
+  workspaceDirectory: string,
+): string {
+  return (
+    resolveWorkspaceRelativePath(connection.scriptSearchPath, workspaceDirectory) ||
+    resolveWorkspaceRelativePath(DEFAULT_SCRIPT_SEARCH_PATH, workspaceDirectory)
+  );
+}
+
 export function resolveSearchDirectory(
   connection: WorkspaceConnection,
   workspaceDirectory: string,
   resolvedProject: string,
 ): string {
-  const resolvePath = (value: string | undefined) => {
-    if (!value?.trim()) {
-      return "";
-    }
-
-    if (value.startsWith("/") || /^[A-Za-z]:[\\/]/.test(value)) {
-      return value;
-    }
-
-    return `${workspaceDirectory.replace(/\/$/, "")}/${value.replace(/^\.\//, "")}`;
-  };
-
   if (resolvedProject) {
     const normalized = resolvedProject.replace(/\\/g, "/");
     const index = normalized.lastIndexOf("/");
@@ -102,7 +118,7 @@ export function resolveSearchDirectory(
     }
   }
 
-  const configured = resolvePath(connection.searchDirectory);
+  const configured = resolveWorkspaceRelativePath(connection.searchDirectory, workspaceDirectory);
   if (configured) {
     return configured;
   }
@@ -120,28 +136,18 @@ export function workspaceConnectionToSettings(
   toolPath: string,
   defaultWorkspaceRoot: string,
 ): import("./connection").ConnectionSettings {
-  const resolvePath = (value: string | undefined) => {
-    if (!value?.trim()) {
-      return "";
-    }
-
-    if (value.startsWith("/") || /^[A-Za-z]:[\\/]/.test(value)) {
-      return value;
-    }
-
-    return `${workspaceDirectory.replace(/\/$/, "")}/${value.replace(/^\.\//, "")}`;
-  };
-
   return {
-    workspaceRoot: resolvePath(connection.workspaceRoot) || defaultWorkspaceRoot,
-    project: resolvePath(connection.efProject),
-    startupProject: resolvePath(connection.startupProject),
+    workspaceRoot:
+      resolveWorkspaceRelativePath(connection.workspaceRoot, workspaceDirectory) ||
+      defaultWorkspaceRoot,
+    project: resolveWorkspaceRelativePath(connection.efProject, workspaceDirectory),
+    startupProject: resolveWorkspaceRelativePath(connection.startupProject, workspaceDirectory),
     context: connection.context ?? "",
     connectionString: connection.connectionString ?? "",
     toolPath,
     dbLog: connection.dbLog ?? true,
     dotnetFramework: connection.dotnetFramework ?? "",
-    scriptSearchPath: resolvePath(connection.scriptSearchPath),
+    scriptSearchPath: resolveScriptSearchPath(connection, workspaceDirectory),
     scriptLoads: connection.scriptLoads ?? [],
     scriptUsings: (connection.scriptUsings ?? []).map(normalizeScriptUsing),
   };

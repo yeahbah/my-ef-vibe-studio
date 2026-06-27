@@ -2046,6 +2046,9 @@ function App() {
                     onDismissFinding={(note) => void handleDismissScanFinding(note)}
                     onSaveFindingNote={(note) => void handleSaveScanFindingNote(note)}
                     running={running}
+                    scriptSearchPath={connectionSettings?.scriptSearchPath ?? ""}
+                    scriptLoads={connectionSettings?.scriptLoads ?? []}
+                    onScriptsChanged={() => void invalidateEfvibeDaemon()}
                   />
                   </ResizableEditorToolPanel>
                 ) : null}

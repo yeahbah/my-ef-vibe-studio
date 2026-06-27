@@ -15,6 +15,7 @@ import type { ScanMode, ScanReviewItem } from "../types/scan";
 import type { AppTheme } from "../types/theme";
 import type { EditorToolId } from "./EditorToolRail";
 import { ReadOnlyCodeView } from "./ReadOnlyCodeView";
+import { ScriptsToolView } from "./ScriptsToolView";
 
 interface EditorToolPanelProps {
   tool: EditorToolId;
@@ -45,12 +46,16 @@ interface EditorToolPanelProps {
   onDismissFinding: (note?: string) => void;
   onSaveFindingNote: (note: string) => void;
   running?: boolean;
+  scriptSearchPath?: string;
+  scriptLoads?: string[];
+  onScriptsChanged?: () => void;
 }
 
 const TOOL_TITLES: Record<EditorToolId, string> = {
   charts: "Charts",
   history: "History",
   snippets: "Snippets",
+  scripts: "Scripts",
   favorites: "Favorites",
   scan: "Scan",
 };
@@ -84,6 +89,9 @@ export function EditorToolPanel({
   onDismissFinding,
   onSaveFindingNote,
   running = false,
+  scriptSearchPath = "",
+  scriptLoads = [],
+  onScriptsChanged,
 }: EditorToolPanelProps) {
   return (
     <aside className="editor-tool-panel" aria-label={TOOL_TITLES[tool]}>
@@ -94,7 +102,7 @@ export function EditorToolPanel({
         </button>
       </header>
 
-      <div className="editor-tool-panel-body">
+      <div className={`editor-tool-panel-body${tool === "scripts" ? " editor-tool-panel-body-fill" : ""}`}>
         {tool === "charts" ? (
           <ChartsToolView history={history} benchmark={benchmark} />
         ) : null}
@@ -113,6 +121,15 @@ export function EditorToolPanel({
             onInstallBuiltinPack={onInstallBuiltinPack}
             onInstallRemotePack={onInstallRemotePack}
             onInstallPackFromUrl={onInstallPackFromUrl}
+          />
+        ) : null}
+
+        {tool === "scripts" ? (
+          <ScriptsToolView
+            scriptSearchPath={scriptSearchPath}
+            scriptLoads={scriptLoads}
+            theme={theme}
+            onScriptsChanged={onScriptsChanged}
           />
         ) : null}
 

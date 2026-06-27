@@ -143,6 +143,21 @@ fn resolve_cli_path(value: &str, base_directory: Option<&Path>) -> String {
     trimmed.to_string()
 }
 
+fn resolve_script_load_path(value: &str) -> String {
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        return String::new();
+    }
+
+    let path = Path::new(trimmed);
+    if path.is_absolute() {
+        return path.to_string_lossy().to_string();
+    }
+
+    // Relative script names are resolved by efvibe via --script-search-path.
+    trimmed.to_string()
+}
+
 fn resolve_existing_cli_path(value: &str, base_directory: Option<&Path>) -> String {
     let direct = resolve_cli_path(value, None);
     if !direct.is_empty() && Path::new(&direct).exists() {
@@ -221,24 +236,27 @@ fn append_script_args(
         args.push(script_search_path);
     }
 
-    for load in &settings.script_loads {
-        let trimmed = load.trim();
-        if trimmed.is_empty() {
-            continue;
-        }
-
+    let script_loads = settings
+        .script_loads
+        .iter()
+        .map(|load| resolve_script_load_path(load))
+        .filter(|load| !load.is_empty())
+        .collect::<Vec<_>>();
+    if !script_loads.is_empty() {
         args.push("--script-load".to_string());
-        args.push(resolve_cli_path(trimmed, base_directory));
+        args.push(script_loads.join(";"));
     }
 
-    for using in &settings.script_usings {
-        let trimmed = using.trim();
-        if trimmed.is_empty() {
-            continue;
-        }
-
+    let script_usings = settings
+        .script_usings
+        .iter()
+        .map(|using| using.trim())
+        .filter(|using| !using.is_empty())
+        .map(|using| using.to_string())
+        .collect::<Vec<_>>();
+    if !script_usings.is_empty() {
         args.push("--script-using".to_string());
-        args.push(trimmed.to_string());
+        args.push(script_usings.join(";"));
     }
 }
 
@@ -302,10 +320,10 @@ mod tests {
         let args = build_efvibe_args(&sample_settings(), Some(base), false);
 
         assert!(args.windows(2).any(|pair| pair == ["--script-search-path", "/tmp/workspace/scripts"]));
-        assert!(args.windows(2).any(|pair| pair == ["--script-load", "/tmp/workspace/helpers.csx"]));
-        assert!(args.windows(2).any(|pair| pair == ["--script-load", "/tmp/workspace/filters.csx"]));
-        assert!(args.windows(2).any(|pair| pair == ["--script-using", "MyApp.Helpers"]));
-        assert!(args.windows(2).any(|pair| pair == ["--script-using", "System.Globalization"]));
+        assert!(args.windows(2).any(|pair| pair == ["--script-load", "helpers.csx;filters.csx"]));
+        assert!(args.windows(2).any(|pair| {
+            pair == ["--script-using", "MyApp.Helpers;System.Globalization"]
+        }));
     }
 
     #[test]
@@ -313,7 +331,17 @@ mod tests {
         let args = build_serve_args(&sample_settings(), Some(Path::new("/tmp/workspace")), false);
 
         assert_eq!(args.first().map(String::as_str), Some("serve"));
-        assert!(args.windows(2).any(|pair| pair == ["--script-load", "/tmp/workspace/helpers.csx"]));
+        assert!(args.windows(2).any(|pair| pair == ["--script-load", "helpers.csx;filters.csx"]));
+    }
+
+    #[test]
+    fn build_efvibe_args_keeps_absolute_script_load_paths() {
+        let mut settings = sample_settings();
+        settings.script_loads = vec!["/tmp/custom/constants.csx".to_string()];
+
+        let args = build_efvibe_args(&settings, Some(Path::new("/tmp/workspace")), false);
+
+        assert!(args.windows(2).any(|pair| pair == ["--script-load", "/tmp/custom/constants.csx"]));
     }
 
     #[test]

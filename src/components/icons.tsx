@@ -194,6 +194,28 @@ export function IconSnippets(props: IconProps) {
   );
 }
 
+export function IconScripts(props: IconProps) {
+  return (
+    <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" {...props}>
+      <path
+        d="M4.5 2.75h5.25L12.5 5.5v7.75a.75.75 0 0 1-.75.75H4.5a.75.75 0 0 1-.75-.75V3.5a.75.75 0 0 1 .75-.75Z"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.1"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M9.75 2.75V5.5H12.5M5.5 8h5M5.5 10.25h3.25"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.1"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 export function IconScan(props: IconProps) {
   return (
     <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" {...props}>

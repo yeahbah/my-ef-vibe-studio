@@ -453,6 +453,178 @@ button:disabled {
   padding: 8px;
 }
 
+.editor-tool-panel-body-fill {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 0;
+}
+
+.scripts-tool-view {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  gap: 8px;
+  padding: 8px;
+}
+
+.scripts-tool-empty {
+  padding: 12px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.scripts-tool-toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.scripts-tool-path {
+  font-size: 11px;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.scripts-tool-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.scripts-tool-actions button {
+  font-size: 11px;
+  padding: 4px 8px;
+}
+
+.scripts-tool-error {
+  margin: 0;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+  color: var(--danger);
+  font-size: 11px;
+}
+
+.scripts-tool-status {
+  margin: 0;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.scripts-tool-body {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  gap: 8px;
+}
+
+.scripts-tool-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 140px;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--bg-elevated) 35%, transparent);
+}
+
+.scripts-tool-list-empty {
+  padding: 10px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.scripts-tool-list-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 7px 10px;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.scripts-tool-list-item:hover,
+.scripts-tool-list-item.active {
+  background: var(--accent-faint);
+}
+
+.scripts-tool-list-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+}
+
+.scripts-tool-list-badge {
+  flex: 0 0 auto;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--bg-app);
+  color: var(--text-muted);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.scripts-tool-editor {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 180px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--bg-app);
+}
+
+.scripts-tool-editor-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border);
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.scripts-tool-dirty {
+  color: var(--warning, #d4a017);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.scripts-tool-editor-host {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.scripts-tool-editor-empty {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
 .tool-panel-sections {
   display: flex;
   flex-direction: column;
