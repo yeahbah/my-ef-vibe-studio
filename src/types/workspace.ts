@@ -13,6 +13,12 @@ export interface WorkspaceConnection {
   connectionString?: string;
   dotnetFramework?: string;
   dbLog?: boolean;
+  /** Optional directory for resolving #load paths (defaults to search directory). */
+  scriptSearchPath?: string;
+  /** Script files to load when the session starts (workspace-relative or absolute). */
+  scriptLoads?: string[];
+  /** Extra namespaces imported into every query for this connection. */
+  scriptUsings?: string[];
 }
 
 export interface EfvibeWorkspace {
@@ -135,5 +141,8 @@ export function workspaceConnectionToSettings(
     toolPath,
     dbLog: connection.dbLog ?? true,
     dotnetFramework: connection.dotnetFramework ?? "",
+    scriptSearchPath: resolvePath(connection.scriptSearchPath),
+    scriptLoads: connection.scriptLoads ?? [],
+    scriptUsings: connection.scriptUsings ?? [],
   };
 }

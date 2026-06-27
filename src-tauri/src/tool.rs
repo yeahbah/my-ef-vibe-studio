@@ -13,6 +13,12 @@ pub struct ConnectionSettings {
     pub tool_path: String,
     pub db_log: bool,
     pub dotnet_framework: String,
+    #[serde(default)]
+    pub script_search_path: String,
+    #[serde(default)]
+    pub script_loads: Vec<String>,
+    #[serde(default)]
+    pub script_usings: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -199,7 +205,41 @@ pub fn build_efvibe_args(
         args.push("--force-build".to_string());
     }
 
+    append_script_args(settings, base_directory, &mut args);
+
     args
+}
+
+fn append_script_args(
+    settings: &ConnectionSettings,
+    base_directory: Option<&Path>,
+    args: &mut Vec<String>,
+) {
+    let script_search_path = resolve_cli_path(&settings.script_search_path, base_directory);
+    if !script_search_path.is_empty() {
+        args.push("--script-search-path".to_string());
+        args.push(script_search_path);
+    }
+
+    for load in &settings.script_loads {
+        let trimmed = load.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+
+        args.push("--script-load".to_string());
+        args.push(resolve_cli_path(trimmed, base_directory));
+    }
+
+    for using in &settings.script_usings {
+        let trimmed = using.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+
+        args.push("--script-using".to_string());
+        args.push(trimmed.to_string());
+    }
 }
 
 pub fn build_serve_args(
@@ -228,6 +268,9 @@ pub fn settings_key(
         "toolPath": settings.tool_path,
         "dbLog": settings.db_log,
         "dotnetFramework": settings.dotnet_framework,
+        "scriptSearchPath": settings.script_search_path,
+        "scriptLoads": settings.script_loads,
+        "scriptUsings": settings.script_usings,
     })
     .to_string()
 }

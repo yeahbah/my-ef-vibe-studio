@@ -10,6 +10,9 @@ export interface ConnectionSettings {
   toolPath: string;
   dbLog: boolean;
   dotnetFramework: string;
+  scriptSearchPath?: string;
+  scriptLoads?: string[];
+  scriptUsings?: string[];
 }
 
 export type PreferredEditor = "code" | "rider" | "devenv" | "custom";

@@ -135,7 +135,61 @@ export function ConnectionPanel({
             Show SQL in daemon logs
           </label>
         </section>
+
+        <section>
+          <h3>Script session</h3>
+          <p className="settings-hint">
+            Optional helpers loaded into every query for this connection. Use <code>#load</code>{" "}
+            in a query tab for one-off files.
+          </p>
+          <label>
+            Script search path
+            <PathInput
+              kind="folder"
+              value={connection.scriptSearchPath ?? ""}
+              onChange={(scriptSearchPath) =>
+                onConnectionChange({ ...connection, scriptSearchPath })
+              }
+              placeholder="Defaults to search directory"
+            />
+          </label>
+          <label>
+            Script loads (one path per line)
+            <textarea
+              rows={4}
+              value={(connection.scriptLoads ?? []).join("\n")}
+              onChange={(event) =>
+                onConnectionChange({
+                  ...connection,
+                  scriptLoads: splitMultilineList(event.target.value),
+                })
+              }
+              placeholder={"scripts/helpers.csx\nshared/query-filters.csx"}
+            />
+          </label>
+          <label>
+            Additional usings (one namespace per line)
+            <textarea
+              rows={3}
+              value={(connection.scriptUsings ?? []).join("\n")}
+              onChange={(event) =>
+                onConnectionChange({
+                  ...connection,
+                  scriptUsings: splitMultilineList(event.target.value),
+                })
+              }
+              placeholder={"MyApp.QueryHelpers\nSystem.Globalization"}
+            />
+          </label>
+        </section>
       </div>
     </div>
   );
+}
+
+function splitMultilineList(value: string): string[] {
+  return value
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
 }
