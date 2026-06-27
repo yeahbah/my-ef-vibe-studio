@@ -274,3 +274,58 @@ pub fn settings_key(
     })
     .to_string()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::Path;
+
+    fn sample_settings() -> ConnectionSettings {
+        ConnectionSettings {
+            workspace_root: "workspace".to_string(),
+            project: "src/App.csproj".to_string(),
+            startup_project: "src/Api.csproj".to_string(),
+            context: "AppDbContext".to_string(),
+            connection_string: String::new(),
+            tool_path: String::new(),
+            db_log: true,
+            dotnet_framework: "net10.0".to_string(),
+            script_search_path: "scripts".to_string(),
+            script_loads: vec!["helpers.csx".to_string(), "filters.csx".to_string()],
+            script_usings: vec!["MyApp.Helpers".to_string(), "System.Globalization".to_string()],
+        }
+    }
+
+    #[test]
+    fn build_efvibe_args_includes_script_flags() {
+        let base = Path::new("/tmp/workspace");
+        let args = build_efvibe_args(&sample_settings(), Some(base), false);
+
+        assert!(args.windows(2).any(|pair| pair == ["--script-search-path", "/tmp/workspace/scripts"]));
+        assert!(args.windows(2).any(|pair| pair == ["--script-load", "/tmp/workspace/helpers.csx"]));
+        assert!(args.windows(2).any(|pair| pair == ["--script-load", "/tmp/workspace/filters.csx"]));
+        assert!(args.windows(2).any(|pair| pair == ["--script-using", "MyApp.Helpers"]));
+        assert!(args.windows(2).any(|pair| pair == ["--script-using", "System.Globalization"]));
+    }
+
+    #[test]
+    fn build_serve_args_prefixes_serve_command() {
+        let args = build_serve_args(&sample_settings(), Some(Path::new("/tmp/workspace")), false);
+
+        assert_eq!(args.first().map(String::as_str), Some("serve"));
+        assert!(args.windows(2).any(|pair| pair == ["--script-load", "/tmp/workspace/helpers.csx"]));
+    }
+
+    #[test]
+    fn settings_key_includes_script_session_fields() {
+        let key = settings_key(
+            &sample_settings(),
+            Path::new("/tmp/workspace"),
+            Path::new("/tmp/workspace"),
+        );
+
+        assert!(key.contains("\"scriptSearchPath\":\"scripts\""));
+        assert!(key.contains("\"scriptLoads\":[\"helpers.csx\",\"filters.csx\"]"));
+        assert!(key.contains("\"scriptUsings\":[\"MyApp.Helpers\",\"System.Globalization\"]"));
+    }
+}
