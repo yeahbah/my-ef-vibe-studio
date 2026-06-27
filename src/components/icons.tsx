@@ -95,6 +95,14 @@ export function IconCharts(props: IconProps) {
   );
 }
 
+export function IconStop(props: IconProps) {
+  return (
+    <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" {...props}>
+      <rect x="4.25" y="4.25" width="7.5" height="7.5" rx="1" fill="currentColor" />
+    </svg>
+  );
+}
+
 export function IconBenchmark(props: IconProps) {
   return (
     <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" {...props}>

@@ -3,6 +3,7 @@ import { homeDir } from "@tauri-apps/api/path";
 import { save } from "@tauri-apps/plugin-dialog";
 import { writeTextFile } from "@tauri-apps/plugin-fs";
 import { ConnectionPicker } from "./components/ConnectionPicker";
+import { IconStop } from "./components/icons";
 import { SplashScreen } from "./components/SplashScreen";
 import { StatusBarBusy } from "./components/StatusBarBusy";
 import { ErDiagramView } from "./components/ErDiagramView";
@@ -176,7 +177,6 @@ function App() {
   const [queryLibrary, setQueryLibrary] = useState<QueryLibraryState>(createEmptyQueryLibrary());
   const [activeEditorTool, setActiveEditorTool] = useState<EditorToolId | undefined>();
   const [benchmarkResult, setBenchmarkResult] = useState<BenchmarkResult | undefined>();
-  const [compareBaseline, setCompareBaseline] = useState<EvaluationHistoryEntry | undefined>();
   const [benchmarking, setBenchmarking] = useState(false);
   const [benchmarkConfirmOpen, setBenchmarkConfirmOpen] = useState(false);
   const [benchmarkIterations, setBenchmarkIterations] = useState(5);
@@ -1479,24 +1479,6 @@ function App() {
           <button type="button" disabled={running} onClick={() => void handleRun(true)}>
             Run Plan
           </button>
-          <button
-            type="button"
-            className="runbar-stop"
-            disabled={!running}
-            onClick={handleStopQuery}
-          >
-            Stop
-          </button>
-          <button
-            type="button"
-            disabled={history.length === 0}
-            onClick={() => {
-              setCompareBaseline(history[0]);
-              setStatus("Compare baseline set from last run.");
-            }}
-          >
-            Set baseline
-          </button>
         </div>
         ) : null}
         <div
@@ -1511,6 +1493,16 @@ function App() {
           ) : (
             <span className="status-bar-text">{status}</span>
           )}
+          <button
+            type="button"
+            className={running ? "status-bar-stop active" : "status-bar-stop"}
+            disabled={!running}
+            onClick={handleStopQuery}
+            aria-label="Stop query"
+            title="Stop query"
+          >
+            <IconStop />
+          </button>
         </div>
       </header>
 
@@ -1752,7 +1744,6 @@ function App() {
                     <EditorToolPanel
                       tool={activeEditorTool}
                       history={history}
-                      compareBaseline={compareBaseline}
                       benchmark={benchmarkResult}
                       userSnippets={userSnippets}
                       favoriteTabs={favoriteTabs}

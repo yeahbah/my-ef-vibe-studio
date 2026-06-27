@@ -7,9 +7,11 @@ const PAGE_SIZE = 100;
 interface ResultRowsViewProps {
   rows: Array<Record<string, string>>;
   onSave?: (rows: Array<Record<string, string>>) => Promise<void>;
+  exportEnabled?: boolean;
+  onExport?: (format: "csv" | "json") => void;
 }
 
-export function ResultRowsView({ rows, onSave }: ResultRowsViewProps) {
+export function ResultRowsView({ rows, onSave, exportEnabled = false, onExport }: ResultRowsViewProps) {
   const [mode, setMode] = useState<"grid" | "tree">("grid");
   const [draftRows, setDraftRows] = useState(rows);
   const [isDirty, setIsDirty] = useState(false);
@@ -90,6 +92,18 @@ export function ResultRowsView({ rows, onSave }: ResultRowsViewProps) {
     setPage(0);
   }
 
+  const exportButtons =
+    exportEnabled && onExport ? (
+      <>
+        <button type="button" onClick={() => onExport("csv")}>
+          CSV
+        </button>
+        <button type="button" onClick={() => onExport("json")}>
+          JSON
+        </button>
+      </>
+    ) : null;
+
   return (
     <div className="result-explorer">
       <div className="result-view-toolbar">
@@ -119,6 +133,7 @@ export function ResultRowsView({ rows, onSave }: ResultRowsViewProps) {
               <button type="button" disabled={!isDirty || saving} onClick={handleCancel}>
                 Cancel
               </button>
+              {exportButtons}
             </div>
 
             <div className="result-view-toolbar-group result-grid-paging">
@@ -162,6 +177,8 @@ export function ResultRowsView({ rows, onSave }: ResultRowsViewProps) {
               </span>
             </div>
           </>
+        ) : exportButtons ? (
+          <div className="result-view-toolbar-group">{exportButtons}</div>
         ) : null}
       </div>
 
@@ -200,16 +217,46 @@ export function ResultRowsView({ rows, onSave }: ResultRowsViewProps) {
   );
 }
 
-export function ResultValueView({ value }: { value: string }) {
+export function ResultValueView({
+  value,
+  exportEnabled = false,
+  onExport,
+}: {
+  value: string;
+  exportEnabled?: boolean;
+  onExport?: (format: "csv" | "json") => void;
+}) {
   const nodes = buildResultTree(value);
+  const exportButtons =
+    exportEnabled && onExport ? (
+      <>
+        <button type="button" onClick={() => onExport("csv")}>
+          CSV
+        </button>
+        <button type="button" onClick={() => onExport("json")}>
+          JSON
+        </button>
+      </>
+    ) : null;
+
   if (nodes.length === 0) {
-    return <pre className="value-block">{value}</pre>;
+    return (
+      <div className="result-explorer">
+        {exportButtons ? (
+          <div className="result-view-toolbar">
+            <div className="result-view-toolbar-group">{exportButtons}</div>
+          </div>
+        ) : null}
+        <pre className="value-block">{value}</pre>
+      </div>
+    );
   }
 
   return (
     <div className="result-explorer">
       <div className="result-view-toolbar">
         <span className="muted result-view-toolbar-label">Tree</span>
+        {exportButtons ? <div className="result-view-toolbar-group">{exportButtons}</div> : null}
       </div>
       {nodes.map((node, index) => (
         <TreeNode key={`${node.key}-${index}`} node={node} depth={0} defaultOpen />

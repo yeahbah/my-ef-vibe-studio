@@ -244,14 +244,29 @@ button:disabled {
   border-color: var(--success);
 }
 
-.runbar-stop:not(:disabled) {
-  background: var(--danger, #c0392b);
-  border-color: var(--danger, #c0392b);
-  color: #fff;
+.status-bar-stop {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-muted);
+  flex-shrink: 0;
+  opacity: 0.45;
 }
 
-.runbar-stop:not(:disabled):hover {
-  filter: brightness(1.08);
+.status-bar-stop.active,
+.status-bar-stop:not(:disabled) {
+  color: var(--error);
+  opacity: 1;
+}
+
+.status-bar-stop:not(:disabled):hover {
+  background: var(--error-subtle);
 }
 
 .banner {

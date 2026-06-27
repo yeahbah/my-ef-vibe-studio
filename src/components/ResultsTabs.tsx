@@ -54,12 +54,6 @@ export function ResultsTabs({
         </div>
         <div className="results-tab-actions">
           <span className="results-metrics">{formatMetrics(payload)}</span>
-          <button type="button" disabled={!exportEnabled} onClick={() => onExport("csv")}>
-            CSV
-          </button>
-          <button type="button" disabled={!exportEnabled} onClick={() => onExport("json")}>
-            JSON
-          </button>
         </div>
       </header>
 
@@ -69,7 +63,14 @@ export function ResultsTabs({
         id={`results-panel-${resolvedTab}`}
         aria-labelledby={`results-tab-${resolvedTab}`}
       >
-        {resolvedTab === "result" && <ResultBody payload={payload} onSaveRows={onSaveRows} />}
+        {resolvedTab === "result" && (
+          <ResultBody
+            payload={payload}
+            exportEnabled={exportEnabled}
+            onExport={onExport}
+            onSaveRows={onSaveRows}
+          />
+        )}
         {resolvedTab === "sql" && <SqlBody payload={payload} />}
         {resolvedTab === "plan" && <PlanBody payload={payload} />}
         {resolvedTab === "messages" && <MessagesBody payload={payload} />}
@@ -80,9 +81,13 @@ export function ResultsTabs({
 
 function ResultBody({
   payload,
+  exportEnabled,
+  onExport,
   onSaveRows,
 }: {
   payload: EvaluationJsonPayload;
+  exportEnabled: boolean;
+  onExport: (format: "csv" | "json") => void;
   onSaveRows?: (rows: Array<Record<string, string>>) => Promise<void>;
 }) {
   if (payload.metrics.resultKind === "pending") {
@@ -98,11 +103,20 @@ function ResultBody({
   }
 
   if (payload.rows && payload.rows.length > 0) {
-    return <ResultRowsView rows={payload.rows} onSave={onSaveRows} />;
+    return (
+      <ResultRowsView
+        rows={payload.rows}
+        onSave={onSaveRows}
+        exportEnabled={exportEnabled}
+        onExport={onExport}
+      />
+    );
   }
 
   if (payload.value) {
-    return <ResultValueView value={payload.value} />;
+    return (
+      <ResultValueView value={payload.value} exportEnabled={exportEnabled} onExport={onExport} />
+    );
   }
 
   return <pre className="value-block">(null)</pre>;

@@ -12,7 +12,6 @@ import { ReadOnlyCodeView } from "./ReadOnlyCodeView";
 interface EditorToolPanelProps {
   tool: EditorToolId;
   history: EvaluationHistoryEntry[];
-  compareBaseline?: EvaluationHistoryEntry;
   benchmark?: import("../lib/benchmark").BenchmarkResult;
   userSnippets: SnippetDefinition[];
   favoriteTabs: QueryTab[];
@@ -48,7 +47,6 @@ const TOOL_TITLES: Record<EditorToolId, string> = {
 export function EditorToolPanel({
   tool,
   history,
-  compareBaseline,
   benchmark,
   userSnippets,
   favoriteTabs,
@@ -83,7 +81,7 @@ export function EditorToolPanel({
 
       <div className="editor-tool-panel-body">
         {tool === "charts" ? (
-          <ChartsToolView history={history} compareBaseline={compareBaseline} benchmark={benchmark} />
+          <ChartsToolView history={history} benchmark={benchmark} />
         ) : null}
 
         {tool === "history" ? (
@@ -130,11 +128,9 @@ export function EditorToolPanel({
 
 function ChartsToolView({
   history,
-  compareBaseline,
   benchmark,
 }: {
   history: EvaluationHistoryEntry[];
-  compareBaseline?: EvaluationHistoryEntry;
   benchmark?: import("../lib/benchmark").BenchmarkResult;
 }) {
   const latest = history[0];
@@ -224,40 +220,6 @@ function ChartsToolView({
           </table>
         </section>
       ) : null}
-
-      <section className="tool-panel-section">
-        <h3>Compare baseline</h3>
-        {compareBaseline && latest ? (
-          <table className="charts-table">
-            <thead>
-              <tr>
-                <th>Metric</th>
-                <th>Baseline</th>
-                <th>Latest</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td>Total</td>
-                <td>{compareBaseline.totalMs} ms</td>
-                <td>{latest.totalMs} ms</td>
-              </tr>
-              <tr>
-                <td>Database</td>
-                <td>{compareBaseline.databaseMs ?? "—"} ms</td>
-                <td>{latest.databaseMs ?? "—"} ms</td>
-              </tr>
-              <tr>
-                <td>Rows</td>
-                <td>{compareBaseline.rowCount ?? "—"}</td>
-                <td>{latest.rowCount ?? "—"}</td>
-              </tr>
-            </tbody>
-          </table>
-        ) : (
-          <p className="muted">Use Set baseline in the run bar, then run another query.</p>
-        )}
-      </section>
 
       {benchmark ? (
         <section className="tool-panel-section">

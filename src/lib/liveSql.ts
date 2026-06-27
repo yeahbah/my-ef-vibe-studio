@@ -102,7 +102,57 @@ export function buildSqlProbeExpression(expression: string): string | undefined 
     return undefined;
   }
 
-  return `${queryable}.ToQueryString();`;
+  return `${wrapForTrailingMemberAccess(queryable)}.ToQueryString();`;
+}
+
+const QUERY_COMPREHENSION_KEYWORDS = [
+  "from ",
+  "where ",
+  "select ",
+  "join ",
+  "into ",
+  "let ",
+  "orderby ",
+  "group ",
+  "on ",
+  "equals ",
+  "by ",
+];
+
+function looksLikeQueryComprehension(expression: string): boolean {
+  for (const line of expression.split(/\r?\n/u)) {
+    const trimmed = line.trim();
+    if (!trimmed) {
+      continue;
+    }
+
+    let text = trimmed.startsWith("(") ? trimmed.slice(1).trimStart() : trimmed;
+    const lower = text.toLowerCase();
+    if (QUERY_COMPREHENSION_KEYWORDS.some((keyword) => lower.startsWith(keyword))) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function isFullyParenthesized(expression: string): boolean {
+  const trimmed = expression.trim();
+  if (!trimmed.startsWith("(")) {
+    return false;
+  }
+
+  const closeIndex = findClosingParen(trimmed, 0);
+  return closeIndex === trimmed.length - 1;
+}
+
+function wrapForTrailingMemberAccess(expression: string): string {
+  const trimmed = expression.trim().replace(/;+\s*$/u, "").trim();
+  if (looksLikeQueryComprehension(trimmed) && !isFullyParenthesized(trimmed)) {
+    return `(${trimmed})`;
+  }
+
+  return trimmed;
 }
 
 function stripToQueryStringSuffix(expression: string): string {
