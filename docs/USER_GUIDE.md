@@ -15,6 +15,7 @@ This guide covers day-to-day use of the Studio app. For installation and release
    - [Script session: loads, `#load`, and additional usings](#script-session-loads-load-and-additional-usings)
 5. [Query view](#query-view)
    - [Three ways to write a query](#three-ways-to-write-a-query)
+   - [Using project types in queries](#using-project-types-in-queries)
 6. [Editor tools](#editor-tools)
 7. [Explorer sidebar](#explorer-sidebar)
 8. [ER Diagram view](#er-diagram-view)
@@ -379,6 +380,73 @@ For SQL preview on a bare comprehension, wrap it:
 
 All three styles work in **notebooks** as code cells. Command cells (`:dbinfo`, `:tables`) and markdown cells are separate.
 
+### Using project types in queries
+
+You can use types from your solution in LINQ queries — domain models, DTOs, value objects, and extension methods — not only anonymous types and EF entities.
+
+When you run a query, efvibe builds your **EF project** and loads assemblies from that build (including **project references**, such as a Domain layer referenced by Persistence). Roslyn gets metadata for those assemblies, and efvibe **auto-imports namespaces** from them (except `System.*` and `Microsoft.*`).
+
+#### Example: project to a domain type
+
+If `MyDomain` is defined in a project referenced by your EF project (for example `MyApp.Domain`), you can write:
+
+```csharp
+db.Products
+  .Select(x => new MyDomain { Name = x.Name })
+  .Take(10)
+  .ToList();
+```
+
+When the namespace is auto-imported, no extra configuration is needed.
+
+#### If the type is not found
+
+**Use the fully qualified name:**
+
+```csharp
+db.Products
+  .Select(x => new MyApp.Domain.Models.MyDomain { Name = x.Name })
+  .Take(10)
+  .ToList();
+```
+
+**Or add the namespace** under **Connections → Edit… → Script session → Additional usings**:
+
+```
+MyApp.Domain.Models
+```
+
+**Confirm the type is in the EF project dependency graph.** efvibe loads assemblies from the **EF project** build (`-p`), not every project in the solution. A type in `MyApp.Api` alone is unavailable unless that assembly is referenced (directly or transitively) from the EF project you configured.
+
+| Project | Typical contents | Available in queries? |
+|---------|------------------|------------------------|
+| Domain / Core | `MyDomain`, entities, enums | Yes, when referenced by `-p` |
+| Application | DTOs, handlers, services | Yes, when referenced by `-p` |
+| API / Web host only | Controllers, startup types | Only if that assembly is in the `-p` build graph |
+
+After adding or moving types, **Refresh** or **Rebuild** the connection so the daemon loads the latest build.
+
+#### EF translation
+
+Referencing a type in C# is separate from whether EF can **translate** the projection to SQL:
+
+- Simple property bindings (`Name = x.Name`) often translate for POCOs and DTOs.
+- Complex logic in the projection may client-evaluate or fail — check the **SQL** and **Messages** tabs.
+
+If translation fails, materialize on the server first, then project in memory:
+
+```csharp
+db.Products
+  .Take(100)
+  .AsEnumerable()
+  .Select(x => new MyDomain { Name = x.Name })
+  .ToList();
+```
+
+Anonymous projections always work when you do not need a named type: `new { x.Name }`.
+
+See also [Script session: loads, `#load`, and additional usings](#script-session-loads-load-and-additional-usings) for extension methods and shared `.csx` helpers.
+
 ### Results panel
 
 After each run, inspect output in four tabs:
@@ -683,6 +751,10 @@ Install the global tool (`dotnet tool install --global efvibe`) or set **efvibe 
 
 Studio waits for the efvibe daemon to finish building and loading your `DbContext`. The status bar shows progress. Use **Refresh** or **Rebuild** on the connection if the model gets out of date.
 
+### Type or namespace not found in a query
+
+Ensure the type’s assembly is referenced by the connection **EF project**, then **Refresh** or **Rebuild**. Add the namespace under **Additional usings**, or use the fully qualified type name. See [Using project types in queries](#using-project-types-in-queries).
+
 ### Scan deep failures on some call sites
 
 Deep scan adapts repository code for the REPL, but expressions that depend on runtime parameters or complex locals may fail translation. The finding still appears with a note.
@@ -752,6 +824,21 @@ OFFSET 0 ROWS FETCH NEXT 10 ROWS ONLY;
 from p in ActiveProducts()
 where p.Name.Contains("Chain")
 select p;
+```
+
+### Project types (domain models and DTOs)
+
+```csharp
+db.Products
+  .Select(x => new MyDomain { Name = x.Name })
+  .Take(10)
+  .ToList();
+
+// Fully qualified when the namespace is not auto-imported:
+db.Products
+  .Select(x => new MyApp.Domain.Models.MyDomain { Name = x.Name })
+  .Take(10)
+  .ToList();
 ```
 
 For REPL-style exploration with charts, benchmarks, exports, and advanced diagnostics, switch to the **REPL** view and use `:help`.
