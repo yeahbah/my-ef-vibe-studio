@@ -4,11 +4,22 @@ Standalone desktop app for EF Core LINQ exploration — a LINQPad-style scratchp
 
 Built with **Tauri 2** + **React** + **Monaco**. The [efvibe](https://github.com/yeahbah/my-ef-vibe) CLI remains the evaluation engine; Studio is orchestration and UX.
 
-## Phase 5 (current)
+## Phase 6 (current)
+
+Polish, shipping, and Tier 2 depth. See **[docs/PHASE6_CHECKLIST.md](docs/PHASE6_CHECKLIST.md)** for tasks and exit criteria.
+
+- **Compare baseline UI** — run-bar set/clear + Charts panel (REPL `:compare` parity)
+- **Expression mode toggle** — expose lambda scratchpad mode in the toolbar
+- **Query library UX** — folders, search, and organization in the Library panel
+- **Aligned releases** — efvibe 0.6.26+ with Studio builds; website screenshots
+- **Tier 2** — SQL→LINQ polish, two-connection diff, `workspace validate --json`
+
+## Phase 5
 
 - **Cloud sync** — push/pull favorite queries to a cloud-backed folder (Dropbox, iCloud, OneDrive); no credentials synced
 - **Pack marketplace** — install snippet packs from a registry URL or any direct `.efvibe-pack` link
-- **Session charts** — timing breakdown, compare baseline, and benchmark bars in the Charts tool panel
+- **Scripts panel** — list, edit, and save `.csx` helpers; default `scripts/` search path beside workspace file
+- **Session charts** — timing breakdown and benchmark bars in the Charts tool panel
 - **Connection form** — dedicated connection editor (separate from global Settings)
 - **Path pickers** — browse for folders and `.csproj` files in connection and settings forms
 
@@ -30,6 +41,8 @@ Built with **Tauri 2** + **React** + **Monaco**. The [efvibe](https://github.com
 See [INSTALL.md](INSTALL.md) for release build instructions.
 
 See [docs/USER_GUIDE.md](docs/USER_GUIDE.md) for a full user guide (workspaces, queries, notebooks, sync, and troubleshooting).
+
+See [docs/PHASE6_CHECKLIST.md](docs/PHASE6_CHECKLIST.md) for the current development backlog.
 
 ## Phase 2
 
@@ -130,6 +143,10 @@ An example file lives at `examples/sample.efvibe-workspace`.
 | Shortcut | Action |
 |----------|--------|
 | Ctrl+Enter | Run query |
+| Ctrl+Tab | Next query tab |
+| Ctrl+Shift+Tab | Previous query tab |
+| Ctrl+Shift+T | New query tab |
+| Ctrl+F4 | Close query tab |
 | Ctrl+B | Toggle explorer sidebar |
 | Ctrl+S | Save query tab (when bound to a file) |
 

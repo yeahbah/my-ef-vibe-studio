@@ -70,6 +70,30 @@ export function HelpDialog({ open, settings, onClose }: HelpDialogProps) {
                 <kbd>{keybindings.toggleExplorer}</kbd>
               </dd>
             </div>
+            <div>
+              <dt>Next query tab</dt>
+              <dd>
+                <kbd>{keybindings.nextQueryTab}</kbd>
+              </dd>
+            </div>
+            <div>
+              <dt>Previous query tab</dt>
+              <dd>
+                <kbd>{keybindings.previousQueryTab}</kbd>
+              </dd>
+            </div>
+            <div>
+              <dt>New query tab</dt>
+              <dd>
+                <kbd>{keybindings.newQueryTab}</kbd>
+              </dd>
+            </div>
+            <div>
+              <dt>Close query tab</dt>
+              <dd>
+                <kbd>{keybindings.closeQueryTab}</kbd>
+              </dd>
+            </div>
           </dl>
           <p className="settings-hint">Customize shortcuts in Settings.</p>
         </section>

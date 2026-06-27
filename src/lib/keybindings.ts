@@ -94,6 +94,10 @@ export function resolveKeybindings(
     runPlan: settings?.runPlan?.trim() || "Ctrl+Shift+Enter",
     toggleExplorer: settings?.toggleExplorer?.trim() || "Ctrl+B",
     saveQuery: settings?.saveQuery?.trim() || "Ctrl+S",
+    nextQueryTab: settings?.nextQueryTab?.trim() || "Ctrl+Tab",
+    previousQueryTab: settings?.previousQueryTab?.trim() || "Ctrl+Shift+Tab",
+    newQueryTab: settings?.newQueryTab?.trim() || "Ctrl+Shift+T",
+    closeQueryTab: settings?.closeQueryTab?.trim() || "Ctrl+F4",
   };
 }
 

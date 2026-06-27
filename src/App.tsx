@@ -59,6 +59,7 @@ import {
   syncConnectionSecretToVault,
 } from "./lib/connectionVault";
 import { keybindingLabel, matchesKeybinding, resolveKeybindings } from "./lib/keybindings";
+import { cycleQueryTabId } from "./lib/queryTabs";
 import { buildExportContent } from "./lib/resultFormat";
 import { inferResultEntity, persistResultChanges } from "./lib/resultPersist";
 import { runScanJson } from "./lib/schema";
@@ -771,6 +772,89 @@ function App() {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [handleSaveQuery, keybindings.saveQuery, keybindings.toggleExplorer, toggleExplorer]);
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.defaultPrevented || mainView !== "query") {
+        return;
+      }
+
+      if (matchesKeybinding(event, keybindings.newQueryTab)) {
+        if (!document) {
+          return;
+        }
+
+        event.preventDefault();
+        event.stopImmediatePropagation();
+
+        const tab = createQueryTab(activeConnectionId, {
+          name: `Query ${queryTabs.length + 1}`,
+        });
+        setQueryTabs((tabs) => [...tabs, tab]);
+        setActiveQueryTabId(tab.id);
+        return;
+      }
+
+      if (matchesKeybinding(event, keybindings.closeQueryTab)) {
+        if (queryTabs.length <= 1 || !activeQueryTabId) {
+          return;
+        }
+
+        event.preventDefault();
+        event.stopImmediatePropagation();
+
+        const closingId = activeQueryTabId;
+        const nextTabs = queryTabs.filter((tab) => tab.id !== closingId);
+        setQueryTabs(nextTabs);
+        const nextTab = nextTabs[0];
+        if (nextTab) {
+          setActiveQueryTabId(nextTab.id);
+          setActiveConnectionId(nextTab.connectionId);
+        }
+        return;
+      }
+
+      if (queryTabs.length <= 1) {
+        return;
+      }
+
+      let direction: 1 | -1 | undefined;
+      if (matchesKeybinding(event, keybindings.nextQueryTab)) {
+        direction = 1;
+      } else if (matchesKeybinding(event, keybindings.previousQueryTab)) {
+        direction = -1;
+      } else {
+        return;
+      }
+
+      event.preventDefault();
+      event.stopImmediatePropagation();
+
+      const nextId = cycleQueryTabId(queryTabs, activeQueryTabId, direction);
+      if (!nextId || nextId === activeQueryTabId) {
+        return;
+      }
+
+      setActiveQueryTabId(nextId);
+      const tab = queryTabs.find((entry) => entry.id === nextId);
+      if (tab) {
+        setActiveConnectionId(tab.connectionId);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown, true);
+    return () => window.removeEventListener("keydown", handleKeyDown, true);
+  }, [
+    activeConnectionId,
+    activeQueryTabId,
+    document,
+    keybindings.newQueryTab,
+    keybindings.closeQueryTab,
+    keybindings.nextQueryTab,
+    keybindings.previousQueryTab,
+    mainView,
+    queryTabs,
+  ]);
 
   useEffect(() => {
     if (!settings) {

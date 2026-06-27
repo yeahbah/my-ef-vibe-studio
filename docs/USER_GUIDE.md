@@ -726,6 +726,10 @@ Default bindings (customizable in Settings):
 |----------|--------|
 | `Ctrl+Enter` | Run query (or run notebook cell when focused) |
 | `Ctrl+Shift+Enter` | Run with plan |
+| `Ctrl+Tab` | Next query tab |
+| `Ctrl+Shift+Tab` | Previous query tab |
+| `Ctrl+Shift+T` | New query tab |
+| `Ctrl+F4` | Close query tab |
 | `Ctrl+S` | Save query tab |
 | `Ctrl+B` | Toggle explorer sidebar |
 
