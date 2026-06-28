@@ -24,6 +24,24 @@ describe("looksLikeRawSql", () => {
     expect(looksLikeRawSql("SELECT 1\n.Where(x => x.Id > 0)")).toBe(true);
     expect(looksLikeRawSql(".Where(x => x.Id > 0)\nSELECT 1")).toBe(false);
   });
+
+  it("detects SQL after T-SQL DECLARE parameter lines", () => {
+    const sql = `DECLARE @p int = 25;
+
+SELECT TOP(@p) [p].[ProductId], [p].[Name]
+FROM [Production].[Product] AS [p]
+WHERE [p].[DiscontinuedDate] IS NULL
+ORDER BY [p].[Name]`;
+
+    expect(looksLikeRawSql(sql)).toBe(true);
+    expect(resolveQueryEditorLanguage(sql)).toBe("sql");
+  });
+
+  it("detects SQL after SET preamble lines", () => {
+    expect(looksLikeRawSql("SET NOCOUNT ON;\nSELECT 1")).toBe(true);
+    expect(looksLikeRawSql("SET @p = 25;\nSELECT @p")).toBe(true);
+    expect(looksLikeRawSql("DECLARE @p int = 25; SELECT TOP(@p) 1")).toBe(true);
+  });
 });
 
 describe("stripLeadingSqlComments", () => {

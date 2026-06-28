@@ -1,13 +1,37 @@
 const RAW_SQL_PATTERN =
-  /^(SELECT|WITH|INSERT|UPDATE|DELETE|CREATE|ALTER|DROP|TRUNCATE|MERGE|EXEC|EXECUTE|EXPLAIN|SHOW|DESCRIBE|DESC|PRAGMA|BEGIN|COMMIT|ROLLBACK|GRANT|REVOKE|USE)\b/iu;
+  /^(SELECT|WITH|INSERT|UPDATE|DELETE|CREATE|ALTER|DROP|TRUNCATE|MERGE|EXEC|EXECUTE|EXPLAIN|SHOW|DESCRIBE|DESC|PRAGMA|BEGIN|COMMIT|ROLLBACK|GRANT|REVOKE|USE|DECLARE|SET)\b/iu;
+
+const SQL_PREAMBLE_PATTERN = /^(DECLARE|SET)\b/iu;
 
 const LINQ_PATTERN =
   /^(db\.|await\s|var\s|return\s|using\s|namespace\s|public\s|private\s|from\s+\S+\s+in\s+)/iu;
 
+function isSqlPreambleLine(line: string): boolean {
+  return SQL_PREAMBLE_PATTERN.test(line);
+}
+
+function enumerateSqlStatements(text: string): string[] {
+  return text
+    .split(";")
+    .map((part) => part.trim())
+    .filter((part) => part.length > 0);
+}
+
+function firstMeaningfulStatement(text: string): string {
+  for (const statement of enumerateSqlStatements(text)) {
+    const line = firstMeaningfulLine(statement);
+    if (line) {
+      return line;
+    }
+  }
+
+  return "";
+}
+
 function firstMeaningfulLine(text: string): string {
   for (const line of text.split(/\r?\n/u)) {
     const trimmed = line.trim();
-    if (!trimmed || isSqlCommentLine(trimmed)) {
+    if (!trimmed || isSqlCommentLine(trimmed) || isSqlPreambleLine(trimmed)) {
       continue;
     }
 
@@ -57,8 +81,7 @@ export function looksLikeRawSql(text: string): boolean {
     return false;
   }
 
-  const withoutLeadingComments = stripLeadingSqlComments(trimmed);
-  const primaryLine = firstMeaningfulLine(trimmed);
+  const primaryLine = firstMeaningfulStatement(trimmed);
 
   if (LINQ_PATTERN.test(primaryLine) || containsLinqMarkers(primaryLine)) {
     return false;
@@ -72,7 +95,18 @@ export function looksLikeRawSql(text: string): boolean {
     return false;
   }
 
-  return RAW_SQL_PATTERN.test(withoutLeadingComments);
+  for (const statement of enumerateSqlStatements(trimmed)) {
+    const line = firstMeaningfulLine(stripLeadingSqlComments(statement));
+    if (!line || isSqlPreambleLine(line)) {
+      continue;
+    }
+
+    if (RAW_SQL_PATTERN.test(line)) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 function containsLinqMarkers(text: string): boolean {
