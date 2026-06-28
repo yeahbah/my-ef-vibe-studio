@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useEscapeClose } from "../lib/useEscapeClose";
 
 interface InstallPackUrlDialogProps {
   open: boolean;
@@ -10,6 +11,8 @@ export function InstallPackUrlDialog({ open, onClose, onInstall }: InstallPackUr
   const [url, setUrl] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | undefined>();
+
+  useEscapeClose(open, onClose, !busy);
 
   if (!open) {
     return null;

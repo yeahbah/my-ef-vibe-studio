@@ -31,7 +31,7 @@ pub fn run() {
 
             #[cfg(target_os = "linux")]
             if let Err(error) = linux_window::use_system_window_decorations(app) {
-                eprintln!("efvibe Studio: could not enable system window decorations: {error}");
+                eprintln!("MyEFvibe Studio: could not enable system window decorations: {error}");
             }
 
             Ok(())

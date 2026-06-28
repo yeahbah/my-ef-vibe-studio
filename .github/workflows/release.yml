@@ -64,7 +64,7 @@ jobs:
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "tag=v${VERSION}" >> "$GITHUB_OUTPUT"
           echo "draft=$DRAFT" >> "$GITHUB_OUTPUT"
-          echo "Publishing efvibe Studio ${VERSION} (draft=${DRAFT})"
+          echo "Publishing MyEFvibe Studio ${VERSION} (draft=${DRAFT})"
 
   build-tauri:
     needs: resolve-version
@@ -203,7 +203,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tag_name: ${{ needs.resolve-version.outputs.tag }}
-          name: efvibe Studio ${{ needs.resolve-version.outputs.tag }}
+          name: MyEFvibe Studio ${{ needs.resolve-version.outputs.tag }}
           target_commitish: ${{ github.sha }}
           generate_release_notes: true
           draft: ${{ needs.resolve-version.outputs.draft == 'true' }}
@@ -211,7 +211,7 @@ jobs:
           make_latest: true
           files: artifacts/*
           body: |
-            Desktop release for **efvibe Studio** ${{ needs.resolve-version.outputs.version }}.
+            Desktop release for **MyEFvibe Studio** ${{ needs.resolve-version.outputs.version }}.
 
             ### Downloads
             | Platform | Artifacts |

@@ -49,6 +49,7 @@ interface ExplorerSidebarProps {
   appSettings: AppSettings;
   connections: WorkspaceConnection[];
   activeConnectionId: string;
+  daemonConnectedIds: string[];
   history: EvaluationHistoryEntry[];
   queryTabs: QueryTab[];
   queryLibrary: QueryLibraryState;
@@ -87,7 +88,7 @@ interface ExplorerSidebarProps {
   aboutSearchDirectory: string;
   aboutToolPath: string;
   aboutDotnetFramework: string;
-  onRequestEngine?: () => void;
+  onRequestEngine?: (connectionId?: string) => void;
   onEngineBusyChange?: (delta: number) => void;
   onOpenErDiagram?: (dbSet?: string) => void;
   theme: AppTheme;
@@ -109,6 +110,7 @@ export function ExplorerSidebar(props: ExplorerSidebarProps) {
     appSettings,
     connections,
     activeConnectionId,
+    daemonConnectedIds,
     history,
     queryTabs,
     queryLibrary,
@@ -227,7 +229,7 @@ export function ExplorerSidebar(props: ExplorerSidebarProps) {
         }
       }
 
-      onRequestEngine?.();
+      onRequestEngine?.(connectionId);
       schemaRefreshInFlight.current.add(connectionId);
 
       setSchemaByConnection((current) => ({
@@ -302,7 +304,7 @@ export function ExplorerSidebar(props: ExplorerSidebarProps) {
         return;
       }
 
-      onRequestEngine?.();
+      onRequestEngine?.(connectionId);
       onEngineBusyChange?.(1);
       await yieldToUi();
 
@@ -395,7 +397,7 @@ export function ExplorerSidebar(props: ExplorerSidebarProps) {
         return;
       }
 
-      onRequestEngine?.();
+      onRequestEngine?.(connectionId);
       onEngineBusyChange?.(1);
       await yieldToUi();
 
@@ -451,6 +453,7 @@ export function ExplorerSidebar(props: ExplorerSidebarProps) {
         documentPath,
         connections,
         activeConnectionId,
+        daemonConnectedIds,
         schemaByConnection,
         queryTabs,
         userSnippets,
@@ -462,6 +465,7 @@ export function ExplorerSidebar(props: ExplorerSidebarProps) {
     [
       activeConnectionId,
       connections,
+      daemonConnectedIds,
       documentPath,
       gitLoading,
       gitStatus,
@@ -792,6 +796,7 @@ function buildExplorerTree(input: {
   documentPath: string;
   connections: WorkspaceConnection[];
   activeConnectionId: string;
+  daemonConnectedIds: string[];
   schemaByConnection: Record<string, ConnectionSchemaState>;
   queryTabs: QueryTab[];
   userSnippets: SnippetDefinition[];
@@ -816,9 +821,10 @@ function buildExplorerTree(input: {
             return {
               id: `connection:${connection.id}`,
               label: connection.name || connection.context || "Unnamed",
-              subtitle: connection.context || "Auto-discover",
+              subtitle: connection.context || undefined,
               kind: "connection" as const,
               active: connection.id === input.activeConnectionId,
+              daemonConnected: input.daemonConnectedIds.includes(connection.id),
               children: [
                 {
                   id: `model:${connection.id}`,

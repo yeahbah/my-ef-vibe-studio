@@ -2,7 +2,7 @@ import packageJson from "../../package.json";
 
 export const STUDIO_VERSION = packageJson.version;
 
-export const STUDIO_NAME = "efvibe Studio";
+export const STUDIO_NAME = "MyEFvibe Studio";
 
 export const STUDIO_DESCRIPTION =
   packageJson.description ?? "EF Core database client and LINQ scratchpad";

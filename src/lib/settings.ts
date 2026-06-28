@@ -43,6 +43,7 @@ export interface StudioSession {
   liveSqlEnabled?: boolean;
   sqlPaneOpen?: boolean;
   sqlPaneWidth?: number;
+  sqlPreviewAuto?: boolean;
   editorToolPanelWidth?: number;
   lambdaMode?: boolean;
   userSnippets?: SnippetDefinition[];

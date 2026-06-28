@@ -90,6 +90,7 @@ export function resolveKeybindings(
   settings?: Partial<KeybindingSettings>,
 ): KeybindingSettings {
   return {
+    runAll: settings?.runAll?.trim() || "F5",
     runQuery: settings?.runQuery?.trim() || "Ctrl+Enter",
     runPlan: settings?.runPlan?.trim() || "Ctrl+Shift+Enter",
     toggleExplorer: settings?.toggleExplorer?.trim() || "Ctrl+B",
@@ -154,6 +155,7 @@ function monacoKeyCode(key: string, KeyCode: Record<string, number>): number | u
     down: "DownArrow",
     left: "LeftArrow",
     right: "RightArrow",
+    f5: "F5",
   };
 
   const resolved = aliases[normalized] ?? (normalized.length === 1 ? normalized.toUpperCase() : key);

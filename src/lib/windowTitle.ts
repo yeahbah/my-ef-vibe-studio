@@ -1,6 +1,8 @@
 import { invoke } from "@tauri-apps/api/core";
 
-export const STUDIO_WINDOW_TITLE = "My EF Vibe Studio";
+import { STUDIO_NAME } from "./appMeta";
+
+export const STUDIO_WINDOW_TITLE = STUDIO_NAME;
 
 export async function setWindowTitle(title: string): Promise<void> {
   globalThis.document.title = title;

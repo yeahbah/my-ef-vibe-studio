@@ -85,9 +85,17 @@ const TAKE_LIMIT_METHODS: Record<string, number> = {
   SingleOrDefaultAsync: 2,
 };
 
+function containsScriptAttributes(expression: string): boolean {
+  return /^\s*#\[/m.test(expression);
+}
+
 export function buildSqlProbeExpression(expression: string): string | undefined {
   let trimmed = expression.trim().replace(/;+\s*$/u, "");
   if (!trimmed) {
+    return undefined;
+  }
+
+  if (containsScriptAttributes(trimmed)) {
     return undefined;
   }
 
@@ -523,6 +531,10 @@ export async function fetchLiveSqlPreview(
   expression: string,
 ): Promise<{ sql?: string; error?: string }> {
   const trimmed = expression.trim();
+  if (containsScriptAttributes(trimmed)) {
+    return {};
+  }
+
   if (looksLikeRawSql(trimmed)) {
     return { sql: trimmed };
   }

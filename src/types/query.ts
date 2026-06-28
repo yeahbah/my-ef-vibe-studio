@@ -2,10 +2,10 @@ import type { EvaluationJsonPayload } from "./evaluation";
 
 export type ResultsTab = "result" | "sql" | "plan" | "messages";
 
-export type LegacyResultsTab = ResultsTab | "explorer";
+export type LegacyResultsTab = ResultsTab | "explorer" | "compare";
 
 export function normalizeResultsTab(tab: LegacyResultsTab | undefined): ResultsTab {
-  if (!tab || tab === "explorer") {
+  if (!tab || tab === "explorer" || tab === "compare") {
     return "result";
   }
 
@@ -26,6 +26,8 @@ export interface QueryTab {
   resultRowsBaseline?: Array<Record<string, string>>;
   /** DbSet name inferred from the last LINQ query (e.g. Products from db.Products...). */
   resultEntity?: string;
+  /** Trimmed editor snapshot from the last run on this tab. */
+  lastRunExpression?: string;
 }
 
 export interface EfvibeQueryFile {
@@ -48,5 +50,16 @@ export function createQueryTab(
     expression: options?.expression ?? DEFAULT_QUERY_EXPRESSION,
     filePath: options?.filePath ?? "",
     activeResultsTab: "result",
+  };
+}
+
+export function restoreQueryTabFromSession(tab: QueryTab): QueryTab {
+  return {
+    ...tab,
+    activeResultsTab: "result",
+    lastPayload: undefined,
+    lastRunExpression: undefined,
+    resultRowsBaseline: undefined,
+    resultEntity: undefined,
   };
 }

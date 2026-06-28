@@ -1,6 +1,6 @@
-# efvibe Studio — User Guide
+# MyEFvibe Studio — User Guide
 
-efvibe Studio is a desktop LINQ scratchpad for Entity Framework Core. It runs real queries against your project's `DbContext`, shows translated SQL and execution plans, and helps you explore schema, scan for performance issues, and share queries with your team.
+MyEFvibe Studio is a desktop LINQ scratchpad for Entity Framework Core. It runs real queries against your project's `DbContext`, shows translated SQL and execution plans, and helps you explore schema, scan for performance issues, and share queries with your team.
 
 This guide covers day-to-day use of the Studio app. For installation and release builds, see [INSTALL.md](../INSTALL.md). For the underlying CLI and REPL commands, see the [efvibe features](https://github.com/yeahbah/my-ef-vibe/blob/main/features.md) document.
 
@@ -15,6 +15,7 @@ This guide covers day-to-day use of the Studio app. For installation and release
    - [Script session: loads, `#load`, and additional usings](#script-session-loads-load-and-additional-usings)
 5. [Query view](#query-view)
    - [Three ways to write a query](#three-ways-to-write-a-query)
+   - [Script attributes (`#[Compare]`, `#[Benchmark]`)](#script-attributes-compare-benchmark)
    - [Using project types in queries](#using-project-types-in-queries)
 6. [Editor tools](#editor-tools)
 7. [Explorer sidebar](#explorer-sidebar)
@@ -56,7 +57,7 @@ Studio spawns `efvibe serve` in the background to evaluate queries. If prerequis
 
 1. **Open or create a workspace** — use the sidebar toolbar: **New**, **Open**, or **Save** for `.efvibe-workspace` files.
 2. **Configure a connection** — under **Connections** in the explorer, right-click a connection and choose **Edit…**. Set at least a **search directory** (folder containing your solution) so efvibe can discover `.csproj` files.
-3. **Run a query** — switch to the **Query** view, enter something like `db.Products.Take(5).ToList();`, and press **Run** (or `Ctrl+Enter`).
+3. **Run a query** — switch to the **Query** view, enter something like `db.Products.Take(5).ToList();`, and press **Run current line** (`Ctrl+Enter`) or **Run all** (`F5`) from the query tab toolbar.
 4. **Inspect results** — use the **Result**, **SQL**, **Plan**, and **Messages** tabs in the results panel below the editor.
 
 Your session (open tabs, history, notebook state, panel sizes) is restored when you reopen Studio.
@@ -67,14 +68,15 @@ Your session (open tabs, history, notebook state, panel sizes) is restored when 
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│  Connection bar · Main view tabs · Run bar · Status bar           │
+│  Connection bar · Main view tabs · Status bar                   │
 ├──────────┬──────────────────────────────────────────────────────┤
 │ Explorer │  Query tabs / Notebook / Diagram / REPL               │
-│ sidebar  │  ┌──────┬─────────────────────────┬──────────────┐  "│
+│ sidebar  │  Per-tab toolbar: Run all · Run line · Run plan · Stop│
+│          │  ┌──────┬─────────────────────────┬──────────────┐  │
 │          │  │ Tool │  Editor                 │  Live SQL    │  │
 │          │  │ rail │                         │  preview     │  │
 │          │  └──────┴─────────────────────────┴──────────────┘  │
-│          │  Results panel (Result ·  SQL / Plan / Messages)     │
+│          │  Results panel (Result · SQL · Plan · Messages)       │
 └──────────┴──────────────────────────────────────────────────────┘
 ```
 
@@ -260,13 +262,60 @@ When **Store connection strings in the local secret vault** is enabled in Settin
 
 ### Running queries
 
+Each query tab has its own toolbar (connection picker, **Run all**, **Run current line**, **Run plan**, **Stop**).
+
 | Action | How |
 |--------|-----|
-| **Run** | Run bar button or `Ctrl+Enter` |
-| **Run Plan** | Run bar button or `Ctrl+Shift+Enter` |
-| **Stop** | Status bar stop button while a query is running |
+| **Run all** | Tab toolbar or `F5` — evaluates the full editor text (required for `#[Compare]` / `#[Benchmark]` scripts) |
+| **Run current line** | Tab toolbar or `Ctrl+Enter` — runs the statement at the cursor |
+| **Run plan** | Tab toolbar or `Ctrl+Shift+Enter` |
+| **Stop** | Tab toolbar or status bar while a query is running |
 
 Studio detects what kind of query you wrote and routes it accordingly. The editor switches between **C#** and **SQL** syntax highlighting based on the first meaningful line.
+
+**Results persistence:** the last run stays visible in the **Result** tab while you edit. Results clear when you launch Studio (fresh session), not on every keystroke.
+
+### Script attributes (`#[Compare]`, `#[Benchmark]`)
+
+Attribute lines tell efvibe to run structured experiments instead of a single evaluation. They work in query tabs, the REPL, `efvibe -e`, and `efvibe serve` **eval** requests.
+
+Lines matching `#[Name]` or `#[Name(...)]` are **not** compiled as C# — they are stripped before Roslyn sees the script.
+
+**Shared preamble:** any code before the first attribute line (constants, `#load`, helper methods) is prepended to every attributed block.
+
+**Compare two or more variants** — optional quoted label per block:
+
+```csharp
+#[Compare("With tracking")]
+ActiveProducts()
+  .OrderBy(p => p.Name)
+  .Take(10)
+  .ToList();
+
+#[Compare("No tracking")]
+ActiveProducts()
+  .AsNoTracking()
+  .OrderBy(p => p.Name)
+  .Take(10)
+  .ToList();
+```
+
+**Benchmark one block** — run **N** times (default **5** when omitted):
+
+```csharp
+#[Benchmark(10)]
+ActiveProducts()
+  .AsNoTracking()
+  .OrderBy(p => p.Name)
+  .Take(10)
+  .ToList();
+```
+
+Use **Run all** (`F5`) so the full script is sent to the engine. **Run current line** on an attribute line alone shows a friendly hint instead of a Roslyn error.
+
+Compare and benchmark output appears in the **Result** tab (side-by-side table or timing stats). The **SQL** column in compare tables shows **command count**, not SQL text — open the **SQL** tab for statements.
+
+Live SQL preview is skipped for scripts that contain `#[` attribute lines.
 
 ### Three ways to write a query
 
@@ -453,14 +502,15 @@ After each run, inspect output in four tabs:
 
 | Tab | Contents |
 |-----|----------|
-| **Result** | Tabular data, scalar values, or an object tree |
+| **Result** | Tabular data, scalar values, object tree, **compare table**, or **benchmark stats** |
 | **SQL** | Translated and executed SQL |
 | **Plan** | Query execution plan (when Run Plan was used) |
 | **Messages** | Warnings and errors |
 
 **Result** view features:
 
-- **Grid / Tree toggle** — flat table or nested Dump-style object explorer
+- **Compare / benchmark layouts** — when a run used `#[Compare]` or `#[Benchmark]`, the Result tab switches to a dedicated table or timing summary (no separate Compare tab)
+- **Grid / Tree toggle** — flat table or nested Dump-style object explorer (normal queries)
 - **# column** — row numbers in the grid
 - **Export** — CSV or JSON when the result is tabular
 - **Save to database** — edit grid cells and persist changes back to the database when the query returned tracked entity rows with primary keys
@@ -469,9 +519,9 @@ Timing metrics (total ms, database ms, row count) appear in the results header.
 
 ### Live SQL preview
 
-Toggle the **Linq/Sql** pane on the right edge of the editor. It shows:
+Toggle the **Linq/Sql** pane on the right edge of the editor (off by default). When enabled, it shows:
 
-- **LINQ → SQL** — debounced `ToQueryString()` preview as you type
+- **LINQ → SQL** — debounced `ToQueryString()` preview as you type (plain LINQ only; skipped when the script contains `#[` attributes)
 - **SQL → LINQ** — paste SQL to get a draft LINQ expression (requires efvibe 0.6.13+)
 
 Drag the divider between editor and SQL pane to resize.
@@ -488,7 +538,8 @@ Session timing visualizations:
 
 - Recent query timings (bar chart)
 - Last run breakdown (total vs database vs app/Roslyn)
-- Benchmark results after running **Benchmark** from the tool rail
+
+Use `#[Benchmark(N)]` in a script and **Run all** (`F5`) for timed multi-run results in the **Result** tab.
 
 ### History
 
@@ -520,10 +571,6 @@ Review findings one at a time. For each finding you can:
 - Jump to source in your IDE (configured in Settings)
 - Run the adapted expression in the query editor
 - Dismiss or add a note (persisted for future scans)
-
-### Benchmark
-
-Runs the current query multiple times (default 5) and shows per-iteration timings in the **Charts** panel.
 
 ---
 
@@ -680,7 +727,7 @@ Open Settings from the explorer footer (gear icon).
 
 ### Keybindings
 
-Customize shortcuts for **Run query**, **Run plan**, **Toggle explorer**, and **Save query**. Use `Ctrl` or `Cmd` with `+` (for example `Ctrl+Enter`).
+Customize shortcuts for **Run all**, **Run current line**, **Run plan**, **Toggle explorer**, and **Save query**. Use `Ctrl` or `Cmd` with `+` (for example `F5` for Run all, `Ctrl+Enter` for Run current line).
 
 ---
 
@@ -724,7 +771,8 @@ Default bindings (customizable in Settings):
 
 | Shortcut | Action |
 |----------|--------|
-| `Ctrl+Enter` | Run query (or run notebook cell when focused) |
+| `F5` | Run all (full editor; use for `#[Compare]` / `#[Benchmark]`) |
+| `Ctrl+Enter` | Run current line (or run notebook cell when focused) |
 | `Ctrl+Shift+Enter` | Run with plan |
 | `Ctrl+Tab` | Next query tab |
 | `Ctrl+Shift+Tab` | Previous query tab |

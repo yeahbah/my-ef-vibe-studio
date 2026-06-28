@@ -35,7 +35,7 @@ fn ensure_appimage_webkit_paths() {
         use std::os::unix::fs::symlink;
 
         if symlink("usr/lib", &lib_link).is_err() {
-            eprintln!("efvibe Studio: could not create AppImage lib symlink at {}", lib_link.display());
+            eprintln!("MyEFvibe Studio: could not create AppImage lib symlink at {}", lib_link.display());
         }
     }
 }

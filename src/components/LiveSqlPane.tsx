@@ -13,9 +13,11 @@ interface LiveSqlPaneProps {
   connectionSettings: ConnectionSettings | undefined;
   searchDirectory: string;
   enabled: boolean;
+  autoPreviewEnabled: boolean;
+  onAutoPreviewEnabledChange: (enabled: boolean) => void;
   autoPreviewAllowed?: boolean;
   running?: boolean;
-  onRequestEngine?: () => void;
+  onRequestEngine?: (connectionId?: string) => void;
   onEngineBusyChange?: (delta: number) => void;
   onRun?: (text: string) => void;
   theme?: AppTheme;
@@ -48,6 +50,8 @@ export function LiveSqlPane({
   connectionSettings,
   searchDirectory,
   enabled,
+  autoPreviewEnabled,
+  onAutoPreviewEnabledChange,
   autoPreviewAllowed = false,
   running = false,
   onRequestEngine,
@@ -79,7 +83,14 @@ export function LiveSqlPane({
       return;
     }
 
-    if (!autoPreviewAllowed || !enabled || dirty || !connectionSettings || !searchDirectory.trim()) {
+    if (
+      !autoPreviewEnabled ||
+      !autoPreviewAllowed ||
+      !enabled ||
+      dirty ||
+      !connectionSettings ||
+      !searchDirectory.trim()
+    ) {
       if (!dirty) {
         if (!enabled || !connectionSettings || !searchDirectory.trim()) {
           setPreviewText("");
@@ -98,6 +109,7 @@ export function LiveSqlPane({
 
     return () => window.clearTimeout(handle);
   }, [
+    autoPreviewEnabled,
     autoPreviewAllowed,
     connectionSettings,
     dirty,
@@ -145,6 +157,14 @@ export function LiveSqlPane({
     await refreshPreview();
   }
 
+  function handleAutoPreviewToggle() {
+    const next = !autoPreviewEnabled;
+    onAutoPreviewEnabledChange(next);
+    if (next && !dirty && enabled && connectionSettings && searchDirectory.trim()) {
+      void refreshPreview();
+    }
+  }
+
   function handleRun(textOverride?: string) {
     const trimmed = (textOverride ?? previewText).trim();
     if (!trimmed || !onRun) {
@@ -160,9 +180,24 @@ export function LiveSqlPane({
     <section className="live-sql-pane">
       <div className="live-sql-header">
         <h3>{previewTitle}</h3>
-        <span className="muted">
-          {formatPreviewStatus({ loading, dirty, previewMode, confidence })}
-        </span>
+        <div className="live-sql-header-actions">
+          <button
+            type="button"
+            className={autoPreviewEnabled ? "live-sql-auto-btn active" : "live-sql-auto-btn"}
+            aria-pressed={autoPreviewEnabled}
+            title={
+              autoPreviewEnabled
+                ? "Disable automatic preview"
+                : "Enable automatic preview"
+            }
+            onClick={handleAutoPreviewToggle}
+          >
+            Auto
+          </button>
+          <span className="muted">
+            {formatPreviewStatus({ loading, dirty, previewMode, confidence })}
+          </span>
+        </div>
       </div>
 
       <div className="live-sql-editor">

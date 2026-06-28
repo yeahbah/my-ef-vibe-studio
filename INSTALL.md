@@ -1,6 +1,6 @@
-# Installing efvibe Studio
+# Installing MyEFvibe Studio
 
-efvibe Studio is a Tauri desktop app. You need the **efvibe** CLI on your PATH (or configured in Settings) for query execution.
+MyEFvibe Studio is a Tauri desktop app. You need the **efvibe** CLI on your PATH (or configured in Settings) for query execution.
 
 ## Supported platforms
 
@@ -129,9 +129,9 @@ Built-in packs ship offline. Registry packs under **Team → Snippet packs** dow
      xattr -cr ~/Downloads/efvibe*.dmg
      open ~/Downloads/efvibe*.dmg
      ```
-  2. Drag **efvibe Studio** to Applications, then clear quarantine on the app:
+  2. Drag **MyEFvibe Studio** to Applications, then clear quarantine on the app:
      ```bash
-     xattr -cr "/Applications/efvibe Studio.app"
+     xattr -cr "/Applications/MyEFvibe Studio.app"
      ```
   3. First launch: **right-click** the app → **Open** → **Open** (bypasses the one-time unidentified-developer block).
   If it still fails, check **System Settings → Privacy & Security** for an **Open Anyway** button after the first blocked launch.

@@ -34,8 +34,20 @@ export function TreeView({
         return (
           <div
             key={node.id}
-            className={`tree-row${node.active ? " active" : ""}${node.muted ? " muted" : ""}`}
+            className={[
+              "tree-row",
+              node.active ? "active" : "",
+              node.kind === "connection" && node.daemonConnected
+                ? "tree-row-connection-daemon"
+                : "",
+              node.muted ? "muted" : "",
+            ]
+              .filter(Boolean)
+              .join(" ")}
             role="treeitem"
+            aria-current={
+              node.kind === "connection" && node.daemonConnected ? "true" : undefined
+            }
             aria-expanded={hasChildren ? expanded : undefined}
             style={{ paddingLeft: `${8 + depth * 14}px` }}
             onContextMenu={(event) => {
@@ -59,6 +71,13 @@ export function TreeView({
             >
               {hasChildren ? (expanded ? "▾" : "▸") : "·"}
             </button>
+            {node.kind === "connection" && node.daemonConnected ? (
+              <span
+                className="tree-connection-indicator connected"
+                title="Connected to efvibe daemon"
+                aria-hidden="true"
+              />
+            ) : null}
             <button
               type="button"
               className="tree-label-btn"

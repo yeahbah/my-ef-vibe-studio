@@ -7,6 +7,7 @@ import {
   STUDIO_REPOSITORY,
   STUDIO_VERSION,
 } from "../lib/appMeta";
+import { useEscapeClose } from "../lib/useEscapeClose";
 import type { AboutJsonPayload } from "../types/about";
 import type { PrerequisiteCheckResult } from "../types/connection";
 
@@ -58,6 +59,8 @@ export function AboutDialog({
   const [aboutLoading, setAboutLoading] = useState(false);
   const [aboutError, setAboutError] = useState<string>();
   const [about, setAbout] = useState<AboutJsonPayload>();
+
+  useEscapeClose(open, onClose);
 
   useEffect(() => {
     if (!open) {

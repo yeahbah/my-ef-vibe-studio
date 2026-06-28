@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { fetchSqlToLinq } from "../lib/sqlToLinq";
+import { useEscapeClose } from "../lib/useEscapeClose";
 import type { ConnectionSettings } from "../types/connection";
 import { EMPTY_SQL_TO_LINQ_RESULT, type SqlToLinqResult } from "../types/sqlToLinq";
 
@@ -69,6 +70,8 @@ export function SqlToLinqDialog({
 
     return () => window.clearTimeout(handle);
   }, [open, connectionSettings, searchDirectory, sql]);
+
+  useEscapeClose(open, onClose);
 
   if (!open) {
     return null;

@@ -6,7 +6,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { dispatchRunPlan, dispatchRunQuery } from "../lib/editorRun";
+import { dispatchRunAll, dispatchRunPlan, dispatchRunQuery } from "../lib/editorRun";
 import { matchesKeybinding, resolveKeybindings } from "../lib/keybindings";
 import { EditorWorkspace } from "./EditorWorkspace";
 import { LiveSqlPane } from "./LiveSqlPane";
@@ -30,11 +30,13 @@ interface QueryWorkspaceProps {
   onSqlPaneOpenChange: (open: boolean) => void;
   sqlPaneWidth: number;
   onSqlPaneWidthChange: (width: number) => void;
+  sqlPreviewAuto: boolean;
+  onSqlPreviewAutoChange: (enabled: boolean) => void;
   connectionSettings: ConnectionSettings | undefined;
   searchDirectory: string;
   autoPreviewAllowed: boolean;
   running: boolean;
-  onRequestEngine?: () => void;
+  onRequestEngine?: (connectionId?: string) => void;
   onEngineBusyChange?: (delta: number) => void;
   onRun: (text: string) => void;
   keybindings?: KeybindingSettings;
@@ -53,6 +55,8 @@ export const QueryWorkspace = forwardRef<QueryWorkspaceHandle, QueryWorkspacePro
       onSqlPaneOpenChange,
       sqlPaneWidth,
       onSqlPaneWidthChange,
+      sqlPreviewAuto,
+      onSqlPreviewAutoChange,
       connectionSettings,
       searchDirectory,
       autoPreviewAllowed,
@@ -89,6 +93,13 @@ export const QueryWorkspace = forwardRef<QueryWorkspaceHandle, QueryWorkspacePro
           return;
         }
 
+        if (matchesKeybinding(event, resolvedKeybindings.runAll)) {
+          event.preventDefault();
+          event.stopImmediatePropagation();
+          dispatchRunAll();
+          return;
+        }
+
         if (matchesKeybinding(event, resolvedKeybindings.runQuery)) {
           event.preventDefault();
           event.stopImmediatePropagation();
@@ -105,7 +116,7 @@ export const QueryWorkspace = forwardRef<QueryWorkspaceHandle, QueryWorkspacePro
 
       window.addEventListener("keydown", onKeyDown, true);
       return () => window.removeEventListener("keydown", onKeyDown, true);
-    }, [resolvedKeybindings.runPlan, resolvedKeybindings.runQuery]);
+    }, [resolvedKeybindings.runAll, resolvedKeybindings.runPlan, resolvedKeybindings.runQuery]);
 
     const flushDraft = useCallback(
       (tabIdToFlush: string, value: string) => {
@@ -181,6 +192,8 @@ export const QueryWorkspace = forwardRef<QueryWorkspaceHandle, QueryWorkspacePro
             connectionSettings={connectionSettings}
             searchDirectory={searchDirectory}
             enabled
+            autoPreviewEnabled={sqlPreviewAuto}
+            onAutoPreviewEnabledChange={onSqlPreviewAutoChange}
             autoPreviewAllowed={autoPreviewAllowed}
             running={running}
             onRequestEngine={onRequestEngine}

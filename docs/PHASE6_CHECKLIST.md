@@ -17,26 +17,28 @@ Small, visible fixes. Each item is independently shippable.
 
 **Goal:** Match REPL `:compare set` / `:compare` in the query workspace and Charts panel.
 
-**Current gap:** README claims compare baseline; `ChartsPanel.tsx` has compare UI but is unused. `ChartsToolView` in `EditorToolPanel.tsx` only shows timings + benchmark. `resultRowsBaseline` on query tabs is used for **grid writeback**, not performance compare.
+**Shipped (engine + Studio Result tab):** `#[Compare]` multi-variant scripts and `#[Benchmark(N)]` render in the **Result** tab when using **Run all** (`F5`). See `docs/USER_GUIDE.md` — Script attributes.
+
+**Current gap:** Charts baseline UI for ad-hoc A→B compare without script attributes. `ChartsPanel.tsx` has compare UI but is unused. `ChartsToolView` in `EditorToolPanel.tsx` only shows timings + benchmark. `resultRowsBaseline` on query tabs is used for **grid writeback**, not performance compare.
 
 **Tasks**
 
-- [ ] Add run-bar actions: **Set baseline**, **Clear baseline** (per active query tab or per expression).
+- [ ] Add per-tab toolbar actions: **Set baseline**, **Clear baseline** (per active query tab or per expression).
 - [ ] Store compare baseline as `EvaluationHistoryEntry` (or dedicated type) separate from `resultRowsBaseline`.
 - [ ] Wire **Charts** tool panel: baseline vs latest table (total ms, database ms, row count, SQL command count) — merge logic from orphaned `ChartsPanel.tsx` into `ChartsToolView`.
 - [ ] Optional: row/SQL diff summary when both runs succeeded (reuse patterns from REPL compare if exposed via daemon).
 - [ ] Update `docs/USER_GUIDE.md` Charts section; remove or delete dead `ChartsPanel.tsx` once merged.
 - [ ] Vitest: baseline set/clear state; Charts renders when baseline + latest exist.
 
-**Key files:** `src/App.tsx`, `src/components/EditorToolPanel.tsx`, `src/types/query.ts`, `src/lib/history.ts`, run-bar toolbar in `App.tsx`.
+**Key files:** `src/App.tsx`, `src/components/EditorToolPanel.tsx`, `src/components/QueryTabToolbar.tsx`, `src/types/query.ts`, `src/lib/history.ts`.
 
 **Exit criteria**
 
 - User runs query A → **Set baseline** → runs query B → Charts shows side-by-side timing compare without opening REPL.
 - Clear baseline resets Charts empty state message.
-- README Phase 6 / user guide accurately describe behavior.
+- README Phase 6 / user guide accurately describe behavior (script attributes vs Charts baseline).
 
-**Suggested issue:** `studio: compare baseline UI (run bar + Charts)`
+**Suggested issue:** `studio: compare baseline UI (Charts + per-tab toolbar)`
 
 ---
 
@@ -97,7 +99,7 @@ Small, visible fixes. Each item is independently shippable.
 **Tasks**
 
 - [ ] README Phase 5: add **Scripts panel**; move Phase 5 to "complete" summary; link this checklist as Phase 6.
-- [ ] README: fix compare baseline wording until A1 ships (or ship A1 first).
+- [ ] README: compare baseline wording matches shipped behavior (`#[Compare]` in Result tab; Charts baseline still A1).
 - [ ] Website: capture screenshots per `my-ef-vibe-website/images/SCREENSHOTS.md` (Studio section).
 - [ ] Website: replace dashed placeholders on `studio.html` and `docs/studio-user-guide.html`.
 - [ ] INSTALL.md: require **efvibe 0.6.26+** when script session fields are used.
@@ -295,7 +297,7 @@ Phase 6 is **done** when:
 
 | Title | Track |
 |-------|-------|
-| `studio: compare baseline UI (run bar + Charts)` | A1 |
+| `studio: compare baseline UI (Charts + per-tab toolbar)` | A1 |
 | `studio: expression mode toolbar toggle` | A2 |
 | `studio: query library folders and search` | A3 |
 | `website: Studio screenshot capture` | A4 |

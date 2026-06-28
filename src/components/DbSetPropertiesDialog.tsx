@@ -1,4 +1,5 @@
 import type { DescribeJsonPayload } from "../types/schema";
+import { useEscapeClose } from "../lib/useEscapeClose";
 
 interface DbSetPropertiesDialogProps {
   open: boolean;
@@ -19,6 +20,8 @@ export function DbSetPropertiesDialog({
   payload,
   onClose,
 }: DbSetPropertiesDialogProps) {
+  useEscapeClose(open, onClose);
+
   if (!open) {
     return null;
   }

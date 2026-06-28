@@ -15,14 +15,14 @@ export const REMOTE_SNIPPET_PACK_REGISTRY: RemotePackEntry[] = [
     id: "ef-core-basics-remote",
     name: "EF Core basics (registry)",
     description: "Common DbSet queries — latest from GitHub.",
-    author: "efvibe Studio",
+    author: "MyEFvibe Studio",
     url: `${REGISTRY_BASE}/ef-core-basics.efvibe-pack`,
   },
   {
     id: "performance-probes-remote",
     name: "Performance probes (registry)",
     description: "Translation and round-trip probes — latest from GitHub.",
-    author: "efvibe Studio",
+    author: "MyEFvibe Studio",
     url: `${REGISTRY_BASE}/performance-probes.efvibe-pack`,
   },
 ];

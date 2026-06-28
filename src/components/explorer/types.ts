@@ -17,7 +17,10 @@ export interface ExplorerNode {
   subtitle?: string;
   kind: ExplorerNodeKind;
   children?: ExplorerNode[];
+  /** Current query/editor connection. */
   active?: boolean;
+  /** efvibe daemon session is running for this connection. */
+  daemonConnected?: boolean;
   checked?: boolean;
   muted?: boolean;
 }

@@ -45,7 +45,7 @@ export function SplashScreen({ message = "Starting up…", exiting = false }: Sp
         </div>
 
         <h1 className="splash-title">
-          efvibe <span className="splash-title-accent">Studio</span>
+          MyEFvibe <span className="splash-title-accent">Studio</span>
         </h1>
         <p className="splash-tagline">LINQ scratchpad · SQL · Entity Framework</p>
 

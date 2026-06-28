@@ -3,7 +3,7 @@
   "kind": "snippet-pack",
   "name": "EF Core basics",
   "description": "Common DbSet queries for everyday exploration.",
-  "author": "efvibe Studio",
+  "author": "MyEFvibe Studio",
   "exportedAt": "2026-01-01T00:00:00.000Z",
   "folders": [],
   "snippets": [

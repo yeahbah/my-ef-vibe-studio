@@ -4,6 +4,7 @@ import {
   EFVIBE_REPOSITORY,
   STUDIO_REPOSITORY,
 } from "../lib/appMeta";
+import { useEscapeClose } from "../lib/useEscapeClose";
 import type { AppSettings } from "../types/connection";
 
 interface HelpDialogProps {
@@ -21,6 +22,8 @@ async function openExternal(url: string) {
 }
 
 export function HelpDialog({ open, settings, onClose }: HelpDialogProps) {
+  useEscapeClose(open, onClose);
+
   if (!open) {
     return null;
   }
@@ -47,7 +50,13 @@ export function HelpDialog({ open, settings, onClose }: HelpDialogProps) {
           <h3>Keyboard shortcuts</h3>
           <dl className="help-shortcuts">
             <div>
-              <dt>Run query</dt>
+              <dt>Run all</dt>
+              <dd>
+                <kbd>{keybindings.runAll}</kbd>
+              </dd>
+            </div>
+            <div>
+              <dt>Run current line</dt>
               <dd>
                 <kbd>{keybindings.runQuery}</kbd>
               </dd>

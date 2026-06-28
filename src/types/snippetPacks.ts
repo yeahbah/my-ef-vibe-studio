@@ -13,13 +13,13 @@ export const BUILTIN_SNIPPET_PACKS: SnippetPackManifest[] = [
     id: "ef-core-basics",
     name: "EF Core basics",
     description: "Common DbSet queries for everyday exploration.",
-    author: "efvibe Studio",
+    author: "MyEFvibe Studio",
     pack: {
       version: 1,
       kind: "snippet-pack",
       name: "EF Core basics",
       description: "Common DbSet queries for everyday exploration.",
-      author: "efvibe Studio",
+      author: "MyEFvibe Studio",
       exportedAt: "2026-01-01T00:00:00.000Z",
       folders: [],
       snippets: [
@@ -56,13 +56,13 @@ export const BUILTIN_SNIPPET_PACKS: SnippetPackManifest[] = [
     id: "performance-probes",
     name: "Performance probes",
     description: "Queries that help spot translation and round-trip issues.",
-    author: "efvibe Studio",
+    author: "MyEFvibe Studio",
     pack: {
       version: 1,
       kind: "snippet-pack",
       name: "Performance probes",
       description: "Queries that help spot translation and round-trip issues.",
-      author: "efvibe Studio",
+      author: "MyEFvibe Studio",
       exportedAt: "2026-01-01T00:00:00.000Z",
       folders: [],
       snippets: [

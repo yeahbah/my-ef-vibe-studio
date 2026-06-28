@@ -2,7 +2,7 @@
   "name": "efvibe-studio",
   "private": true,
   "version": "0.2.3",
-  "description": "efvibe Studio — EF Core database client and LINQ scratchpad",
+  "description": "MyEFvibe Studio — EF Core database client and LINQ scratchpad",
   "type": "module",
   "scripts": {
     "dev": "vite",

@@ -20,7 +20,6 @@ import { ScriptsToolView } from "./ScriptsToolView";
 interface EditorToolPanelProps {
   tool: EditorToolId;
   history: EvaluationHistoryEntry[];
-  benchmark?: import("../lib/benchmark").BenchmarkResult;
   userSnippets: SnippetDefinition[];
   favoriteTabs: QueryTab[];
   scanItems: ScanReviewItem[];
@@ -67,7 +66,6 @@ const TOOL_TITLES: Record<EditorToolId, string> = {
 export function EditorToolPanel({
   tool,
   history,
-  benchmark,
   userSnippets,
   favoriteTabs,
   scanItems,
@@ -112,7 +110,7 @@ export function EditorToolPanel({
 
       <div className={`editor-tool-panel-body${tool === "scripts" ? " editor-tool-panel-body-fill" : ""}`}>
         {tool === "charts" ? (
-          <ChartsToolView history={history} benchmark={benchmark} />
+          <ChartsToolView history={history} />
         ) : null}
 
         {tool === "history" ? (
@@ -174,16 +172,10 @@ export function EditorToolPanel({
   );
 }
 
-function ChartsToolView({
-  history,
-  benchmark,
-}: {
-  history: EvaluationHistoryEntry[];
-  benchmark?: import("../lib/benchmark").BenchmarkResult;
-}) {
+function ChartsToolView({ history }: { history: EvaluationHistoryEntry[] }) {
   const chartHistory = filterQueryHistory(history);
   const latest = chartHistory[0];
-  const maxMs = Math.max(...chartHistory.map((entry) => entry.totalMs), benchmark?.maxMs ?? 0, 1);
+  const maxMs = Math.max(...chartHistory.map((entry) => entry.totalMs), 1);
   const appMs =
     latest && latest.databaseMs !== undefined
       ? Math.max(0, latest.totalMs - latest.databaseMs)
@@ -265,38 +257,6 @@ function ChartsToolView({
                   ) : null}
                 </td>
               </tr>
-            </tbody>
-          </table>
-        </section>
-      ) : null}
-
-      {benchmark ? (
-        <section className="tool-panel-section">
-          <h3>Benchmark ({benchmark.iterations} runs)</h3>
-          <p className="muted">
-            Avg {benchmark.averageMs} ms · min {benchmark.minMs} ms · max {benchmark.maxMs} ms
-          </p>
-          <table className="charts-table">
-            <thead>
-              <tr>
-                <th>Run</th>
-                <th>Total</th>
-                <th />
-              </tr>
-            </thead>
-            <tbody>
-              {benchmark.samples.map((sample) => (
-                <tr key={sample.iteration}>
-                  <td>{sample.iteration}</td>
-                  <td>{sample.totalMs} ms</td>
-                  <td>
-                    <div
-                      className="chart-bar"
-                      style={{ width: `${Math.max(4, (sample.totalMs / maxMs) * 100)}%` }}
-                    />
-                  </td>
-                </tr>
-              ))}
             </tbody>
           </table>
         </section>

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useEscapeClose } from "../lib/useEscapeClose";
 
 interface NewScriptDialogProps {
   open: boolean;
@@ -30,6 +31,8 @@ export function NewScriptDialog({ open, onClose, onCreate }: NewScriptDialogProp
 
     return () => cancelAnimationFrame(frame);
   }, [open]);
+
+  useEscapeClose(open, onClose, !busy);
 
   if (!open) {
     return null;

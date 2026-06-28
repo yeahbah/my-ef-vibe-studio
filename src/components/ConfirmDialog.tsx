@@ -1,3 +1,5 @@
+import { useEscapeClose } from "../lib/useEscapeClose";
+
 interface ConfirmDialogProps {
   open: boolean;
   title: string;
@@ -19,6 +21,8 @@ export function ConfirmDialog({
   onConfirm,
   onClose,
 }: ConfirmDialogProps) {
+  useEscapeClose(open, onClose);
+
   if (!open) {
     return null;
   }

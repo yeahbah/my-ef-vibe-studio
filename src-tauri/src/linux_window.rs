@@ -41,7 +41,7 @@ pub fn use_system_window_decorations(app: &App) -> Result<(), Box<dyn std::error
     // Defer GTK calls until the native window exists (avoids AppImage launch crashes).
     glib::idle_add_local_once(move || {
         let Ok(gtk_window) = window.gtk_window() else {
-            eprintln!("efvibe Studio: could not access GTK window for decorations");
+            eprintln!("MyEFvibe Studio: could not access GTK window for decorations");
             return;
         };
 

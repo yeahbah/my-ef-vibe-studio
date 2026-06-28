@@ -2,8 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { homeDir } from "@tauri-apps/api/path";
 import { save } from "@tauri-apps/plugin-dialog";
 import { writeTextFile } from "@tauri-apps/plugin-fs";
-import { ConnectionPicker } from "./components/ConnectionPicker";
-import { IconSidebar, IconStop } from "./components/icons";
+import { IconSidebar } from "./components/icons";
 import { SplashScreen } from "./components/SplashScreen";
 import { StatusBarBusy } from "./components/StatusBarBusy";
 import { ErDiagramView } from "./components/ErDiagramView";
@@ -13,8 +12,8 @@ import { MainViewSwitcher } from "./components/MainViewSwitcher";
 import { NotebookView, type NotebookRunScope } from "./components/NotebookView";
 import { QueryWorkspace, type QueryWorkspaceHandle } from "./components/QueryWorkspace";
 import { ReplView } from "./components/ReplView";
-import { PrerequisitesBanner } from "./components/PrerequisitesBanner";
 import { QueryTabBar } from "./components/QueryTabBar";
+import { QueryTabToolbar } from "./components/QueryTabToolbar";
 import { ResizableResultsDock, DEFAULT_RESULTS_DOCK_HEIGHT } from "./components/ResizableResultsDock";
 import {
   ResizableEditorToolPanel,
@@ -22,11 +21,9 @@ import {
 } from "./components/ResizableEditorToolPanel";
 import { ResultsTabs } from "./components/ResultsTabs";
 import { ConnectionPanel } from "./components/ConnectionPanel";
-import { ConfirmDialog } from "./components/ConfirmDialog";
 import { SettingsPanel } from "./components/SettingsPanel";
 import { ExplorerSidebar } from "./components/explorer/ExplorerSidebar";
 import { resolveExplorerExpandedNodes, normalizeExplorerExpandedNodes } from "./components/explorer/types";
-import { runBenchmark, type BenchmarkResult } from "./lib/benchmark";
 import {
   cancelEfvibeDaemonRequest,
   checkPrerequisites,
@@ -52,7 +49,7 @@ import { openQueryFile, saveQueryFile } from "./lib/queryFile";
 import { isQueryCancelledMessage } from "./lib/queryCancel";
 import { runSqlViaDaemon } from "./lib/rawSql";
 import { looksLikeRawSql } from "./lib/sqlDetect";
-import { RUN_QUERY_EVENT, RUN_PLAN_EVENT, normalizeExpression } from "./lib/editorRun";
+import { RUN_ALL_EVENT, RUN_QUERY_EVENT, RUN_PLAN_EVENT, normalizeExpression } from "./lib/editorRun";
 import { appendQueryExpression } from "./lib/editorRunText";
 import {
   hydrateWorkspaceSecrets,
@@ -60,6 +57,7 @@ import {
   syncConnectionSecretToVault,
 } from "./lib/connectionVault";
 import { keybindingLabel, matchesKeybinding, resolveKeybindings } from "./lib/keybindings";
+import { formatPrerequisitesStatus } from "./lib/prerequisitesStatus";
 import { cycleQueryTabId } from "./lib/queryTabs";
 import { buildExportContent } from "./lib/resultFormat";
 import { inferResultEntity, persistResultChanges } from "./lib/resultPersist";
@@ -91,10 +89,11 @@ import {
   type WorkspaceDocument,
 } from "./lib/workspace";
 import type { AppSettings, PrerequisiteCheckResult } from "./types/connection";
-import { emptyEvaluationPayload, type EvaluationJsonPayload } from "./types/evaluation";
+import { type EvaluationJsonPayload } from "./types/evaluation";
+import { resolveDisplayPayload } from "./lib/resultView";
 import { createDefaultNotebook, createNotebookCell, type NotebookCell } from "./types/notebook";
 import { resolveSavedMainView, type AppMainView } from "./types/mainView";
-import { createQueryTab, normalizeResultsTab, type LegacyResultsTab, type QueryTab, type ResultsTab } from "./types/query";
+import { createQueryTab, restoreQueryTabFromSession, type QueryTab, type ResultsTab } from "./types/query";
 import { createUserSnippet, type SnippetDefinition } from "./types/snippets";
 import type { ScanMode, ScanReviewItem } from "./types/scan";
 import {
@@ -134,7 +133,6 @@ function App() {
   const [document, setDocument] = useState<WorkspaceDocument | undefined>();
   const [queryTabs, setQueryTabs] = useState<QueryTab[]>([]);
   const [activeQueryTabId, setActiveQueryTabId] = useState("");
-  const [activeConnectionId, setActiveConnectionId] = useState("");
   const [settings, setSettings] = useState<AppSettings | undefined>();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [connectionEditorId, setConnectionEditorId] = useState<string | undefined>();
@@ -170,17 +168,15 @@ function App() {
   const [notebookRunning, setNotebookRunning] = useState(false);
   const [runningNotebookCellId, setRunningNotebookCellId] = useState<string | undefined>();
   const [engineAllowed, setEngineAllowed] = useState(false);
+  const [daemonConnectedIds, setDaemonConnectedIds] = useState<string[]>([]);
   const [sqlPaneOpen, setSqlPaneOpen] = useState(true);
   const [sqlPaneWidth, setSqlPaneWidth] = useState(360);
+  const [sqlPreviewAuto, setSqlPreviewAuto] = useState(false);
   const [editorToolPanelWidth, setEditorToolPanelWidth] = useState(DEFAULT_EDITOR_TOOL_PANEL_WIDTH);
   const [lambdaMode, setLambdaMode] = useState(false);
   const [userSnippets, setUserSnippets] = useState<SnippetDefinition[]>([]);
   const [queryLibrary, setQueryLibrary] = useState<QueryLibraryState>(createEmptyQueryLibrary());
   const [activeEditorTool, setActiveEditorTool] = useState<EditorToolId | undefined>();
-  const [benchmarkResult, setBenchmarkResult] = useState<BenchmarkResult | undefined>();
-  const [benchmarking, setBenchmarking] = useState(false);
-  const [benchmarkConfirmOpen, setBenchmarkConfirmOpen] = useState(false);
-  const [benchmarkIterations, setBenchmarkIterations] = useState(5);
   const [installedPackIds, setInstalledPackIds] = useState<string[]>([]);
   const [scanItems, setScanItems] = useState<ScanReviewItem[]>([]);
   const [scanIndex, setScanIndex] = useState(0);
@@ -198,6 +194,18 @@ function App() {
     () => queryTabs.find((tab) => tab.id === activeQueryTabId),
     [queryTabs, activeQueryTabId],
   );
+
+  const activeConnectionId = useMemo(() => {
+    if (activeQueryTab?.connectionId) {
+      return activeQueryTab.connectionId;
+    }
+
+    if (queryTabs[0]?.connectionId) {
+      return queryTabs[0].connectionId;
+    }
+
+    return document?.workspace.connections[0]?.id ?? "";
+  }, [activeQueryTab, queryTabs, document]);
 
   const workspaceDirectory = useMemo(
     () => (document?.path ? workspaceDirectoryFromPath(document.path) : "."),
@@ -277,7 +285,7 @@ function App() {
     );
   }, [notebookConnection, notebookConnectionSettings, workspaceDirectory]);
 
-  const payload = activeQueryTab?.lastPayload ?? emptyEvaluationPayload();
+  const payload = resolveDisplayPayload(activeQueryTab);
   const activeTab = activeQueryTab?.activeResultsTab ?? "result";
   const expression = activeQueryTab?.expression ?? "";
 
@@ -307,16 +315,45 @@ function App() {
     setDocument((current) => (current ? { ...current, workspace } : current));
   }, []);
 
+  const clearDaemonSession = useCallback(async () => {
+    await invalidateEfvibeDaemon();
+  }, []);
+
+  const resetDaemonSessions = useCallback(async () => {
+    await invalidateEfvibeDaemon();
+    setEngineAllowed(false);
+    setDaemonConnectedIds([]);
+  }, []);
+
+  const disconnectDaemonConnection = useCallback(async (connectionId: string) => {
+    await invalidateEfvibeDaemon();
+    setDaemonConnectedIds((current) => {
+      const next = current.filter((id) => id !== connectionId);
+      if (next.length === 0) {
+        setEngineAllowed(false);
+      }
+      return next;
+    });
+  }, []);
+
+  const allowEngine = useCallback(
+    (connectionId?: string) => {
+      const id = connectionId ?? activeConnectionId;
+      if (!id) {
+        return;
+      }
+
+      setEngineAllowed(true);
+      setDaemonConnectedIds((current) =>
+        current.includes(id) ? current : [...current, id],
+      );
+    },
+    [activeConnectionId],
+  );
+
   const applyWorkspaceUpdate = useCallback(
     (workspace: EfvibeWorkspace) => {
       updateWorkspace(workspace);
-      setActiveConnectionId((currentId) => {
-        if (workspace.connections.some((connection) => connection.id === currentId)) {
-          return currentId;
-        }
-
-        return workspace.connections[0]?.id ?? "";
-      });
       setQueryTabs((tabs) =>
         tabs.map((tab) => {
           if (workspace.connections.some((connection) => connection.id === tab.connectionId)) {
@@ -327,15 +364,11 @@ function App() {
           return { ...tab, connectionId: fallbackId };
         }),
       );
-      void invalidateEfvibeDaemon();
+      void resetDaemonSessions();
       setStatus(`Updated workspace ${workspace.name}`);
     },
-    [updateWorkspace],
+    [resetDaemonSessions, updateWorkspace],
   );
-
-  const allowEngine = useCallback(() => {
-    setEngineAllowed(true);
-  }, []);
 
   const adjustEngineBusy = useCallback((delta: number) => {
     setEngineBusyCount((count) => Math.max(0, count + delta));
@@ -485,15 +518,8 @@ function App() {
             (connection) => connection.id === savedSession.activeConnectionId,
           )?.id ?? savedSession.workspace.connections[0].id;
 
-        setActiveConnectionId(connectionId);
-
         if (savedSession.queryTabs?.length) {
-          setQueryTabs(
-            savedSession.queryTabs.map((tab) => ({
-              ...tab,
-              activeResultsTab: normalizeResultsTab(tab.activeResultsTab as LegacyResultsTab),
-            })),
-          );
+          setQueryTabs(savedSession.queryTabs.map(restoreQueryTabFromSession));
           setActiveQueryTabId(
             savedSession.queryTabs.some((tab) => tab.id === savedSession.activeQueryTabId)
               ? savedSession.activeQueryTabId
@@ -544,6 +570,9 @@ function App() {
         if (savedSession.sqlPaneWidth) {
           setSqlPaneWidth(savedSession.sqlPaneWidth);
         }
+        if (savedSession.sqlPreviewAuto !== undefined) {
+          setSqlPreviewAuto(savedSession.sqlPreviewAuto);
+        }
         if (savedSession.editorToolPanelWidth) {
           setEditorToolPanelWidth(savedSession.editorToolPanelWidth);
         }
@@ -574,7 +603,6 @@ function App() {
             connections: [connection],
           },
         });
-        setActiveConnectionId(connection.id);
         setQueryTabs([tab]);
         setActiveQueryTabId(tab.id);
       }
@@ -658,6 +686,7 @@ function App() {
         liveSqlEnabled: sqlPaneOpen,
         sqlPaneOpen,
         sqlPaneWidth,
+        sqlPreviewAuto,
         editorToolPanelWidth,
         lambdaMode,
         userSnippets,
@@ -682,6 +711,7 @@ function App() {
       notebookCells,
       sqlPaneOpen,
       sqlPaneWidth,
+      sqlPreviewAuto,
       editorToolPanelWidth,
       lambdaMode,
       userSnippets,
@@ -811,7 +841,6 @@ function App() {
         const nextTab = nextTabs[0];
         if (nextTab) {
           setActiveQueryTabId(nextTab.id);
-          setActiveConnectionId(nextTab.connectionId);
         }
         return;
       }
@@ -838,10 +867,6 @@ function App() {
       }
 
       setActiveQueryTabId(nextId);
-      const tab = queryTabs.find((entry) => entry.id === nextId);
-      if (tab) {
-        setActiveConnectionId(tab.connectionId);
-      }
     };
 
     window.addEventListener("keydown", handleKeyDown, true);
@@ -863,19 +888,35 @@ function App() {
       return;
     }
 
+    let cancelled = false;
+    const loadingTimer = window.setTimeout(() => {
+      if (!cancelled) {
+        setPrerequisitesLoading(true);
+      }
+    }, 300);
+
     void (async () => {
-      setPrerequisitesLoading(true);
       try {
         const result = await checkPrerequisites(
           searchDirectory || ".",
           settings.toolPath,
           activeConnection?.dotnetFramework ?? "",
         );
-        setPrerequisites(result);
+        if (!cancelled) {
+          setPrerequisites(result);
+        }
       } finally {
-        setPrerequisitesLoading(false);
+        window.clearTimeout(loadingTimer);
+        if (!cancelled) {
+          setPrerequisitesLoading(false);
+        }
       }
     })();
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(loadingTimer);
+    };
   }, [settings, searchDirectory, activeConnection?.dotnetFramework]);
 
   const handleRunSql = useCallback(
@@ -890,7 +931,9 @@ function App() {
         return;
       }
 
-      allowEngine();
+      const editorSnapshot = activeQueryTab.expression.trim();
+
+      allowEngine(activeConnectionId);
 
       if (!searchDirectory) {
         const errorPayload: EvaluationJsonPayload = {
@@ -927,6 +970,7 @@ function App() {
 
           updateQueryTab(activeQueryTab.id, {
             lastPayload: result.payload,
+            lastRunExpression: editorSnapshot,
             activeResultsTab: nextTab,
             resultRowsBaseline: result.payload.rows
               ? result.payload.rows.map((row) => ({ ...row }))
@@ -959,6 +1003,7 @@ function App() {
               warnings: [],
               error: result.stdout || "No SQL result payload returned.",
             },
+            lastRunExpression: editorSnapshot,
             activeResultsTab: "messages",
           });
           setStatus("SQL execution failed.");
@@ -981,6 +1026,7 @@ function App() {
             warnings: [],
             error: message,
           },
+          lastRunExpression: editorSnapshot,
           activeResultsTab: "messages",
         });
         setStatus(message);
@@ -1008,22 +1054,23 @@ function App() {
       }
 
       queryWorkspaceRef.current?.flush();
-      const rawInput = (
+      const editorText = queryWorkspaceRef.current?.getDraft() ?? activeQueryTab.expression;
+      const editorSnapshot = editorText.trim();
+      const runInput = (
         expressionOverride ??
         queryWorkspaceRef.current?.getRunText() ??
-        queryWorkspaceRef.current?.getDraft() ??
-        activeQueryTab.expression
+        editorText
       ).trim();
-      if (!rawInput) {
+      if (!runInput) {
         return;
       }
 
-      if (looksLikeRawSql(rawInput)) {
-        await handleRunSql(rawInput, withPlan);
+      if (looksLikeRawSql(runInput)) {
+        await handleRunSql(runInput, withPlan);
         return;
       }
 
-      const runExpression = normalizeExpression(rawInput, lambdaMode);
+      const runExpression = normalizeExpression(runInput, lambdaMode);
 
       if (!searchDirectory) {
         const errorPayload: EvaluationJsonPayload = {
@@ -1042,7 +1089,7 @@ function App() {
         return;
       }
 
-      allowEngine();
+      allowEngine(activeConnectionId);
       setRunning(true);
       setStatus(withPlan ? "Running with plan…" : "Running…");
       await yieldToUi();
@@ -1061,6 +1108,8 @@ function App() {
 
           updateQueryTab(activeQueryTab.id, {
             lastPayload: result.payload,
+            expression: editorText,
+            lastRunExpression: editorSnapshot,
             activeResultsTab: nextTab,
             resultRowsBaseline: result.payload.rows
               ? result.payload.rows.map((row) => ({ ...row }))
@@ -1084,7 +1133,11 @@ function App() {
 
           setStatus(
             result.payload.success
-              ? `Done · ${result.payload.metrics.totalMs} ms`
+              ? (result.payload.compareResults?.length ?? 0) >= 2
+                ? `Compared ${result.payload.compareResults!.length} variants · ${result.payload.metrics.totalMs} ms (last)`
+                : result.payload.benchmarkResult
+                  ? `Benchmarked ${result.payload.benchmarkResult.iterations} runs · avg ${result.payload.benchmarkResult.averageMs} ms`
+                  : `Done · ${result.payload.metrics.totalMs} ms`
               : result.payload.error ?? "Evaluation failed.",
           );
         } else {
@@ -1096,6 +1149,8 @@ function App() {
               warnings: [],
               error: result.stdout || "No evaluation payload returned.",
             },
+            expression: editorText,
+            lastRunExpression: editorSnapshot,
             activeResultsTab: "messages",
           });
           setStatus("Evaluation failed.");
@@ -1114,6 +1169,8 @@ function App() {
             warnings: [],
             error: message,
           },
+          expression: editorText,
+          lastRunExpression: editorSnapshot,
           activeResultsTab: "messages",
         });
         setStatus(message);
@@ -1140,14 +1197,53 @@ function App() {
     setStatus("Stopping query…");
   }, []);
 
+  const handleRunAll = useCallback(() => {
+    queryWorkspaceRef.current?.flush();
+    const fullText =
+      queryWorkspaceRef.current?.getDraft() ??
+      activeQueryTab?.expression ??
+      "";
+    void handleRun(false, fullText);
+  }, [activeQueryTab, handleRun]);
+
+  const handleRunLine = useCallback(() => {
+    void handleRun(false);
+  }, [handleRun]);
+
   useEffect(() => {
     const listener = () => {
-      void handleRun(false);
+      void handleRunAll();
+    };
+
+    window.addEventListener(RUN_ALL_EVENT, listener);
+    return () => window.removeEventListener(RUN_ALL_EVENT, listener);
+  }, [handleRunAll]);
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.defaultPrevented || mainView !== "query") {
+        return;
+      }
+
+      if (matchesKeybinding(event, keybindings.runAll)) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        void handleRunAll();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown, true);
+    return () => window.removeEventListener("keydown", handleKeyDown, true);
+  }, [handleRunAll, keybindings.runAll, mainView]);
+
+  useEffect(() => {
+    const listener = () => {
+      void handleRunLine();
     };
 
     window.addEventListener(RUN_QUERY_EVENT, listener);
     return () => window.removeEventListener(RUN_QUERY_EVENT, listener);
-  }, [handleRun]);
+  }, [handleRunLine]);
 
   useEffect(() => {
     const listener = () => {
@@ -1160,10 +1256,6 @@ function App() {
 
   function selectQueryTab(tabId: string) {
     setActiveQueryTabId(tabId);
-    const tab = queryTabs.find((entry) => entry.id === tabId);
-    if (tab) {
-      setActiveConnectionId(tab.connectionId);
-    }
   }
 
   function addQueryTab() {
@@ -1188,7 +1280,6 @@ function App() {
     if (activeQueryTabId === tabId) {
       const nextTab = nextTabs[0];
       setActiveQueryTabId(nextTab.id);
-      setActiveConnectionId(nextTab.connectionId);
     }
   }
 
@@ -1209,7 +1300,6 @@ function App() {
 
       setQueryTabs((tabs) => [...tabs, opened]);
       setActiveQueryTabId(opened.id);
-      setActiveConnectionId(opened.connectionId);
       setStatus(`Opened ${opened.name}`);
     } catch (error) {
       setStatus(error instanceof Error ? error.message : String(error));
@@ -1229,11 +1319,10 @@ function App() {
         workspace: hydratedWorkspace,
       });
       const connectionId = opened.workspace.connections[0]?.id ?? "";
-      setActiveConnectionId(connectionId);
       const tab = createQueryTab(connectionId);
       setQueryTabs([tab]);
       setActiveQueryTabId(tab.id);
-      await invalidateEfvibeDaemon();
+      await resetDaemonSessions();
       setStatus(`Opened ${hydratedWorkspace.name}`);
     } catch (error) {
       setStatus(error instanceof Error ? error.message : String(error));
@@ -1265,10 +1354,9 @@ function App() {
     const connection = created.workspace.connections[0];
     const tab = createQueryTab(connection.id);
     setDocument(created);
-    setActiveConnectionId(connection.id);
     setQueryTabs([tab]);
     setActiveQueryTabId(tab.id);
-    await invalidateEfvibeDaemon();
+    await resetDaemonSessions();
     setStatus("New workspace");
   }
 
@@ -1367,7 +1455,7 @@ function App() {
           entry.id === connection.id ? synced : entry,
         ),
       });
-      await invalidateEfvibeDaemon();
+      await resetDaemonSessions();
     })();
   }
 
@@ -1520,7 +1608,7 @@ function App() {
       return;
     }
 
-    allowEngine();
+    allowEngine(notebookConnectionId || activeConnectionId);
     setRunningNotebookCellId(cellId);
     updateNotebookCell(cellId, {
       executionStatus: "running",
@@ -1701,48 +1789,6 @@ function App() {
     });
   }
 
-  function requestBenchmark(iterations = 5) {
-    if (!connectionSettings || !searchDirectory || !activeQueryTab) {
-      setStatus("Configure a connection before benchmarking.");
-      return;
-    }
-
-    if (!activeQueryTab.expression.trim()) {
-      setStatus("Enter a query in the editor before benchmarking.");
-      return;
-    }
-
-    setBenchmarkIterations(iterations);
-    setBenchmarkConfirmOpen(true);
-  }
-
-  async function handleBenchmark(iterations = 5) {
-    if (!connectionSettings || !searchDirectory || !activeQueryTab) {
-      setStatus("Configure a connection before benchmarking.");
-      return;
-    }
-
-    allowEngine();
-    setBenchmarking(true);
-    setStatus(`Benchmarking (${iterations} runs)…`);
-    await yieldToUi();
-    try {
-      const result = await runBenchmark(
-        connectionSettings,
-        searchDirectory,
-        normalizeExpression(activeQueryTab.expression, lambdaMode),
-        iterations,
-      );
-      setBenchmarkResult(result);
-      setActiveEditorTool("charts");
-      setStatus(`Benchmark avg ${result.averageMs} ms`);
-    } catch (error) {
-      setStatus(error instanceof Error ? error.message : String(error));
-    } finally {
-      setBenchmarking(false);
-    }
-  }
-
   function handleToggleFavorite(tabId: string) {
     setQueryTabs((tabs) =>
       tabs.map((tab) =>
@@ -1758,7 +1804,6 @@ function App() {
     });
     setQueryTabs((tabs) => [...tabs, tab]);
     setActiveQueryTabId(tab.id);
-    setActiveConnectionId(connectionId);
   }
 
   function handleOpenLibraryQuery(expression: string, connectionId: string, name?: string) {
@@ -1771,14 +1816,12 @@ function App() {
     );
     if (existing) {
       setActiveQueryTabId(existing.id);
-      setActiveConnectionId(existing.connectionId);
       return;
     }
 
     const tab = createQueryTab(connectionId, { expression, name });
     setQueryTabs((tabs) => [...tabs, tab]);
     setActiveQueryTabId(tab.id);
-    setActiveConnectionId(connectionId);
   }
 
   function handleInsertSnippet(expression: string) {
@@ -1867,11 +1910,35 @@ function App() {
       ? document.workspace.connections.find((connection) => connection.id === connectionEditorId)
       : undefined;
 
+  const handleQueryTabConnectionChange = useCallback(
+    (connectionId: string) => {
+      if (!activeQueryTab) {
+        return;
+      }
+
+      updateQueryTab(activeQueryTab.id, { connectionId });
+      void clearDaemonSession();
+    },
+    [activeQueryTab, clearDaemonSession, updateQueryTab],
+  );
+
   const showBusyOverlay =
-    running || benchmarking || notebookRunning || engineBusyCount > 0;
+    running || notebookRunning || engineBusyCount > 0;
 
   const busyMessage =
-    running || benchmarking || notebookRunning ? status : "Working with efvibe…";
+    running || notebookRunning ? status : "Working with efvibe…";
+
+  const statusBarMessage = useMemo(() => {
+    if (prerequisitesLoading) {
+      return "Checking .NET SDK and efvibe…";
+    }
+
+    if (prerequisites && !prerequisites.ok) {
+      return formatPrerequisitesStatus(prerequisites);
+    }
+
+    return status;
+  }, [prerequisites, prerequisitesLoading, status]);
 
   if (!splashDone) {
     const splashMessage = appReady ? "Opening workspace…" : "Loading workspace…";
@@ -1895,52 +1962,21 @@ function App() {
         >
           <IconSidebar />
         </button>
-        <ConnectionPicker
-          connections={document.workspace.connections}
-          activeConnectionId={activeConnectionId}
-          onChange={(connectionId) => {
-            setActiveConnectionId(connectionId);
-            updateQueryTab(activeQueryTab.id, { connectionId });
-            void invalidateEfvibeDaemon();
-          }}
-        />
         <MainViewSwitcher value={mainView} onChange={handleMainViewChange} />
-        {mainView === "query" ? (
-        <div className="runbar">
-          <button type="button" disabled={running} onClick={() => void handleRun(false)}>
-            Run
-          </button>
-          <button type="button" disabled={running} onClick={() => void handleRun(true)}>
-            Run Plan
-          </button>
-        </div>
-        ) : null}
         <div
           className="status-bar"
           role="status"
           aria-live="polite"
           aria-busy={showBusyOverlay}
-          title={showBusyOverlay ? busyMessage : status}
+          title={showBusyOverlay ? busyMessage : statusBarMessage}
         >
           {showBusyOverlay ? (
             <StatusBarBusy message={busyMessage} />
           ) : (
-            <span className="status-bar-text">{status}</span>
+            <span className="status-bar-text">{statusBarMessage}</span>
           )}
-          <button
-            type="button"
-            className={running ? "status-bar-stop active" : "status-bar-stop"}
-            disabled={!running}
-            onClick={handleStopQuery}
-            aria-label="Stop query"
-            title="Stop query"
-          >
-            <IconStop />
-          </button>
         </div>
       </header>
-
-      <PrerequisitesBanner result={prerequisites} loading={prerequisitesLoading} />
 
       <div className={explorerOpen ? "workspace" : "workspace explorer-hidden"}>
         {explorerOpen ? (
@@ -1954,6 +1990,7 @@ function App() {
           onExpandedNodeIdsChange={setExplorerExpandedNodes}
           connections={document.workspace.connections}
           activeConnectionId={activeConnectionId}
+          daemonConnectedIds={daemonConnectedIds}
           history={history}
           queryTabs={queryTabs}
           queryLibrary={queryLibrary}
@@ -1961,9 +1998,10 @@ function App() {
           teamSyncDirectory={settings.teamSyncDirectory}
           cloudSyncDirectory={settings.cloudSyncDirectory ?? ""}
           onSelectConnection={(connectionId) => {
-            setActiveConnectionId(connectionId);
-            updateQueryTab(activeQueryTab.id, { connectionId });
-            void invalidateEfvibeDaemon();
+            if (activeQueryTab) {
+              updateQueryTab(activeQueryTab.id, { connectionId });
+            }
+            void clearDaemonSession();
           }}
           onAddConnection={() => {
             const connection = createSampleConnection(
@@ -1973,7 +2011,9 @@ function App() {
               ...document.workspace,
               connections: [...document.workspace.connections, connection],
             });
-            setActiveConnectionId(connection.id);
+            if (activeQueryTab) {
+              updateQueryTab(activeQueryTab.id, { connectionId: connection.id });
+            }
             setConnectionEditorId(connection.id);
           }}
           onDuplicateConnection={(connectionId) => {
@@ -1989,7 +2029,9 @@ function App() {
               ...document.workspace,
               connections: [...document.workspace.connections, copy],
             });
-            setActiveConnectionId(copy.id);
+            if (activeQueryTab) {
+              updateQueryTab(activeQueryTab.id, { connectionId: copy.id });
+            }
           }}
           onRefreshConnection={(connectionId) => {
             const connection = document.workspace.connections.find(
@@ -1999,13 +2041,8 @@ function App() {
               return;
             }
 
-            if (connectionId !== activeConnectionId) {
-              setActiveConnectionId(connectionId);
-              updateQueryTab(activeQueryTab.id, { connectionId });
-            }
-
             void (async () => {
-              await invalidateEfvibeDaemon();
+              await disconnectDaemonConnection(connectionId);
               setStatus(`Refreshed ${connectionDisplayName(connection)}`);
             })();
           }}
@@ -2019,11 +2056,6 @@ function App() {
             );
             if (!connection) {
               return;
-            }
-
-            if (connectionId !== activeConnectionId) {
-              setActiveConnectionId(connectionId);
-              updateQueryTab(activeQueryTab.id, { connectionId });
             }
 
             const rebuildSettings = workspaceConnectionToSettings(
@@ -2049,7 +2081,7 @@ function App() {
                 : rebuildSearchDirectory;
 
             void (async () => {
-              allowEngine();
+              allowEngine(connectionId);
               adjustEngineBusy(1);
               setStatus(`Rebuilding EF projects for ${connectionDisplayName(connection)}…`);
               await yieldToUi();
@@ -2085,8 +2117,7 @@ function App() {
             }
 
             void (async () => {
-              await invalidateEfvibeDaemon();
-              setEngineAllowed(false);
+              await disconnectDaemonConnection(connectionId);
               setStatus(`Disconnected from ${connectionDisplayName(connection)}.`);
             })();
           }}
@@ -2100,12 +2131,12 @@ function App() {
 
             updateWorkspace({ ...document.workspace, connections: remaining });
             const nextId = remaining[0].id;
-            setActiveConnectionId(nextId);
             setQueryTabs((tabs) =>
               tabs.map((tab) =>
                 tab.connectionId === connectionId ? { ...tab, connectionId: nextId } : tab,
               ),
             );
+            setDaemonConnectedIds((current) => current.filter((id) => id !== connectionId));
           }}
           onEditConnection={(connectionId) => {
             setConnectionEditorId(connectionId);
@@ -2153,13 +2184,23 @@ function App() {
                 onToggleFavorite={handleToggleFavorite}
               />
 
+              <QueryTabToolbar
+                connections={document.workspace.connections}
+                connectionId={activeConnectionId}
+                onConnectionChange={handleQueryTabConnectionChange}
+                running={running}
+                runAllShortcutLabel={keybindingLabel(keybindings.runAll)}
+                runLineShortcutLabel={keybindingLabel(keybindings.runQuery)}
+                onRunAll={() => void handleRunAll()}
+                onRunLine={() => void handleRunLine()}
+                onRunPlan={() => void handleRun(true)}
+                onStop={handleStopQuery}
+              />
+
               <div className="editor-shell">
                 <EditorToolRail
                   activeTool={activeEditorTool}
                   onSelect={handleEditorTool}
-                  onBenchmark={() => requestBenchmark(5)}
-                  benchmarking={benchmarking}
-                  running={running}
                 />
 
                 {activeEditorTool ? (
@@ -2170,7 +2211,6 @@ function App() {
                     <EditorToolPanel
                       tool={activeEditorTool}
                       history={history}
-                      benchmark={benchmarkResult}
                       userSnippets={userSnippets}
                       favoriteTabs={favoriteTabs}
                       scanItems={scanItems}
@@ -2202,7 +2242,7 @@ function App() {
                     scriptSearchPath={connectionSettings?.scriptSearchPath ?? ""}
                     scriptLoads={activeConnection?.scriptLoads ?? []}
                     scriptUsings={activeConnection?.scriptUsings ?? []}
-                    onScriptsChanged={() => void invalidateEfvibeDaemon()}
+                    onScriptsChanged={() => void resetDaemonSessions()}
                     onScriptCreated={handleScriptCreated}
                     onScriptLoadsChange={handleScriptLoadsChange}
                     onScriptUsingsChange={handleScriptUsingsChange}
@@ -2225,6 +2265,8 @@ function App() {
                         onSqlPaneOpenChange={handleSqlPaneOpenChange}
                         sqlPaneWidth={sqlPaneWidth}
                         onSqlPaneWidthChange={setSqlPaneWidth}
+                        sqlPreviewAuto={sqlPreviewAuto}
+                        onSqlPreviewAutoChange={setSqlPreviewAuto}
                         connectionSettings={connectionSettings}
                         searchDirectory={searchDirectory}
                         autoPreviewAllowed={engineAllowed}
@@ -2392,20 +2434,6 @@ function App() {
           onConnectionChange={updateConnection}
         />
       ) : null}
-
-      <ConfirmDialog
-        open={benchmarkConfirmOpen}
-        title="Run benchmark?"
-        message={`The query in the editor will be executed ${benchmarkIterations} times against your database.`}
-        detail={activeQueryTab?.expression.trim()}
-        confirmLabel="Run benchmark"
-        cancelLabel="Cancel"
-        onClose={() => setBenchmarkConfirmOpen(false)}
-        onConfirm={() => {
-          setBenchmarkConfirmOpen(false);
-          void handleBenchmark(benchmarkIterations);
-        }}
-      />
 
     </main>
   );

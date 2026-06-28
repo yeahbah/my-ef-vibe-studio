@@ -103,6 +103,37 @@ export function IconPlay(props: IconProps) {
   );
 }
 
+export function IconRunPlan(props: IconProps) {
+  return (
+    <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" {...props}>
+      <rect x="6.25" y="2" width="3.5" height="2.25" rx="0.5" fill="currentColor" />
+      <path
+        d="M8 4.25v1.75M4.75 7.25h6.5M4.75 7.25v1.5M11.25 7.25v1.5"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.25"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <rect x="2.75" y="8.75" width="4" height="2.25" rx="0.5" fill="currentColor" />
+      <rect x="9.25" y="8.75" width="4" height="2.25" rx="0.5" fill="currentColor" />
+      <rect x="5.75" y="12" width="4.5" height="2" rx="0.5" fill="currentColor" />
+    </svg>
+  );
+}
+
+export function IconRunLine(props: IconProps) {
+  return (
+    <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" {...props}>
+      <path d="M3.5 4.25 8.25 8 3.5 11.75V4.25Z" fill="currentColor" />
+      <path
+        d="M10.25 5.25h2.5v1h-2.5v-1Zm0 2.25h2.5v1h-2.5v-1Zm0 2.25h2v1h-2v-1Z"
+        fill="currentColor"
+      />
+    </svg>
+  );
+}
+
 export function IconRunAbove(props: IconProps) {
   return (
     <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" {...props}>

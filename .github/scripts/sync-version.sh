@@ -18,4 +18,4 @@ mv "$ROOT/src-tauri/tauri.conf.json.tmp" "$ROOT/src-tauri/tauri.conf.json"
 sed "s/^version = \".*\"/version = \"${VERSION}\"/" "$ROOT/src-tauri/Cargo.toml" > "$ROOT/src-tauri/Cargo.toml.tmp"
 mv "$ROOT/src-tauri/Cargo.toml.tmp" "$ROOT/src-tauri/Cargo.toml"
 
-echo "Synced efvibe Studio version to ${VERSION}"
+echo "Synced MyEFvibe Studio version to ${VERSION}"

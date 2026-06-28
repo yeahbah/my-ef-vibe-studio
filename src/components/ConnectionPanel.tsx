@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { getVaultedConnectionString } from "../lib/connectionVault";
 import { splitMultilineList } from "../lib/multilineList";
+import { useEscapeClose } from "../lib/useEscapeClose";
 import type { WorkspaceConnection } from "../types/workspace";
 import { PathInput } from "./PathInput";
 
@@ -52,6 +53,8 @@ export function ConnectionPanel({
       splitMultilineList(previous).join("\n") === usingsText ? previous : usingsText,
     );
   }, [open, connection.id, connection.scriptLoads, connection.scriptUsings]);
+
+  useEscapeClose(open, onClose);
 
   if (!open) {
     return null;

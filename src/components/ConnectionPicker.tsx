@@ -17,7 +17,7 @@ export function ConnectionPicker({
       <select
         value={activeConnectionId}
         onChange={(event) => onChange(event.target.value)}
-        aria-label="Active connection"
+        aria-label="Connection for this query"
       >
         {connections.map((connection) => (
           <option key={connection.id} value={connection.id}>

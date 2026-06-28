@@ -1,11 +1,16 @@
 import type { editor as MonacoEditor } from "monaco-editor";
 import { resolveRunTextFromString } from "./editorRunText";
 
+export const RUN_ALL_EVENT = "efvibe-run-all";
 export const RUN_QUERY_EVENT = "efvibe-run-query";
 export const RUN_PLAN_EVENT = "efvibe-run-plan";
 
 export interface RunQueryEventDetail {
   text: string;
+}
+
+export function dispatchRunAll() {
+  window.dispatchEvent(new CustomEvent(RUN_ALL_EVENT));
 }
 
 export function dispatchRunQuery(text: string) {

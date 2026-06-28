@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { formatWorkspaceJson, parseWorkspaceFromJson } from "../lib/workspace";
+import { useEscapeClose } from "../lib/useEscapeClose";
 import type { EfvibeWorkspace } from "../types/workspace";
 
 interface WorkspacePropertiesDialogProps {
@@ -27,6 +28,8 @@ export function WorkspacePropertiesDialog({
       setParseError(undefined);
     }
   }, [open, formattedWorkspace]);
+
+  useEscapeClose(open, onClose);
 
   if (!open) {
     return null;

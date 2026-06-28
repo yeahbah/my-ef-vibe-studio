@@ -1,4 +1,5 @@
 export interface KeybindingSettings {
+  runAll: string;
   runQuery: string;
   runPlan: string;
   toggleExplorer: string;
@@ -10,6 +11,7 @@ export interface KeybindingSettings {
 }
 
 export const DEFAULT_KEYBINDINGS: KeybindingSettings = {
+  runAll: "F5",
   runQuery: "Ctrl+Enter",
   runPlan: "Ctrl+Shift+Enter",
   toggleExplorer: "Ctrl+B",

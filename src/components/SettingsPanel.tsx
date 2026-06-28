@@ -1,5 +1,6 @@
 import type { AppSettings } from "../types/connection";
 import { keybindingLabel } from "../lib/keybindings";
+import { useEscapeClose } from "../lib/useEscapeClose";
 import { DEFAULT_KEYBINDINGS } from "../types/keybindings";
 import { PathInput } from "./PathInput";
 
@@ -20,6 +21,8 @@ export function SettingsPanel({
     ...DEFAULT_KEYBINDINGS,
     ...(settings.keybindings ?? {}),
   };
+
+  useEscapeClose(open, onClose);
 
   if (!open) {
     return null;
@@ -131,7 +134,20 @@ export function SettingsPanel({
         <section>
           <h3>Keybindings</h3>
           <label>
-            Run query
+            Run all
+            <input
+              value={keybindings.runAll}
+              onChange={(event) =>
+                onSettingsChange({
+                  ...settings,
+                  keybindings: { ...settings.keybindings, runAll: event.target.value },
+                })
+              }
+              placeholder={DEFAULT_KEYBINDINGS.runAll}
+            />
+          </label>
+          <label>
+            Run current line
             <input
               value={keybindings.runQuery}
               onChange={(event) =>

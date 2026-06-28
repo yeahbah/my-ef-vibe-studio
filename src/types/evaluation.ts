@@ -7,6 +7,35 @@ export interface EvaluationJsonMetrics {
   estimatedBytes?: number;
 }
 
+export interface EvaluationJsonCompareEntry {
+  index: number;
+  label: string;
+  snippet?: string;
+  success: boolean;
+  error?: string;
+  metrics: EvaluationJsonMetrics;
+}
+
+export interface EvaluationJsonBenchmarkSample {
+  iteration: number;
+  totalMs: number;
+  databaseMs?: number;
+  rowCount?: number;
+  sqlCommandCount: number;
+  success: boolean;
+  error?: string;
+}
+
+export interface EvaluationJsonBenchmarkResult {
+  iterations: number;
+  samples: EvaluationJsonBenchmarkSample[];
+  minMs: number;
+  averageMs: number;
+  maxMs: number;
+  p95Ms: number;
+  snippet?: string;
+}
+
 export interface EvaluationJsonPayload {
   success: boolean;
   value?: string | null;
@@ -19,6 +48,8 @@ export interface EvaluationJsonPayload {
   warnings: string[];
   error?: string;
   snippet?: string;
+  compareResults?: EvaluationJsonCompareEntry[];
+  benchmarkResult?: EvaluationJsonBenchmarkResult;
 }
 
 export function parseEvaluationJson(stdout: string): EvaluationJsonPayload | undefined {

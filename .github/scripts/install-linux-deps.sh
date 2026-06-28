@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Native libraries required to build efvibe Studio on Linux (Tauri + GTK window hooks).
+# Native libraries required to build MyEFvibe Studio on Linux (Tauri + GTK window hooks).
 set -euo pipefail
 
 sudo apt-get update

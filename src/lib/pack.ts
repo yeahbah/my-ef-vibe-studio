@@ -19,7 +19,7 @@ export async function exportTeamPack(
   }));
 
   const pack = createPack(name, "team-pack", {
-    description: "Exported from efvibe Studio",
+    description: "Exported from MyEFvibe Studio",
     snippets: userSnippets.map((snippet) => ({
       title: snippet.title,
       expression: snippet.expression,
@@ -112,7 +112,7 @@ export function buildPackFromStudio(
   queryLibrary: QueryLibraryState,
 ): EfvibePack {
   return createPack(name, "team-pack", {
-    description: "Synced from efvibe Studio",
+    description: "Synced from MyEFvibe Studio",
     snippets: userSnippets.map((snippet) => ({
       title: snippet.title,
       expression: snippet.expression,

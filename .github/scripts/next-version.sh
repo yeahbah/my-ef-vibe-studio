@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Prints the next patch version for efvibe Studio.
+# Prints the next patch version for MyEFvibe Studio.
 set -euo pipefail
 
 root="$(cd "$(dirname "$0")/../.." && pwd)"

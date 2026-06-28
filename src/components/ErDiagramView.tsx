@@ -25,7 +25,7 @@ interface ErDiagramViewProps {
   theme: AppTheme;
   focusRequest?: ErDiagramFocusRequest;
   onStatus: (message: string) => void;
-  onRequestEngine?: () => void;
+  onRequestEngine?: (connectionId?: string) => void;
   onEngineBusyChange?: (delta: number) => void;
 }
 

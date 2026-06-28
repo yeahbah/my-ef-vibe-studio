@@ -1,4 +1,5 @@
 import type { DbInfoJsonPayload } from "../types/schema";
+import { useEscapeClose } from "../lib/useEscapeClose";
 
 interface DbInfoDialogProps {
   open: boolean;
@@ -17,6 +18,8 @@ export function DbInfoDialog({
   payload,
   onClose,
 }: DbInfoDialogProps) {
+  useEscapeClose(open, onClose);
+
   if (!open) {
     return null;
   }

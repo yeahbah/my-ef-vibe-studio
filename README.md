@@ -1,4 +1,4 @@
-# efvibe Studio
+# MyEFvibe Studio
 
 Standalone desktop app for EF Core LINQ exploration — a LINQPad-style scratchpad wired to your real `DbContext`, with translated SQL, query plans, and multi-project workspace management.
 
@@ -8,7 +8,7 @@ Built with **Tauri 2** + **React** + **Monaco**. The [efvibe](https://github.com
 
 Polish, shipping, and Tier 2 depth. See **[docs/PHASE6_CHECKLIST.md](docs/PHASE6_CHECKLIST.md)** for tasks and exit criteria.
 
-- **Compare baseline UI** — run-bar set/clear + Charts panel (REPL `:compare` parity)
+- **Compare & benchmark** — `#[Compare]` multi-variant runs and `#[Benchmark(N)]` in the Result tab; REPL `:compare` / `:benchmark` parity in Charts
 - **Expression mode toggle** — expose lambda scratchpad mode in the toolbar
 - **Query library UX** — folders, search, and organization in the Library panel
 - **Aligned releases** — efvibe 0.6.26+ with Studio builds; website screenshots
@@ -52,7 +52,6 @@ See [docs/PHASE6_CHECKLIST.md](docs/PHASE6_CHECKLIST.md) for the current develop
 - **Query library** — favorites, folders, and search across open tabs
 - **Snippets** — built-in EF snippets plus user-defined snippets
 - **Lambda mode** — optional expression scratchpad (semicolon not required)
-- **Benchmark** — repeat last query N times with timing chart
 - **Compare baseline** — set baseline and diff against latest run in Charts panel
 
 ## Phase 1
@@ -142,7 +141,9 @@ An example file lives at `examples/sample.efvibe-workspace`.
 
 | Shortcut | Action |
 |----------|--------|
-| Ctrl+Enter | Run query |
+| F5 | Run all (full editor) |
+| Ctrl+Enter | Run current line |
+| Ctrl+Shift+Enter | Run with plan |
 | Ctrl+Tab | Next query tab |
 | Ctrl+Shift+Tab | Previous query tab |
 | Ctrl+Shift+T | New query tab |
