@@ -254,9 +254,17 @@ When **Store connection strings in the local secret vault** is enabled in Settin
 
 ## Query view
 
-### Query tabs
+### Query tabs and split panes
 
-- Open multiple query tabs; each can bind to a connection and optionally a `.efvibe-query` file.
+Each query tab belongs to a **pane**. By default all tabs live in one pane. **Drag a tab** over the editor area to split:
+
+- Drop on the **left** quarter → split with the tab on the left
+- Drop on the **right** quarter → split with the tab on the right
+- Drop in the **center** → move the tab into that pane (no split)
+
+Each pane has its own tab bar, toolbar, editor, and results dock. Click inside a pane to focus it — keyboard shortcuts and the shared tool rail apply to the focused pane. Drag the vertical divider between panes to resize. Closing the last tab in a pane collapses it automatically.
+
+Session layout (splits and tab placement) is restored when you reopen Studio.
 - Use the tab bar **Open** and **Save** buttons (or `Ctrl+S`) to work with query files.
 - Star a tab to add it to **Favorites** in the editor tools panel.
 
