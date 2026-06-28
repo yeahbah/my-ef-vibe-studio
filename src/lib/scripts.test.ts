@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
+  appendScriptLoad,
   isScriptFileName,
+  isScriptInLoads,
   joinScriptPath,
   normalizeScriptDirectory,
+  removeScriptLoad,
   scriptFileNameFromLoad,
 } from "./scripts";
 
@@ -26,5 +29,24 @@ describe("scripts helpers", () => {
 
   it("joins script paths", () => {
     expect(joinScriptPath("/tmp/scripts", "helpers.csx")).toBe("/tmp/scripts/helpers.csx");
+  });
+
+  it("appends script loads without duplicates", () => {
+    expect(appendScriptLoad(["helpers.csx"], "filters.csx")).toEqual([
+      "helpers.csx",
+      "filters.csx",
+    ]);
+    expect(appendScriptLoad(["helpers.csx"], "Helpers.CSX")).toEqual(["helpers.csx"]);
+    expect(appendScriptLoad(["./scripts/helpers.csx"], "helpers.csx")).toEqual([
+      "./scripts/helpers.csx",
+    ]);
+  });
+
+  it("removes script loads and detects membership", () => {
+    expect(removeScriptLoad(["helpers.csx", "filters.csx"], "filters.csx")).toEqual([
+      "helpers.csx",
+    ]);
+    expect(isScriptInLoads(["./scripts/helpers.csx"], "helpers.csx")).toBe(true);
+    expect(isScriptInLoads(["helpers.csx"], "missing.csx")).toBe(false);
   });
 });

@@ -15,12 +15,12 @@ const TOOLS: Array<{
   label: string;
   Icon: typeof IconCharts;
 }> = [
-  { id: "charts", label: "Charts", Icon: IconCharts },
   { id: "history", label: "History", Icon: IconHistory },
-  { id: "snippets", label: "Snippets", Icon: IconSnippets },
+  { id: "scan", label: "Scan", Icon: IconScan },
   { id: "scripts", label: "Scripts", Icon: IconScripts },
   { id: "favorites", label: "Favorites", Icon: IconStar },
-  { id: "scan", label: "Scan", Icon: IconScan },
+  { id: "snippets", label: "Snippets", Icon: IconSnippets },
+  { id: "charts", label: "Charts", Icon: IconCharts },
 ];
 
 export function EditorToolRail({

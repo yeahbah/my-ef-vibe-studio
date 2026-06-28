@@ -48,7 +48,11 @@ interface EditorToolPanelProps {
   running?: boolean;
   scriptSearchPath?: string;
   scriptLoads?: string[];
+  scriptUsings?: string[];
   onScriptsChanged?: () => void;
+  onScriptCreated?: (fileName: string) => void;
+  onScriptLoadsChange?: (scriptLoads: string[]) => void;
+  onScriptUsingsChange?: (scriptUsings: string[]) => void;
 }
 
 const TOOL_TITLES: Record<EditorToolId, string> = {
@@ -91,7 +95,11 @@ export function EditorToolPanel({
   running = false,
   scriptSearchPath = "",
   scriptLoads = [],
+  scriptUsings = [],
   onScriptsChanged,
+  onScriptCreated,
+  onScriptLoadsChange,
+  onScriptUsingsChange,
 }: EditorToolPanelProps) {
   return (
     <aside className="editor-tool-panel" aria-label={TOOL_TITLES[tool]}>
@@ -128,8 +136,12 @@ export function EditorToolPanel({
           <ScriptsToolView
             scriptSearchPath={scriptSearchPath}
             scriptLoads={scriptLoads}
+            scriptUsings={scriptUsings}
             theme={theme}
             onScriptsChanged={onScriptsChanged}
+            onScriptCreated={onScriptCreated}
+            onScriptLoadsChange={onScriptLoadsChange}
+            onScriptUsingsChange={onScriptUsingsChange}
           />
         ) : null}
 

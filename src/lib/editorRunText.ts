@@ -1,5 +1,21 @@
 import { isQueryLanguageBoundary } from "./sqlDetect";
 
+function isCommentLine(line: string): boolean {
+  const trimmed = line.trim();
+  if (!trimmed) {
+    return false;
+  }
+
+  return (
+    trimmed.startsWith("//") ||
+    trimmed.startsWith("#") ||
+    trimmed.startsWith("--") ||
+    trimmed.startsWith("/*") ||
+    trimmed.startsWith("*") ||
+    trimmed.endsWith("*/")
+  );
+}
+
 export function resolveStatementAtLine(lines: string[], lineNumber: number): string {
   if (lines.length === 0) {
     return "";
@@ -17,7 +33,7 @@ export function resolveStatementAtLine(lines: string[], lineNumber: number): str
   while (startLine > 1) {
     const previous = lines[startLine - 2];
     const current = lines[startLine - 1];
-    if (!previous || previous.trim() === "") {
+    if (!previous || previous.trim() === "" || isCommentLine(previous)) {
       break;
     }
 
@@ -31,7 +47,7 @@ export function resolveStatementAtLine(lines: string[], lineNumber: number): str
   while (endLine < lines.length) {
     const current = lines[endLine - 1];
     const next = lines[endLine];
-    if (!next || next.trim() === "") {
+    if (!next || next.trim() === "" || isCommentLine(next)) {
       break;
     }
 
@@ -43,6 +59,20 @@ export function resolveStatementAtLine(lines: string[], lineNumber: number): str
   }
 
   return lines.slice(startLine - 1, endLine).join("\n");
+}
+
+export function appendQueryExpression(current: string, addition: string): string {
+  const trimmedAddition = addition.trim();
+  if (!trimmedAddition) {
+    return current;
+  }
+
+  const trimmedCurrent = current.trimEnd();
+  if (!trimmedCurrent) {
+    return trimmedAddition;
+  }
+
+  return `${trimmedCurrent}\n\n${trimmedAddition}`;
 }
 
 export function resolveRunTextFromString(

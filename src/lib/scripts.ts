@@ -1,9 +1,10 @@
-import { mkdir, readDir, readTextFile, writeTextFile } from "@tauri-apps/plugin-fs";
+import { exists, mkdir, readDir, readTextFile, remove, writeTextFile } from "@tauri-apps/plugin-fs";
 
 export interface ScriptFileEntry {
   name: string;
   path: string;
   configured: boolean;
+  existsOnDisk: boolean;
 }
 
 const SCRIPT_EXTENSION = ".csx";
@@ -55,6 +56,7 @@ export async function listScriptFiles(
         name: entry.name,
         path: joinScriptPath(directory, entry.name),
         configured: configuredNames.has(entry.name.toLowerCase()),
+        existsOnDisk: true,
       });
     }
   } catch {
@@ -73,6 +75,7 @@ export async function listScriptFiles(
         name: fileName,
         path: joinScriptPath(directory, fileName),
         configured: true,
+        existsOnDisk: false,
       });
     }
   }
@@ -104,4 +107,49 @@ export async function createScriptFile(scriptSearchPath: string, fileName: strin
   const path = joinScriptPath(directory, name);
   await writeScriptContent(path, "// EF query helpers\n");
   return path;
+}
+
+export async function deleteScriptFile(path: string): Promise<void> {
+  const normalized = path.trim();
+  if (!normalized) {
+    throw new Error("Script path is required.");
+  }
+
+  if (!(await exists(normalized))) {
+    throw new Error("Script file does not exist on disk.");
+  }
+
+  await remove(normalized);
+}
+
+export function appendScriptLoad(loads: string[], fileName: string): string[] {
+  const loadPath = scriptFileNameFromLoad(fileName);
+  if (!loadPath) {
+    return loads;
+  }
+
+  const key = loadPath.toLowerCase();
+  if (loads.some((entry) => scriptFileNameFromLoad(entry).toLowerCase() === key)) {
+    return loads;
+  }
+
+  return [...loads, loadPath];
+}
+
+export function removeScriptLoad(loads: string[], fileName: string): string[] {
+  const key = scriptFileNameFromLoad(fileName).toLowerCase();
+  if (!key) {
+    return loads;
+  }
+
+  return loads.filter((entry) => scriptFileNameFromLoad(entry).toLowerCase() !== key);
+}
+
+export function isScriptInLoads(loads: string[], fileName: string): boolean {
+  const key = scriptFileNameFromLoad(fileName).toLowerCase();
+  if (!key) {
+    return false;
+  }
+
+  return loads.some((entry) => scriptFileNameFromLoad(entry).toLowerCase() === key);
 }

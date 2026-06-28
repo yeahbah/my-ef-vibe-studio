@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { getVaultedConnectionString } from "../lib/connectionVault";
+import { splitMultilineList } from "../lib/multilineList";
 import type { WorkspaceConnection } from "../types/workspace";
 import { PathInput } from "./PathInput";
 
@@ -21,6 +22,8 @@ export function ConnectionPanel({
   onConnectionChange,
 }: ConnectionPanelProps) {
   const [vaultStored, setVaultStored] = useState(false);
+  const [scriptLoadsDraft, setScriptLoadsDraft] = useState("");
+  const [scriptUsingsDraft, setScriptUsingsDraft] = useState("");
 
   useEffect(() => {
     if (!open || !vaultConnectionSecrets) {
@@ -33,6 +36,22 @@ export function ConnectionPanel({
       setVaultStored(Boolean(vaulted?.trim()));
     })();
   }, [open, vaultConnectionSecrets, workspacePath, connection.id, connection.connectionString]);
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    const loadsText = (connection.scriptLoads ?? []).join("\n");
+    const usingsText = (connection.scriptUsings ?? []).join("\n");
+
+    setScriptLoadsDraft((previous) =>
+      splitMultilineList(previous).join("\n") === loadsText ? previous : loadsText,
+    );
+    setScriptUsingsDraft((previous) =>
+      splitMultilineList(previous).join("\n") === usingsText ? previous : usingsText,
+    );
+  }, [open, connection.id, connection.scriptLoads, connection.scriptUsings]);
 
   if (!open) {
     return null;
@@ -157,13 +176,15 @@ export function ConnectionPanel({
             Script loads (one path per line)
             <textarea
               rows={4}
-              value={(connection.scriptLoads ?? []).join("\n")}
-              onChange={(event) =>
+              value={scriptLoadsDraft}
+              onChange={(event) => {
+                const next = event.target.value;
+                setScriptLoadsDraft(next);
                 onConnectionChange({
                   ...connection,
-                  scriptLoads: splitMultilineList(event.target.value),
-                })
-              }
+                  scriptLoads: splitMultilineList(next),
+                });
+              }}
               placeholder={"scripts/helpers.csx\nshared/query-filters.csx"}
             />
           </label>
@@ -171,13 +192,15 @@ export function ConnectionPanel({
             Additional usings (one namespace per line)
             <textarea
               rows={3}
-              value={(connection.scriptUsings ?? []).join("\n")}
-              onChange={(event) =>
+              value={scriptUsingsDraft}
+              onChange={(event) => {
+                const next = event.target.value;
+                setScriptUsingsDraft(next);
                 onConnectionChange({
                   ...connection,
-                  scriptUsings: splitMultilineList(event.target.value),
-                })
-              }
+                  scriptUsings: splitMultilineList(next),
+                });
+              }}
               placeholder={"MyApp.QueryHelpers\nSystem.Globalization"}
             />
           </label>
@@ -185,11 +208,4 @@ export function ConnectionPanel({
       </div>
     </div>
   );
-}
-
-function splitMultilineList(value: string): string[] {
-  return value
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter((line) => line.length > 0);
 }

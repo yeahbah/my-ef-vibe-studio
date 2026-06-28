@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { resolveRunTextFromString, resolveStatementAtLine } from "./editorRunText";
+import { appendQueryExpression, resolveRunTextFromString, resolveStatementAtLine } from "./editorRunText";
 
 describe("resolveStatementAtLine", () => {
   it("returns the current line for a single statement", () => {
@@ -15,6 +15,16 @@ describe("resolveStatementAtLine", () => {
     const lines = ["SELECT 1", "db.Products.Take(1)"];
     expect(resolveStatementAtLine(lines, 1)).toBe("SELECT 1");
     expect(resolveStatementAtLine(lines, 2)).toBe("db.Products.Take(1)");
+  });
+
+  it("does not include commented-out statements", () => {
+    const lines = ["// db.Products.Take(1)", "db.Orders.Take(1)"];
+    expect(resolveStatementAtLine(lines, 2)).toBe("db.Orders.Take(1)");
+  });
+
+  it("does not run past a comment when expanding downward", () => {
+    const lines = ["db.Products.Take(1)", "// db.Orders.Take(1)"];
+    expect(resolveStatementAtLine(lines, 1)).toBe("db.Products.Take(1)");
   });
 });
 
@@ -34,5 +44,22 @@ describe("resolveRunTextFromString", () => {
     expect(resolveRunTextFromString(value, { cursorLine: 3 })).toBe(
       "var x = db.Products.Take(1)",
     );
+  });
+});
+
+describe("appendQueryExpression", () => {
+  it("appends with a blank line separator", () => {
+    expect(appendQueryExpression("db.Products.Take(1)", "db.Orders.Take(1)")).toBe(
+      "db.Products.Take(1)\n\ndb.Orders.Take(1)",
+    );
+  });
+
+  it("returns the addition when the editor is empty", () => {
+    expect(appendQueryExpression("", "db.Products.Take(1)")).toBe("db.Products.Take(1)");
+    expect(appendQueryExpression("   \n", "db.Products.Take(1)")).toBe("db.Products.Take(1)");
+  });
+
+  it("ignores empty additions", () => {
+    expect(appendQueryExpression("db.Products.Take(1)", "   ")).toBe("db.Products.Take(1)");
   });
 });

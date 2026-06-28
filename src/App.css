@@ -469,6 +469,68 @@ button:disabled {
   padding: 8px;
 }
 
+.scripts-tool-tabs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px;
+  flex: 0 0 auto;
+}
+
+.scripts-tool-tab {
+  padding: 5px 8px;
+  font-size: 11px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.scripts-tool-tab.active {
+  border-color: var(--accent);
+  background: var(--accent-faint);
+  color: var(--text);
+}
+
+.scripts-tool-usings {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  gap: 8px;
+}
+
+.scripts-tool-usings-hint {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+
+.scripts-tool-usings-label {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.scripts-tool-usings-input {
+  flex: 1 1 auto;
+  min-height: 180px;
+  resize: vertical;
+  background: var(--bg-app);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
 .scripts-tool-empty {
   padding: 12px;
   color: var(--text-secondary);
@@ -499,6 +561,14 @@ button:disabled {
 .scripts-tool-actions button {
   font-size: 11px;
   padding: 4px 8px;
+}
+
+.scripts-tool-actions button.scripts-tool-delete:not(:disabled) {
+  color: var(--danger);
+}
+
+.scripts-tool-actions button.scripts-tool-delete:not(:disabled):hover {
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
 }
 
 .scripts-tool-error {
@@ -544,13 +614,23 @@ button:disabled {
   color: var(--text-muted);
 }
 
-.scripts-tool-list-item {
-  width: 100%;
+.scripts-tool-list-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 7px 10px;
+  gap: 4px;
+  min-width: 0;
+}
+
+.scripts-tool-list-row.active {
+  background: var(--accent-faint);
+}
+
+.scripts-tool-list-item {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  padding: 7px 4px 7px 10px;
   border: none;
   background: transparent;
   color: var(--text);
@@ -558,8 +638,11 @@ button:disabled {
   cursor: pointer;
 }
 
-.scripts-tool-list-item:hover,
-.scripts-tool-list-item.active {
+.scripts-tool-list-row:hover {
+  background: color-mix(in srgb, var(--accent-faint) 65%, transparent);
+}
+
+.scripts-tool-list-row.active:hover {
   background: var(--accent-faint);
 }
 
@@ -570,15 +653,37 @@ button:disabled {
   font-size: 12px;
 }
 
-.scripts-tool-list-badge {
+.scripts-tool-load-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   flex: 0 0 auto;
-  padding: 1px 6px;
-  border-radius: 999px;
-  background: var(--bg-app);
-  color: var(--text-muted);
+  padding: 4px 10px 4px 4px;
   font-size: 10px;
+  color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.04em;
+  cursor: pointer;
+  user-select: none;
+}
+
+.scripts-tool-load-toggle:has(input:checked) {
+  color: var(--accent);
+}
+
+.scripts-tool-load-toggle:has(input:disabled) {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.scripts-tool-load-toggle input {
+  margin: 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.scripts-tool-load-toggle:has(input:disabled) input {
+  cursor: not-allowed;
 }
 
 .scripts-tool-editor {
@@ -2173,12 +2278,21 @@ pre,
 }
 
 .settings-panel input,
-.settings-panel select {
+.settings-panel select,
+.settings-panel textarea {
   background: var(--bg-app);
   color: var(--text);
   border: 1px solid var(--border);
   border-radius: 6px;
   padding: 8px 10px;
+}
+
+.settings-panel textarea {
+  resize: vertical;
+  min-height: 4.5rem;
+  line-height: 1.45;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 12px;
 }
 
 .settings-panel label.checkbox {
@@ -2352,6 +2466,9 @@ pre,
 }
 
 .install-pack-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
   margin-top: 0.75rem;
 }
 

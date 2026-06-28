@@ -1081,7 +1081,7 @@ function buildContextMenuItems(
     if (!entry) {
       return [];
     }
-    return [{ id: "restore", label: "Restore query", onClick: () => onHistorySelect(entry.expression) }];
+    return [{ id: "restore", label: "Append to editor", onClick: () => onHistorySelect(entry.expression) }];
   }
 
   if (node.id === "team:git") {

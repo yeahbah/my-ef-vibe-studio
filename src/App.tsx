@@ -53,6 +53,7 @@ import { isQueryCancelledMessage } from "./lib/queryCancel";
 import { runSqlViaDaemon } from "./lib/rawSql";
 import { looksLikeRawSql } from "./lib/sqlDetect";
 import { RUN_QUERY_EVENT, RUN_PLAN_EVENT, normalizeExpression } from "./lib/editorRun";
+import { appendQueryExpression } from "./lib/editorRunText";
 import {
   hydrateWorkspaceSecrets,
   stripConnectionSecretsForSave,
@@ -63,6 +64,7 @@ import { cycleQueryTabId } from "./lib/queryTabs";
 import { buildExportContent } from "./lib/resultFormat";
 import { inferResultEntity, persistResultChanges } from "./lib/resultPersist";
 import { runScanJson } from "./lib/schema";
+import { appendScriptLoad } from "./lib/scripts";
 import { findingsToReviewItems } from "./lib/scan";
 import {
   dismissScanFinding,
@@ -1016,8 +1018,6 @@ function App() {
         return;
       }
 
-      const updateExpression = expressionOverride === undefined;
-
       if (looksLikeRawSql(rawInput)) {
         await handleRunSql(rawInput, withPlan);
         return;
@@ -1060,7 +1060,6 @@ function App() {
           const nextTab: ResultsTab = withPlan ? "plan" : "result";
 
           updateQueryTab(activeQueryTab.id, {
-            ...(updateExpression ? { expression: runExpression } : {}),
             lastPayload: result.payload,
             activeResultsTab: nextTab,
             resultRowsBaseline: result.payload.rows
@@ -1090,7 +1089,6 @@ function App() {
           );
         } else {
           updateQueryTab(activeQueryTab.id, {
-            ...(updateExpression ? { expression: runExpression } : {}),
             lastPayload: {
               success: false,
               sql: [],
@@ -1109,7 +1107,6 @@ function App() {
           return;
         }
         updateQueryTab(activeQueryTab.id, {
-          ...(updateExpression ? { expression: runExpression } : {}),
           lastPayload: {
             success: false,
             sql: [],
@@ -1373,6 +1370,65 @@ function App() {
       await invalidateEfvibeDaemon();
     })();
   }
+
+  const handleScriptLoadsChange = useCallback(
+    (scriptLoads: string[]) => {
+      if (!document) {
+        return;
+      }
+
+      const connection = connectionForTab(document.workspace, activeQueryTab, activeConnectionId);
+      if (!connection) {
+        return;
+      }
+
+      updateConnection({
+        ...connection,
+        scriptLoads,
+      });
+    },
+    [document, activeQueryTab, activeConnectionId],
+  );
+
+  const handleScriptUsingsChange = useCallback(
+    (scriptUsings: string[]) => {
+      if (!document) {
+        return;
+      }
+
+      const connection = connectionForTab(document.workspace, activeQueryTab, activeConnectionId);
+      if (!connection) {
+        return;
+      }
+
+      updateConnection({
+        ...connection,
+        scriptUsings,
+      });
+    },
+    [document, activeQueryTab, activeConnectionId],
+  );
+
+  const handleScriptCreated = useCallback(
+    (fileName: string) => {
+      if (!document) {
+        return;
+      }
+
+      const connection = connectionForTab(document.workspace, activeQueryTab, activeConnectionId);
+      if (!connection) {
+        return;
+      }
+
+      const nextLoads = appendScriptLoad(connection.scriptLoads ?? [], fileName);
+      if (nextLoads.length === (connection.scriptLoads ?? []).length) {
+        return;
+      }
+
+      handleScriptLoadsChange(nextLoads);
+    },
+    [document, activeQueryTab, activeConnectionId, handleScriptLoadsChange],
+  );
 
   async function handleOpenNotebook() {
     const opened = await openNotebookFile(activeConnectionId);
@@ -1733,6 +1789,23 @@ function App() {
     updateQueryTab(activeQueryTab.id, { expression });
   }
 
+  const handleHistorySelect = useCallback(
+    (nextExpression: string) => {
+      if (!activeQueryTab) {
+        return;
+      }
+
+      queryWorkspaceRef.current?.flush();
+      const current =
+        queryWorkspaceRef.current?.getDraft() ?? activeQueryTab.expression;
+
+      updateQueryTab(activeQueryTab.id, {
+        expression: appendQueryExpression(current, nextExpression),
+      });
+    },
+    [activeQueryTab, updateQueryTab],
+  );
+
   function handleAddSnippet(title: string, expression: string) {
     setUserSnippets((snippets) => [...snippets, createUserSnippet(title, expression)]);
   }
@@ -2038,9 +2111,7 @@ function App() {
             setConnectionEditorId(connectionId);
           }}
           onOpenQueryTab={handleOpenQueryInNewTab}
-          onHistorySelect={(nextExpression) => {
-            updateQueryTab(activeQueryTab.id, { expression: nextExpression });
-          }}
+          onHistorySelect={handleHistorySelect}
           onOpenLibraryQuery={handleOpenLibraryQuery}
           onInsertSnippet={handleInsertSnippet}
           onRemoveSnippet={handleRemoveSnippet}
@@ -2108,9 +2179,7 @@ function App() {
                       scanError={scanError}
                       theme={settings.theme ?? "dark"}
                       onClose={() => setActiveEditorTool(undefined)}
-                      onHistorySelect={(nextExpression) => {
-                        updateQueryTab(activeQueryTab.id, { expression: nextExpression });
-                      }}
+                      onHistorySelect={handleHistorySelect}
                       onInsertSnippet={handleInsertSnippet}
                       onAddSnippet={handleAddSnippet}
                       onRemoveSnippet={handleRemoveSnippet}
@@ -2131,8 +2200,12 @@ function App() {
                     onSaveFindingNote={(note) => void handleSaveScanFindingNote(note)}
                     running={running}
                     scriptSearchPath={connectionSettings?.scriptSearchPath ?? ""}
-                    scriptLoads={connectionSettings?.scriptLoads ?? []}
+                    scriptLoads={activeConnection?.scriptLoads ?? []}
+                    scriptUsings={activeConnection?.scriptUsings ?? []}
                     onScriptsChanged={() => void invalidateEfvibeDaemon()}
+                    onScriptCreated={handleScriptCreated}
+                    onScriptLoadsChange={handleScriptLoadsChange}
+                    onScriptUsingsChange={handleScriptUsingsChange}
                   />
                   </ResizableEditorToolPanel>
                 ) : null}
