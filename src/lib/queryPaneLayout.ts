@@ -338,6 +338,57 @@ export function dropTabOnPane(
   return splitPaneWithTab(next, target.id, tabId, side);
 }
 
+export function setPaneSqlPaneOpen(
+  layout: PaneLayoutNode,
+  paneId: string,
+  open: boolean,
+): PaneLayoutNode {
+  const pane = findPaneById(layout, paneId);
+  if (!pane) {
+    return layout;
+  }
+
+  return replacePane(layout, paneId, { ...pane, sqlPaneOpen: open });
+}
+
+export function migrateLegacySqlPaneOpen(
+  layout: PaneLayoutNode,
+  legacyOpen: boolean | undefined,
+): PaneLayoutNode {
+  if (legacyOpen === undefined) {
+    return layout;
+  }
+
+  let hasPerPaneSetting = false;
+  mapPaneLeaves(layout, (leaf) => {
+    if (leaf.sqlPaneOpen !== undefined) {
+      hasPerPaneSetting = true;
+    }
+    return leaf;
+  });
+
+  if (hasPerPaneSetting) {
+    return layout;
+  }
+
+  return mapPaneLeaves(layout, (leaf) => ({ ...leaf, sqlPaneOpen: legacyOpen }));
+}
+
+function mapPaneLeaves(
+  node: PaneLayoutNode,
+  map: (leaf: PaneLeaf) => PaneLeaf,
+): PaneLayoutNode {
+  if (node.kind === "leaf") {
+    return map(node);
+  }
+
+  return {
+    ...node,
+    first: mapPaneLeaves(node.first, map),
+    second: mapPaneLeaves(node.second, map),
+  };
+}
+
 export function resolveDropSide(clientX: number, rect: DOMRect): PaneDropSide {
   const relative = (clientX - rect.left) / rect.width;
   if (relative < 0.25) {

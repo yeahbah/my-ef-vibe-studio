@@ -3,6 +3,8 @@ export interface PaneLeaf {
   id: string;
   tabIds: string[];
   activeTabId: string;
+  /** Per-pane LINQ/SQL preview panel visibility. */
+  sqlPaneOpen?: boolean;
 }
 
 export interface PaneSplit {

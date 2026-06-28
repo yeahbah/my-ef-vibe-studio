@@ -67,9 +67,11 @@ import {
   findPaneById,
   findPaneContainingTab,
   getFirstPaneId,
+  migrateLegacySqlPaneOpen,
   normalizePaneLayout,
   removeTabFromLayout,
   setPaneActiveTab,
+  setPaneSqlPaneOpen,
   setSplitRatio,
 } from "./lib/queryPaneLayout";
 import { buildExportContent } from "./lib/resultFormat";
@@ -199,7 +201,6 @@ function App() {
   const [runningNotebookCellId, setRunningNotebookCellId] = useState<string | undefined>();
   const [engineAllowed, setEngineAllowed] = useState(false);
   const [daemonConnectedIds, setDaemonConnectedIds] = useState<string[]>([]);
-  const [sqlPaneOpen, setSqlPaneOpen] = useState(true);
   const [sqlPaneWidth, setSqlPaneWidth] = useState(360);
   const [sqlPreviewAuto, setSqlPreviewAuto] = useState(false);
   const [editorToolPanelWidth, setEditorToolPanelWidth] = useState(DEFAULT_EDITOR_TOOL_PANEL_WIDTH);
@@ -529,10 +530,6 @@ function App() {
     });
   }, []);
 
-  const handleSqlPaneOpenChange = useCallback((open: boolean) => {
-    setSqlPaneOpen(open);
-  }, []);
-
   useEffect(() => {
     void (async () => {
       const loaded = await loadAppSettings();
@@ -565,9 +562,12 @@ function App() {
           )
             ? savedSession.activeQueryTabId
             : restoredTabs[0].id;
-          const layout = savedSession.paneLayout
-            ? normalizePaneLayout(savedSession.paneLayout, tabIds, activeId)
-            : createSinglePaneLayout(tabIds, activeId);
+          const layout = migrateLegacySqlPaneOpen(
+            savedSession.paneLayout
+              ? normalizePaneLayout(savedSession.paneLayout, tabIds, activeId)
+              : createSinglePaneLayout(tabIds, activeId),
+            savedSession.sqlPaneOpen ?? (savedSession.liveSqlEnabled ? true : undefined),
+          );
           setPaneLayout(layout);
           setFocusedPaneId(
             savedSession.focusedPaneId &&
@@ -613,11 +613,6 @@ function App() {
           setNotebookPath(savedSession.notebookPath ?? "");
           setNotebookConnectionId(savedSession.notebookConnectionId ?? connectionId);
           setNotebookCells(savedSession.notebookCells ?? createDefaultNotebook(connectionId));
-        }
-        if (savedSession.sqlPaneOpen !== undefined) {
-          setSqlPaneOpen(savedSession.sqlPaneOpen);
-        } else if (savedSession.liveSqlEnabled) {
-          setSqlPaneOpen(true);
         }
         if (savedSession.sqlPaneWidth) {
           setSqlPaneWidth(savedSession.sqlPaneWidth);
@@ -752,8 +747,8 @@ function App() {
         notebookPath,
         notebookConnectionId,
         notebookCells,
-        liveSqlEnabled: sqlPaneOpen,
-        sqlPaneOpen,
+        liveSqlEnabled: focusedPane?.sqlPaneOpen ?? false,
+        sqlPaneOpen: focusedPane?.sqlPaneOpen ?? false,
         sqlPaneWidth,
         sqlPreviewAuto,
         editorToolPanelWidth,
@@ -780,7 +775,7 @@ function App() {
       notebookPath,
       notebookConnectionId,
       notebookCells,
-      sqlPaneOpen,
+      focusedPane?.sqlPaneOpen,
       sqlPaneWidth,
       sqlPreviewAuto,
       editorToolPanelWidth,
@@ -2442,8 +2437,12 @@ function App() {
                                   expression={paneTab.expression}
                                   theme={settings.theme ?? "dark"}
                                   onExpressionChange={handleExpressionChange}
-                                  sqlPaneOpen={sqlPaneOpen}
-                                  onSqlPaneOpenChange={handleSqlPaneOpenChange}
+                                  sqlPaneOpen={pane.sqlPaneOpen ?? false}
+                                  onSqlPaneOpenChange={(open) => {
+                                    setPaneLayout((current) =>
+                                      current ? setPaneSqlPaneOpen(current, pane.id, open) : current,
+                                    );
+                                  }}
                                   sqlPaneWidth={sqlPaneWidth}
                                   onSqlPaneWidthChange={setSqlPaneWidth}
                                   sqlPreviewAuto={sqlPreviewAuto}

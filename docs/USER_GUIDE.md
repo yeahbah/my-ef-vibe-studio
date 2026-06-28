@@ -527,7 +527,7 @@ Timing metrics (total ms, database ms, row count) appear in the results header.
 
 ### Live SQL preview
 
-Toggle the **Linq/Sql** pane on the right edge of the editor (off by default). When enabled, it shows:
+Toggle the **Linq/Sql** pane on the right edge of the editor (off by default). With split panes, each pane has its own toggle — opening or closing the preview in one pane does not affect the others. When enabled, it shows:
 
 - **LINQ → SQL** — debounced `ToQueryString()` preview as you type (plain LINQ only; skipped when the script contains `#[` attributes)
 - **SQL → LINQ** — paste SQL to get a draft LINQ expression (requires efvibe 0.6.13+)

@@ -7,6 +7,7 @@ import {
   moveTabToPane,
   normalizePaneLayout,
   removeTabFromLayout,
+  setPaneSqlPaneOpen,
   splitPaneWithTab,
 } from "./queryPaneLayout";
 
@@ -74,5 +75,11 @@ describe("queryPaneLayout", () => {
     const normalized = normalizePaneLayout(layout, ["a", "c"], "c");
     expect(normalized.tabIds).toEqual(["a", "c"]);
     expect(normalized.activeTabId).toBe("c");
+  });
+
+  it("sets sql pane open state per leaf", () => {
+    const layout = createSinglePaneLayout(["a"], "a");
+    const next = setPaneSqlPaneOpen(layout, layout.id, true);
+    expect(findPaneById(next, layout.id)?.sqlPaneOpen).toBe(true);
   });
 });
