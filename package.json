@@ -3,6 +3,8 @@
   "private": true,
   "version": "0.2.3",
   "description": "MyEFvibe Studio — EF Core database client and LINQ scratchpad",
+  "author": "Yeahbah",
+  "license": "SEE LICENSE IN LICENSE",
   "type": "module",
   "scripts": {
     "dev": "vite",

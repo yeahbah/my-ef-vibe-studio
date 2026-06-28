@@ -98,7 +98,7 @@ export function resolveKeybindings(
     nextQueryTab: settings?.nextQueryTab?.trim() || "Ctrl+Tab",
     previousQueryTab: settings?.previousQueryTab?.trim() || "Ctrl+Shift+Tab",
     newQueryTab: settings?.newQueryTab?.trim() || "Ctrl+Shift+T",
-    closeQueryTab: settings?.closeQueryTab?.trim() || "Ctrl+F4",
+    closeQueryTab: settings?.closeQueryTab?.trim() || "Ctrl+W",
   };
 }
 

@@ -884,34 +884,18 @@ function App() {
 
         event.preventDefault();
         event.stopImmediatePropagation();
-
-        const tab = createQueryTab(activeConnectionId, {
-          name: `Query ${queryTabs.length + 1}`,
-        });
-        setQueryTabs((tabs) => [...tabs, tab]);
-        if (paneLayout) {
-          const next = addTabToPane(paneLayout, focusedPaneId, tab.id);
-          setPaneLayout(next.layout);
-          setFocusedPaneId(next.focusedPaneId);
-        }
+        addQueryTab();
         return;
       }
 
       if (matchesKeybinding(event, keybindings.closeQueryTab)) {
-        if (queryTabs.length <= 1 || !activeQueryTabId || !paneLayout) {
+        if (queryTabs.length <= 1 || !activeQueryTabId) {
           return;
         }
 
         event.preventDefault();
         event.stopImmediatePropagation();
-
-        const closingId = activeQueryTabId;
-        setQueryTabs((tabs) => tabs.filter((tab) => tab.id !== closingId));
-        const next = removeTabFromLayout(paneLayout, closingId);
-        if (next.layout) {
-          setPaneLayout(next.layout);
-          setFocusedPaneId(next.focusedPaneId ?? getFirstPaneId(next.layout));
-        }
+        closeQueryTab(activeQueryTabId);
         return;
       }
 

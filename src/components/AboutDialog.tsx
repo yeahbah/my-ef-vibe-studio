@@ -2,7 +2,11 @@ import { useEffect, useState } from "react";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { fetchAboutJson } from "../lib/daemonClient";
 import {
+  STUDIO_COPYRIGHT,
   STUDIO_DESCRIPTION,
+  STUDIO_LICENSE,
+  STUDIO_LICENSE_SUMMARY,
+  STUDIO_LICENSE_URL,
   STUDIO_NAME,
   STUDIO_REPOSITORY,
   STUDIO_VERSION,
@@ -127,6 +131,25 @@ export function AboutDialog({
               {STUDIO_NAME} <span className="muted">v{STUDIO_VERSION}</span>
             </p>
             <p className="muted about-studio-description">{STUDIO_DESCRIPTION}</p>
+            <dl className="about-details about-studio-meta">
+              <div>
+                <dt>Copyright</dt>
+                <dd>{STUDIO_COPYRIGHT}</dd>
+              </div>
+              <div>
+                <dt>License</dt>
+                <dd>
+                  <button
+                    type="button"
+                    className="about-link-value"
+                    onClick={() => void openExternal(STUDIO_LICENSE_URL)}
+                  >
+                    {STUDIO_LICENSE}
+                  </button>
+                  <p className="muted about-license-summary">{STUDIO_LICENSE_SUMMARY}</p>
+                </dd>
+              </div>
+            </dl>
             <p className="settings-hint">
               <button
                 type="button"

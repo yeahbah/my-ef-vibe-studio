@@ -785,7 +785,7 @@ Default bindings (customizable in Settings):
 | `Ctrl+Tab` | Next query tab |
 | `Ctrl+Shift+Tab` | Previous query tab |
 | `Ctrl+Shift+T` | New query tab |
-| `Ctrl+F4` | Close query tab |
+| `Ctrl+W` | Close query tab |
 | `Ctrl+S` | Save query tab |
 | `Ctrl+B` | Toggle explorer sidebar |
 

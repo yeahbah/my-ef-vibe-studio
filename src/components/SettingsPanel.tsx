@@ -198,6 +198,32 @@ export function SettingsPanel({
               placeholder={DEFAULT_KEYBINDINGS.saveQuery}
             />
           </label>
+          <label>
+            New query tab
+            <input
+              value={keybindings.newQueryTab}
+              onChange={(event) =>
+                onSettingsChange({
+                  ...settings,
+                  keybindings: { ...settings.keybindings, newQueryTab: event.target.value },
+                })
+              }
+              placeholder={DEFAULT_KEYBINDINGS.newQueryTab}
+            />
+          </label>
+          <label>
+            Close query tab
+            <input
+              value={keybindings.closeQueryTab}
+              onChange={(event) =>
+                onSettingsChange({
+                  ...settings,
+                  keybindings: { ...settings.keybindings, closeQueryTab: event.target.value },
+                })
+              }
+              placeholder={DEFAULT_KEYBINDINGS.closeQueryTab}
+            />
+          </label>
           <p className="settings-hint">
             Use <code>Ctrl</code> or <code>Cmd</code> with <code>+</code> (for example{" "}
             {keybindingLabel(DEFAULT_KEYBINDINGS.runQuery)}).
