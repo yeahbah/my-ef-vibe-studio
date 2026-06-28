@@ -12,6 +12,7 @@ import { MainViewSwitcher } from "./components/MainViewSwitcher";
 import { NotebookView, type NotebookRunScope } from "./components/NotebookView";
 import { QueryWorkspace, type QueryWorkspaceHandle } from "./components/QueryWorkspace";
 import { ReplView } from "./components/ReplView";
+import { QueryPaneLayout } from "./components/QueryPaneLayout";
 import { QueryTabBar } from "./components/QueryTabBar";
 import { QueryTabToolbar } from "./components/QueryTabToolbar";
 import { ResizableResultsDock, DEFAULT_RESULTS_DOCK_HEIGHT } from "./components/ResizableResultsDock";
@@ -59,6 +60,20 @@ import {
 import { keybindingLabel, matchesKeybinding, resolveKeybindings } from "./lib/keybindings";
 import { formatPrerequisitesStatus } from "./lib/prerequisitesStatus";
 import { cycleQueryTabId } from "./lib/queryTabs";
+import {
+  addTabToPane,
+  createSinglePaneLayout,
+  dropTabOnPane,
+  findPaneById,
+  findPaneContainingTab,
+  getFirstPaneId,
+  migrateLegacySqlPaneOpen,
+  normalizePaneLayout,
+  removeTabFromLayout,
+  setPaneActiveTab,
+  setPaneSqlPaneOpen,
+  setSplitRatio,
+} from "./lib/queryPaneLayout";
 import { buildExportContent } from "./lib/resultFormat";
 import { inferResultEntity, persistResultChanges } from "./lib/resultPersist";
 import { runScanJson } from "./lib/schema";
@@ -96,6 +111,7 @@ import { resolveSavedMainView, type AppMainView } from "./types/mainView";
 import { createQueryTab, restoreQueryTabFromSession, type QueryTab, type ResultsTab } from "./types/query";
 import { createUserSnippet, type SnippetDefinition } from "./types/snippets";
 import type { ScanMode, ScanReviewItem } from "./types/scan";
+import type { PaneDropSide, PaneLayoutNode, TabDragPayload } from "./types/queryPaneLayout";
 import {
   createEmptyQueryLibrary,
   createQueryFolder,
@@ -129,10 +145,26 @@ function connectionForTab(
   );
 }
 
+function focusTabInLayout(
+  layout: PaneLayoutNode,
+  tabId: string,
+): { layout: PaneLayoutNode; focusedPaneId: string } | null {
+  const pane = findPaneContainingTab(layout, tabId);
+  if (!pane) {
+    return null;
+  }
+
+  return {
+    layout: setPaneActiveTab(layout, pane.id, tabId),
+    focusedPaneId: pane.id,
+  };
+}
+
 function App() {
   const [document, setDocument] = useState<WorkspaceDocument | undefined>();
   const [queryTabs, setQueryTabs] = useState<QueryTab[]>([]);
-  const [activeQueryTabId, setActiveQueryTabId] = useState("");
+  const [paneLayout, setPaneLayout] = useState<PaneLayoutNode | null>(null);
+  const [focusedPaneId, setFocusedPaneId] = useState("");
   const [settings, setSettings] = useState<AppSettings | undefined>();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [connectionEditorId, setConnectionEditorId] = useState<string | undefined>();
@@ -169,7 +201,6 @@ function App() {
   const [runningNotebookCellId, setRunningNotebookCellId] = useState<string | undefined>();
   const [engineAllowed, setEngineAllowed] = useState(false);
   const [daemonConnectedIds, setDaemonConnectedIds] = useState<string[]>([]);
-  const [sqlPaneOpen, setSqlPaneOpen] = useState(true);
   const [sqlPaneWidth, setSqlPaneWidth] = useState(360);
   const [sqlPreviewAuto, setSqlPreviewAuto] = useState(false);
   const [editorToolPanelWidth, setEditorToolPanelWidth] = useState(DEFAULT_EDITOR_TOOL_PANEL_WIDTH);
@@ -189,6 +220,16 @@ function App() {
   const notebookRunGenerationRef = useRef(0);
 
   notebookCellsRef.current = notebookCells;
+
+  const focusedPane = useMemo(() => {
+    if (!paneLayout || !focusedPaneId) {
+      return undefined;
+    }
+
+    return findPaneById(paneLayout, focusedPaneId);
+  }, [paneLayout, focusedPaneId]);
+
+  const activeQueryTabId = focusedPane?.activeTabId ?? "";
 
   const activeQueryTab = useMemo(
     () => queryTabs.find((tab) => tab.id === activeQueryTabId),
@@ -286,8 +327,6 @@ function App() {
   }, [notebookConnection, notebookConnectionSettings, workspaceDirectory]);
 
   const payload = resolveDisplayPayload(activeQueryTab);
-  const activeTab = activeQueryTab?.activeResultsTab ?? "result";
-  const expression = activeQueryTab?.expression ?? "";
 
   const favoriteTabs = useMemo(
     () => queryTabs.filter((tab) => tab.favorite),
@@ -309,7 +348,7 @@ function App() {
     [updateQueryTab],
   );
 
-  const queryWorkspaceRef = useRef<QueryWorkspaceHandle>(null);
+  const queryWorkspaceRefs = useRef(new Map<string, QueryWorkspaceHandle>());
 
   const updateWorkspace = useCallback((workspace: EfvibeWorkspace) => {
     setDocument((current) => (current ? { ...current, workspace } : current));
@@ -491,10 +530,6 @@ function App() {
     });
   }, []);
 
-  const handleSqlPaneOpenChange = useCallback((open: boolean) => {
-    setSqlPaneOpen(open);
-  }, []);
-
   useEffect(() => {
     void (async () => {
       const loaded = await loadAppSettings();
@@ -519,18 +554,35 @@ function App() {
           )?.id ?? savedSession.workspace.connections[0].id;
 
         if (savedSession.queryTabs?.length) {
-          setQueryTabs(savedSession.queryTabs.map(restoreQueryTabFromSession));
-          setActiveQueryTabId(
-            savedSession.queryTabs.some((tab) => tab.id === savedSession.activeQueryTabId)
-              ? savedSession.activeQueryTabId
-              : savedSession.queryTabs[0].id,
+          const restoredTabs = savedSession.queryTabs.map(restoreQueryTabFromSession);
+          setQueryTabs(restoredTabs);
+          const tabIds = restoredTabs.map((tab) => tab.id);
+          const activeId = savedSession.queryTabs.some(
+            (tab) => tab.id === savedSession.activeQueryTabId,
+          )
+            ? savedSession.activeQueryTabId
+            : restoredTabs[0].id;
+          const layout = migrateLegacySqlPaneOpen(
+            savedSession.paneLayout
+              ? normalizePaneLayout(savedSession.paneLayout, tabIds, activeId)
+              : createSinglePaneLayout(tabIds, activeId),
+            savedSession.sqlPaneOpen ?? (savedSession.liveSqlEnabled ? true : undefined),
+          );
+          setPaneLayout(layout);
+          setFocusedPaneId(
+            savedSession.focusedPaneId &&
+              findPaneById(layout, savedSession.focusedPaneId)
+              ? savedSession.focusedPaneId
+              : (findPaneContainingTab(layout, activeId)?.id ?? getFirstPaneId(layout)),
           );
         } else {
           const tab = createQueryTab(connectionId, {
             expression: (savedSession as { expression?: string }).expression,
           });
           setQueryTabs([tab]);
-          setActiveQueryTabId(tab.id);
+          const layout = createSinglePaneLayout([tab.id], tab.id);
+          setPaneLayout(layout);
+          setFocusedPaneId(layout.id);
         }
 
         if (savedSession.resultsDockHeight) {
@@ -561,11 +613,6 @@ function App() {
           setNotebookPath(savedSession.notebookPath ?? "");
           setNotebookConnectionId(savedSession.notebookConnectionId ?? connectionId);
           setNotebookCells(savedSession.notebookCells ?? createDefaultNotebook(connectionId));
-        }
-        if (savedSession.sqlPaneOpen !== undefined) {
-          setSqlPaneOpen(savedSession.sqlPaneOpen);
-        } else if (savedSession.liveSqlEnabled) {
-          setSqlPaneOpen(true);
         }
         if (savedSession.sqlPaneWidth) {
           setSqlPaneWidth(savedSession.sqlPaneWidth);
@@ -604,7 +651,9 @@ function App() {
           },
         });
         setQueryTabs([tab]);
-        setActiveQueryTabId(tab.id);
+        const layout = createSinglePaneLayout([tab.id], tab.id);
+        setPaneLayout(layout);
+        setFocusedPaneId(layout.id);
       }
 
       setSettings(loaded);
@@ -612,6 +661,19 @@ function App() {
       setSessionLoaded(true);
     })();
   }, []);
+
+  useEffect(() => {
+    if (!queryTabs.length || paneLayout) {
+      return;
+    }
+
+    const layout = createSinglePaneLayout(
+      queryTabs.map((tab) => tab.id),
+      queryTabs[0].id,
+    );
+    setPaneLayout(layout);
+    setFocusedPaneId(layout.id);
+  }, [queryTabs, paneLayout]);
 
   useEffect(() => {
     if (!appReady || splashDone) {
@@ -675,6 +737,8 @@ function App() {
         activeConnectionId,
         queryTabs,
         activeQueryTabId,
+        paneLayout: paneLayout ?? undefined,
+        focusedPaneId,
         resultsDockHeight,
         explorerExpandedNodes,
         history,
@@ -683,8 +747,8 @@ function App() {
         notebookPath,
         notebookConnectionId,
         notebookCells,
-        liveSqlEnabled: sqlPaneOpen,
-        sqlPaneOpen,
+        liveSqlEnabled: focusedPane?.sqlPaneOpen ?? false,
+        sqlPaneOpen: focusedPane?.sqlPaneOpen ?? false,
         sqlPaneWidth,
         sqlPreviewAuto,
         editorToolPanelWidth,
@@ -701,6 +765,8 @@ function App() {
       activeConnectionId,
       queryTabs,
       activeQueryTabId,
+      paneLayout,
+      focusedPaneId,
       resultsDockHeight,
       explorerExpandedNodes,
       history,
@@ -709,7 +775,7 @@ function App() {
       notebookPath,
       notebookConnectionId,
       notebookCells,
-      sqlPaneOpen,
+      focusedPane?.sqlPaneOpen,
       sqlPaneWidth,
       sqlPreviewAuto,
       editorToolPanelWidth,
@@ -818,12 +884,7 @@ function App() {
 
         event.preventDefault();
         event.stopImmediatePropagation();
-
-        const tab = createQueryTab(activeConnectionId, {
-          name: `Query ${queryTabs.length + 1}`,
-        });
-        setQueryTabs((tabs) => [...tabs, tab]);
-        setActiveQueryTabId(tab.id);
+        addQueryTab();
         return;
       }
 
@@ -834,18 +895,12 @@ function App() {
 
         event.preventDefault();
         event.stopImmediatePropagation();
-
-        const closingId = activeQueryTabId;
-        const nextTabs = queryTabs.filter((tab) => tab.id !== closingId);
-        setQueryTabs(nextTabs);
-        const nextTab = nextTabs[0];
-        if (nextTab) {
-          setActiveQueryTabId(nextTab.id);
-        }
+        closeQueryTab(activeQueryTabId);
         return;
       }
 
-      if (queryTabs.length <= 1) {
+      const paneTabIds = focusedPane?.tabIds ?? [];
+      if (paneTabIds.length <= 1) {
         return;
       }
 
@@ -861,12 +916,13 @@ function App() {
       event.preventDefault();
       event.stopImmediatePropagation();
 
-      const nextId = cycleQueryTabId(queryTabs, activeQueryTabId, direction);
-      if (!nextId || nextId === activeQueryTabId) {
+      const paneTabs = queryTabs.filter((tab) => paneTabIds.includes(tab.id));
+      const nextId = cycleQueryTabId(paneTabs, activeQueryTabId, direction);
+      if (!nextId || nextId === activeQueryTabId || !paneLayout || !focusedPaneId) {
         return;
       }
 
-      setActiveQueryTabId(nextId);
+      setPaneLayout(setPaneActiveTab(paneLayout, focusedPaneId, nextId));
     };
 
     window.addEventListener("keydown", handleKeyDown, true);
@@ -875,11 +931,14 @@ function App() {
     activeConnectionId,
     activeQueryTabId,
     document,
+    focusedPane,
+    focusedPaneId,
     keybindings.newQueryTab,
     keybindings.closeQueryTab,
     keybindings.nextQueryTab,
     keybindings.previousQueryTab,
     mainView,
+    paneLayout,
     queryTabs,
   ]);
 
@@ -919,146 +978,44 @@ function App() {
     };
   }, [settings, searchDirectory, activeConnection?.dotnetFramework]);
 
-  const handleRunSql = useCallback(
-    async (sql: string, withPlan = false) => {
-      if (!connectionSettings || !settings || !document || !activeQueryTab) {
-        setStatus("Configure a connection before running SQL.");
-        return;
-      }
-
-      const trimmed = sql.trim();
-      if (!trimmed) {
-        return;
-      }
-
-      const editorSnapshot = activeQueryTab.expression.trim();
-
-      allowEngine(activeConnectionId);
-
-      if (!searchDirectory) {
-        const errorPayload: EvaluationJsonPayload = {
-          success: false,
-          sql: [trimmed],
-          metrics: { totalMs: 0, sqlCommandCount: 0, resultKind: "error" },
-          warnings: [],
-          error:
-            "Set a search directory or EF project in Settings so efvibe can discover your .csproj.",
-        };
-        updateQueryTab(activeQueryTab.id, {
-          lastPayload: errorPayload,
-          activeResultsTab: "result",
-        });
-        setStatus("Set a search directory or EF project in Settings.");
-        return;
-      }
-
-      setRunning(true);
-      setStatus(withPlan ? "Running SQL with plan…" : "Running SQL…");
-      await yieldToUi();
-
-      try {
-        const result = await runSqlViaDaemon(
-          connectionSettings,
-          searchDirectory,
-          searchDirectory,
-          trimmed,
-          withPlan,
-        );
-
-        if (result.payload) {
-          const nextTab: ResultsTab = withPlan ? "plan" : "result";
-
-          updateQueryTab(activeQueryTab.id, {
-            lastPayload: result.payload,
-            lastRunExpression: editorSnapshot,
-            activeResultsTab: nextTab,
-            resultRowsBaseline: result.payload.rows
-              ? result.payload.rows.map((row) => ({ ...row }))
-              : undefined,
-            resultEntity: undefined,
-          });
-
-          if (result.payload.success) {
-            setHistory((current) =>
-              recordHistoryEntry(
-                current,
-                trimmed,
-                result.payload!,
-                activeConnection?.name ?? "Connection",
-              ),
-            );
-          }
-
-          setStatus(
-            result.payload.success
-              ? `SQL done · ${result.payload.metrics.totalMs} ms`
-              : result.payload.error ?? "SQL execution failed.",
-          );
-        } else {
-          updateQueryTab(activeQueryTab.id, {
-            lastPayload: {
-              success: false,
-              sql: [trimmed],
-              metrics: { totalMs: 0, sqlCommandCount: 0, resultKind: "error" },
-              warnings: [],
-              error: result.stdout || "No SQL result payload returned.",
-            },
-            lastRunExpression: editorSnapshot,
-            activeResultsTab: "messages",
-          });
-          setStatus("SQL execution failed.");
-        }
-      } catch (error) {
-        let message = error instanceof Error ? error.message : String(error);
-        if (isQueryCancelledMessage(message)) {
-          setStatus("Query cancelled.");
-          return;
-        }
-        if (/unknown request type/i.test(message) && /executesql/i.test(message)) {
-          message =
-            "Raw SQL requires a recent efvibe build with executeSql support. Update the tool in Settings or rebuild the engine.";
-        }
-        updateQueryTab(activeQueryTab.id, {
-          lastPayload: {
-            success: false,
-            sql: [trimmed],
-            metrics: { totalMs: 0, sqlCommandCount: 0, resultKind: "error" },
-            warnings: [],
-            error: message,
-          },
-          lastRunExpression: editorSnapshot,
-          activeResultsTab: "messages",
-        });
-        setStatus(message);
-      } finally {
-        setRunning(false);
-      }
-    },
-    [
-      activeConnection?.name,
-      activeQueryTab,
-      allowEngine,
-      connectionSettings,
-      document,
-      searchDirectory,
-      settings,
-      updateQueryTab,
-    ],
-  );
-
   const handleRun = useCallback(
-    async (withPlan = false, expressionOverride?: string) => {
-      if (!connectionSettings || !settings || !document || !activeQueryTab) {
+    async (withPlan = false, expressionOverride?: string, paneId = focusedPaneId) => {
+      if (!settings || !document || !paneLayout) {
         setStatus("Configure a connection before running.");
         return;
       }
 
-      queryWorkspaceRef.current?.flush();
-      const editorText = queryWorkspaceRef.current?.getDraft() ?? activeQueryTab.expression;
+      const pane = findPaneById(paneLayout, paneId);
+      const tab = queryTabs.find((item) => item.id === pane?.activeTabId);
+      if (!tab) {
+        return;
+      }
+
+      const paneConnection = connectionForTab(document.workspace, tab, activeConnectionId);
+      if (!paneConnection) {
+        setStatus("Configure a connection before running.");
+        return;
+      }
+
+      const paneConnectionSettings = workspaceConnectionToSettings(
+        paneConnection,
+        workspaceDirectory,
+        settings.toolPath,
+        settings.defaultWorkspaceRoot,
+      );
+      const paneSearchDirectory = resolveSearchDirectory(
+        paneConnection,
+        workspaceDirectory,
+        paneConnectionSettings.project,
+      );
+
+      setFocusedPaneId(paneId);
+      queryWorkspaceRefs.current.get(paneId)?.flush();
+      const editorText = queryWorkspaceRefs.current.get(paneId)?.getDraft() ?? tab.expression;
       const editorSnapshot = editorText.trim();
       const runInput = (
         expressionOverride ??
-        queryWorkspaceRef.current?.getRunText() ??
+        queryWorkspaceRefs.current.get(paneId)?.getRunText() ??
         editorText
       ).trim();
       if (!runInput) {
@@ -1066,13 +1023,99 @@ function App() {
       }
 
       if (looksLikeRawSql(runInput)) {
-        await handleRunSql(runInput, withPlan);
+        allowEngine(tab.connectionId);
+
+        if (!paneSearchDirectory) {
+          const errorPayload: EvaluationJsonPayload = {
+            success: false,
+            sql: [runInput],
+            metrics: { totalMs: 0, sqlCommandCount: 0, resultKind: "error" },
+            warnings: [],
+            error:
+              "Set a search directory or EF project in Settings so efvibe can discover your .csproj.",
+          };
+          updateQueryTab(tab.id, {
+            lastPayload: errorPayload,
+            activeResultsTab: "result",
+          });
+          setStatus("Set a search directory or EF project in Settings.");
+          return;
+        }
+
+        setRunning(true);
+        setStatus(withPlan ? "Running SQL with plan…" : "Running SQL…");
+        await yieldToUi();
+
+        try {
+          const result = await runSqlViaDaemon(
+            paneConnectionSettings,
+            paneSearchDirectory,
+            paneSearchDirectory,
+            runInput,
+            withPlan,
+          );
+
+          if (result.payload) {
+            const nextTab: ResultsTab = withPlan ? "plan" : "result";
+            updateQueryTab(tab.id, {
+              lastPayload: result.payload,
+              lastRunExpression: editorSnapshot,
+              activeResultsTab: nextTab,
+              resultRowsBaseline: result.payload.rows
+                ? result.payload.rows.map((row) => ({ ...row }))
+                : undefined,
+              resultEntity: undefined,
+            });
+
+            if (result.payload.success) {
+              setHistory((current) =>
+                recordHistoryEntry(
+                  current,
+                  runInput,
+                  result.payload!,
+                  paneConnection.name ?? "Connection",
+                ),
+              );
+            }
+
+            setStatus(
+              result.payload.success
+                ? `SQL done · ${result.payload.metrics.totalMs} ms`
+                : result.payload.error ?? "SQL execution failed.",
+            );
+          }
+        } catch (error) {
+          let message = error instanceof Error ? error.message : String(error);
+          if (isQueryCancelledMessage(message)) {
+            setStatus("Query cancelled.");
+            return;
+          }
+          if (/unknown request type/i.test(message) && /executesql/i.test(message)) {
+            message =
+              "Raw SQL requires a recent efvibe build with executeSql support. Update the tool in Settings or rebuild the engine.";
+          }
+          updateQueryTab(tab.id, {
+            lastPayload: {
+              success: false,
+              sql: [runInput],
+              metrics: { totalMs: 0, sqlCommandCount: 0, resultKind: "error" },
+              warnings: [],
+              error: message,
+            },
+            lastRunExpression: editorSnapshot,
+            activeResultsTab: "messages",
+          });
+          setStatus(message);
+        } finally {
+          setRunning(false);
+        }
+
         return;
       }
 
       const runExpression = normalizeExpression(runInput, lambdaMode);
 
-      if (!searchDirectory) {
+      if (!paneSearchDirectory) {
         const errorPayload: EvaluationJsonPayload = {
           success: false,
           sql: [],
@@ -1081,7 +1124,7 @@ function App() {
           error:
             "Set a search directory or EF project in Settings so efvibe can discover your .csproj.",
         };
-        updateQueryTab(activeQueryTab.id, {
+        updateQueryTab(tab.id, {
           lastPayload: errorPayload,
           activeResultsTab: "result",
         });
@@ -1089,16 +1132,16 @@ function App() {
         return;
       }
 
-      allowEngine(activeConnectionId);
+      allowEngine(tab.connectionId);
       setRunning(true);
       setStatus(withPlan ? "Running with plan…" : "Running…");
       await yieldToUi();
 
       try {
         const result = await runExpressionViaDaemon(
-          connectionSettings,
-          searchDirectory,
-          searchDirectory,
+          paneConnectionSettings,
+          paneSearchDirectory,
+          paneSearchDirectory,
           runExpression,
           withPlan,
         );
@@ -1106,7 +1149,7 @@ function App() {
         if (result.payload) {
           const nextTab: ResultsTab = withPlan ? "plan" : "result";
 
-          updateQueryTab(activeQueryTab.id, {
+          updateQueryTab(tab.id, {
             lastPayload: result.payload,
             expression: editorText,
             lastRunExpression: editorSnapshot,
@@ -1126,7 +1169,7 @@ function App() {
                 current,
                 runExpression,
                 result.payload!,
-                activeConnection?.name ?? "Connection",
+                paneConnection.name ?? "Connection",
               ),
             );
           }
@@ -1141,7 +1184,7 @@ function App() {
               : result.payload.error ?? "Evaluation failed.",
           );
         } else {
-          updateQueryTab(activeQueryTab.id, {
+          updateQueryTab(tab.id, {
             lastPayload: {
               success: false,
               sql: [],
@@ -1161,7 +1204,7 @@ function App() {
           setStatus("Query cancelled.");
           return;
         }
-        updateQueryTab(activeQueryTab.id, {
+        updateQueryTab(tab.id, {
           lastPayload: {
             success: false,
             sql: [],
@@ -1179,16 +1222,16 @@ function App() {
       }
     },
     [
-      connectionSettings,
       settings,
       document,
-      activeQueryTab,
-      searchDirectory,
-      activeConnection?.name,
+      paneLayout,
+      queryTabs,
+      activeConnectionId,
+      focusedPaneId,
       updateQueryTab,
       lambdaMode,
-      handleRunSql,
       allowEngine,
+      workspaceDirectory,
     ],
   );
 
@@ -1197,18 +1240,24 @@ function App() {
     setStatus("Stopping query…");
   }, []);
 
-  const handleRunAll = useCallback(() => {
-    queryWorkspaceRef.current?.flush();
-    const fullText =
-      queryWorkspaceRef.current?.getDraft() ??
-      activeQueryTab?.expression ??
-      "";
-    void handleRun(false, fullText);
-  }, [activeQueryTab, handleRun]);
+  const handleRunAll = useCallback(
+    (paneId = focusedPaneId) => {
+      queryWorkspaceRefs.current.get(paneId)?.flush();
+      const pane = paneLayout ? findPaneById(paneLayout, paneId) : undefined;
+      const tab = queryTabs.find((item) => item.id === pane?.activeTabId);
+      const fullText =
+        queryWorkspaceRefs.current.get(paneId)?.getDraft() ?? tab?.expression ?? "";
+      void handleRun(false, fullText, paneId);
+    },
+    [focusedPaneId, handleRun, paneLayout, queryTabs],
+  );
 
-  const handleRunLine = useCallback(() => {
-    void handleRun(false);
-  }, [handleRun]);
+  const handleRunLine = useCallback(
+    (paneId = focusedPaneId) => {
+      void handleRun(false, undefined, paneId);
+    },
+    [focusedPaneId, handleRun],
+  );
 
   useEffect(() => {
     const listener = () => {
@@ -1254,11 +1303,16 @@ function App() {
     return () => window.removeEventListener(RUN_PLAN_EVENT, listener);
   }, [handleRun]);
 
-  function selectQueryTab(tabId: string) {
-    setActiveQueryTabId(tabId);
+  function selectQueryTab(tabId: string, paneId = focusedPaneId) {
+    if (!paneLayout) {
+      return;
+    }
+
+    setPaneLayout(setPaneActiveTab(paneLayout, paneId, tabId));
+    setFocusedPaneId(paneId);
   }
 
-  function addQueryTab() {
+  function addQueryTab(paneId = focusedPaneId) {
     if (!document) {
       return;
     }
@@ -1267,19 +1321,23 @@ function App() {
       name: `Query ${queryTabs.length + 1}`,
     });
     setQueryTabs((tabs) => [...tabs, tab]);
-    setActiveQueryTabId(tab.id);
+    if (paneLayout) {
+      const next = addTabToPane(paneLayout, paneId, tab.id);
+      setPaneLayout(next.layout);
+      setFocusedPaneId(next.focusedPaneId);
+    }
   }
 
   function closeQueryTab(tabId: string) {
-    if (queryTabs.length <= 1) {
+    if (queryTabs.length <= 1 || !paneLayout) {
       return;
     }
 
-    const nextTabs = queryTabs.filter((tab) => tab.id !== tabId);
-    setQueryTabs(nextTabs);
-    if (activeQueryTabId === tabId) {
-      const nextTab = nextTabs[0];
-      setActiveQueryTabId(nextTab.id);
+    setQueryTabs((tabs) => tabs.filter((tab) => tab.id !== tabId));
+    const next = removeTabFromLayout(paneLayout, tabId);
+    if (next.layout) {
+      setPaneLayout(next.layout);
+      setFocusedPaneId(next.focusedPaneId ?? getFirstPaneId(next.layout));
     }
   }
 
@@ -1299,7 +1357,11 @@ function App() {
       }
 
       setQueryTabs((tabs) => [...tabs, opened]);
-      setActiveQueryTabId(opened.id);
+      if (paneLayout) {
+        const next = addTabToPane(paneLayout, focusedPaneId, opened.id);
+        setPaneLayout(next.layout);
+        setFocusedPaneId(next.focusedPaneId);
+      }
       setStatus(`Opened ${opened.name}`);
     } catch (error) {
       setStatus(error instanceof Error ? error.message : String(error));
@@ -1321,7 +1383,9 @@ function App() {
       const connectionId = opened.workspace.connections[0]?.id ?? "";
       const tab = createQueryTab(connectionId);
       setQueryTabs([tab]);
-      setActiveQueryTabId(tab.id);
+      const layout = createSinglePaneLayout([tab.id], tab.id);
+      setPaneLayout(layout);
+      setFocusedPaneId(layout.id);
       await resetDaemonSessions();
       setStatus(`Opened ${hydratedWorkspace.name}`);
     } catch (error) {
@@ -1355,7 +1419,9 @@ function App() {
     const tab = createQueryTab(connection.id);
     setDocument(created);
     setQueryTabs([tab]);
-    setActiveQueryTabId(tab.id);
+    const layout = createSinglePaneLayout([tab.id], tab.id);
+    setPaneLayout(layout);
+    setFocusedPaneId(layout.id);
     await resetDaemonSessions();
     setStatus("New workspace");
   }
@@ -1803,7 +1869,11 @@ function App() {
       name: name ?? `Query ${queryTabs.length + 1}`,
     });
     setQueryTabs((tabs) => [...tabs, tab]);
-    setActiveQueryTabId(tab.id);
+    if (paneLayout) {
+      const next = addTabToPane(paneLayout, focusedPaneId, tab.id);
+      setPaneLayout(next.layout);
+      setFocusedPaneId(next.focusedPaneId);
+    }
   }
 
   function handleOpenLibraryQuery(expression: string, connectionId: string, name?: string) {
@@ -1814,14 +1884,22 @@ function App() {
     const existing = queryTabs.find(
       (tab) => tab.expression === expression && tab.connectionId === connectionId,
     );
-    if (existing) {
-      setActiveQueryTabId(existing.id);
+    if (existing && paneLayout) {
+      const focused = focusTabInLayout(paneLayout, existing.id);
+      if (focused) {
+        setPaneLayout(focused.layout);
+        setFocusedPaneId(focused.focusedPaneId);
+      }
       return;
     }
 
     const tab = createQueryTab(connectionId, { expression, name });
     setQueryTabs((tabs) => [...tabs, tab]);
-    setActiveQueryTabId(tab.id);
+    if (paneLayout) {
+      const next = addTabToPane(paneLayout, focusedPaneId, tab.id);
+      setPaneLayout(next.layout);
+      setFocusedPaneId(next.focusedPaneId);
+    }
   }
 
   function handleInsertSnippet(expression: string) {
@@ -1838,15 +1916,15 @@ function App() {
         return;
       }
 
-      queryWorkspaceRef.current?.flush();
+      queryWorkspaceRefs.current.get(focusedPaneId)?.flush();
       const current =
-        queryWorkspaceRef.current?.getDraft() ?? activeQueryTab.expression;
+        queryWorkspaceRefs.current.get(focusedPaneId)?.getDraft() ?? activeQueryTab.expression;
 
       updateQueryTab(activeQueryTab.id, {
         expression: appendQueryExpression(current, nextExpression),
       });
     },
-    [activeQueryTab, updateQueryTab],
+    [activeQueryTab, focusedPaneId, updateQueryTab],
   );
 
   function handleAddSnippet(title: string, expression: string) {
@@ -1939,6 +2017,27 @@ function App() {
 
     return status;
   }, [prerequisites, prerequisitesLoading, status]);
+
+  const handleTabDrop = useCallback(
+    (payload: TabDragPayload, targetPaneId: string, side: PaneDropSide) => {
+      if (!paneLayout) {
+        return;
+      }
+
+      const next = dropTabOnPane(
+        paneLayout,
+        payload.tabId,
+        payload.sourcePaneId,
+        targetPaneId,
+        side,
+      );
+      if (next) {
+        setPaneLayout(next.layout);
+        setFocusedPaneId(next.focusedPaneId);
+      }
+    },
+    [paneLayout],
+  );
 
   if (!splashDone) {
     const splashMessage = appReady ? "Opening workspace…" : "Loading workspace…";
@@ -2173,30 +2272,6 @@ function App() {
         <div className="main-stack">
           {mainView === "query" ? (
             <>
-              <QueryTabBar
-                tabs={queryTabs}
-                activeTabId={activeQueryTabId}
-                onSelect={selectQueryTab}
-                onAdd={addQueryTab}
-                onClose={closeQueryTab}
-                onOpen={() => void handleOpenQuery()}
-                onSave={() => void handleSaveQuery()}
-                onToggleFavorite={handleToggleFavorite}
-              />
-
-              <QueryTabToolbar
-                connections={document.workspace.connections}
-                connectionId={activeConnectionId}
-                onConnectionChange={handleQueryTabConnectionChange}
-                running={running}
-                runAllShortcutLabel={keybindingLabel(keybindings.runAll)}
-                runLineShortcutLabel={keybindingLabel(keybindings.runQuery)}
-                onRunAll={() => void handleRunAll()}
-                onRunLine={() => void handleRunLine()}
-                onRunPlan={() => void handleRun(true)}
-                onStop={handleStopQuery}
-              />
-
               <div className="editor-shell">
                 <EditorToolRail
                   activeTool={activeEditorTool}
@@ -2230,109 +2305,209 @@ function App() {
                       onOpenFavorite={(tab) => selectQueryTab(tab.id)}
                       onToggleFavorite={handleToggleFavorite}
                       onRunScan={(mode) => void runScan(mode)}
-                    onScanIndexChange={setScanIndex}
-                    onGoToSource={(file, line) => void handleGoToSource(file, line)}
-                    onRunQuery={(expression) => {
-                      updateQueryTab(activeQueryTab.id, { expression });
-                      void handleRun(false, expression);
-                    }}
-                    onDismissFinding={(note) => void handleDismissScanFinding(note)}
-                    onSaveFindingNote={(note) => void handleSaveScanFindingNote(note)}
-                    running={running}
-                    scriptSearchPath={connectionSettings?.scriptSearchPath ?? ""}
-                    scriptLoads={activeConnection?.scriptLoads ?? []}
-                    scriptUsings={activeConnection?.scriptUsings ?? []}
-                    onScriptsChanged={() => void resetDaemonSessions()}
-                    onScriptCreated={handleScriptCreated}
-                    onScriptLoadsChange={handleScriptLoadsChange}
-                    onScriptUsingsChange={handleScriptUsingsChange}
-                  />
+                      onScanIndexChange={setScanIndex}
+                      onGoToSource={(file, line) => void handleGoToSource(file, line)}
+                      onRunQuery={(expression) => {
+                        updateQueryTab(activeQueryTab.id, { expression });
+                        void handleRun(false, expression);
+                      }}
+                      onDismissFinding={(note) => void handleDismissScanFinding(note)}
+                      onSaveFindingNote={(note) => void handleSaveScanFindingNote(note)}
+                      running={running}
+                      scriptSearchPath={connectionSettings?.scriptSearchPath ?? ""}
+                      scriptLoads={activeConnection?.scriptLoads ?? []}
+                      scriptUsings={activeConnection?.scriptUsings ?? []}
+                      onScriptsChanged={() => void resetDaemonSessions()}
+                      onScriptCreated={handleScriptCreated}
+                      onScriptLoadsChange={handleScriptLoadsChange}
+                      onScriptUsingsChange={handleScriptUsingsChange}
+                    />
                   </ResizableEditorToolPanel>
                 ) : null}
 
                 <div className="editor-shell-main">
-                  <ResizableResultsDock
-                    height={resultsDockHeight}
-                    onHeightChange={setResultsDockHeight}
-                    editor={
-                      <QueryWorkspace
-                        ref={queryWorkspaceRef}
-                        tabId={activeQueryTab.id}
-                        expression={expression}
-                        theme={settings.theme ?? "dark"}
-                        onExpressionChange={handleExpressionChange}
-                        sqlPaneOpen={sqlPaneOpen}
-                        onSqlPaneOpenChange={handleSqlPaneOpenChange}
-                        sqlPaneWidth={sqlPaneWidth}
-                        onSqlPaneWidthChange={setSqlPaneWidth}
-                        sqlPreviewAuto={sqlPreviewAuto}
-                        onSqlPreviewAutoChange={setSqlPreviewAuto}
-                        connectionSettings={connectionSettings}
-                        searchDirectory={searchDirectory}
-                        autoPreviewAllowed={engineAllowed}
-                        running={running}
-                        onEngineBusyChange={adjustEngineBusy}
-                        onRequestEngine={allowEngine}
-                        onRun={(text) => void handleRun(false, text)}
-                        keybindings={keybindings}
-                      />
-                    }
-                    results={
-                      <ResultsTabs
-                        payload={payload}
-                        activeTab={activeTab}
-                        onTabChange={(tab) =>
-                          updateQueryTab(activeQueryTab.id, { activeResultsTab: tab })
+                  {paneLayout ? (
+                    <QueryPaneLayout
+                      layout={paneLayout}
+                      focusedPaneId={focusedPaneId}
+                      onSplitRatioChange={(splitId, ratio) => {
+                        setPaneLayout((current) =>
+                          current ? setSplitRatio(current, splitId, ratio) : current,
+                        );
+                      }}
+                      onFocusedPaneChange={setFocusedPaneId}
+                      onTabDrop={handleTabDrop}
+                      renderLeaf={(pane) => {
+                        const paneTabs = queryTabs.filter((tab) => pane.tabIds.includes(tab.id));
+                        const paneTab = queryTabs.find((tab) => tab.id === pane.activeTabId);
+                        if (!paneTab) {
+                          return (
+                            <div className="query-pane-empty">
+                              <p className="muted">No query tab in this pane.</p>
+                              <button type="button" onClick={() => addQueryTab(pane.id)}>
+                                New query tab
+                              </button>
+                            </div>
+                          );
                         }
-                        onExport={(format) => void handleExport(format)}
-                        onSaveRows={async (rows) => {
-                          if (!connectionSettings || !searchDirectory || !activeQueryTab?.lastPayload) {
-                            const message = "Configure a connection before saving result changes.";
-                            setStatus(message);
-                            throw new Error(message);
-                          }
 
-                          const baseline = activeQueryTab.resultRowsBaseline;
-                          const entity = activeQueryTab.resultEntity;
+                        const paneConnection = connectionForTab(
+                          document.workspace,
+                          paneTab,
+                          activeConnectionId,
+                        );
+                        if (!paneConnection) {
+                          return (
+                            <div className="query-pane-empty">
+                              <p className="muted">Configure a connection for this query tab.</p>
+                            </div>
+                          );
+                        }
 
-                          if (!baseline || !entity) {
-                            const message =
-                              "These results cannot be saved to the database. Run a DbSet LINQ query (for example db.Products.Take(10).ToList()) that returns entity rows with primary keys.";
-                            setStatus(message);
-                            throw new Error(message);
-                          }
+                        const paneConnectionSettings = workspaceConnectionToSettings(
+                          paneConnection,
+                          workspaceDirectory,
+                          settings.toolPath,
+                          settings.defaultWorkspaceRoot,
+                        );
+                        const paneSearchDirectory = resolveSearchDirectory(
+                          paneConnection,
+                          workspaceDirectory,
+                          paneConnectionSettings.project,
+                        );
+                        const panePayload = resolveDisplayPayload(paneTab);
+                        const paneResultsTab = paneTab.activeResultsTab ?? "result";
 
-                          try {
-                            const message = await persistResultChanges(
-                              connectionSettings,
-                              searchDirectory,
-                              searchDirectory,
-                              entity,
-                              baseline,
-                              rows,
-                            );
+                        return (
+                          <>
+                            <QueryTabBar
+                              paneId={pane.id}
+                              tabs={paneTabs}
+                              activeTabId={pane.activeTabId}
+                              onSelect={(tabId) => selectQueryTab(tabId, pane.id)}
+                              onAdd={() => addQueryTab(pane.id)}
+                              onClose={closeQueryTab}
+                              onOpen={() => void handleOpenQuery()}
+                              onSave={() => void handleSaveQuery()}
+                              onToggleFavorite={handleToggleFavorite}
+                            />
 
-                            updateQueryTab(activeQueryTab.id, {
-                              lastPayload: {
-                                ...activeQueryTab.lastPayload,
-                                rows: rows.map((row) => ({ ...row })),
-                                metrics: {
-                                  ...activeQueryTab.lastPayload.metrics,
-                                  rowCount: rows.length,
-                                },
-                              },
-                              resultRowsBaseline: rows.map((row) => ({ ...row })),
-                            });
-                            setStatus(message);
-                          } catch (error) {
-                            const message = error instanceof Error ? error.message : String(error);
-                            setStatus(message);
-                            throw error;
-                          }
-                        }}
-                      />
-                    }
-                  />
+                            <QueryTabToolbar
+                              connections={document.workspace.connections}
+                              connectionId={paneTab.connectionId}
+                              onConnectionChange={handleQueryTabConnectionChange}
+                              running={running}
+                              runAllShortcutLabel={keybindingLabel(keybindings.runAll)}
+                              runLineShortcutLabel={keybindingLabel(keybindings.runQuery)}
+                              onRunAll={() => void handleRunAll(pane.id)}
+                              onRunLine={() => void handleRunLine(pane.id)}
+                              onRunPlan={() => void handleRun(true, undefined, pane.id)}
+                              onStop={handleStopQuery}
+                            />
+
+                            <ResizableResultsDock
+                              height={resultsDockHeight}
+                              onHeightChange={setResultsDockHeight}
+                              editor={
+                                <QueryWorkspace
+                                  ref={(handle) => {
+                                    if (handle) {
+                                      queryWorkspaceRefs.current.set(pane.id, handle);
+                                    } else {
+                                      queryWorkspaceRefs.current.delete(pane.id);
+                                    }
+                                  }}
+                                  tabId={paneTab.id}
+                                  expression={paneTab.expression}
+                                  theme={settings.theme ?? "dark"}
+                                  onExpressionChange={handleExpressionChange}
+                                  sqlPaneOpen={pane.sqlPaneOpen ?? false}
+                                  onSqlPaneOpenChange={(open) => {
+                                    setPaneLayout((current) =>
+                                      current ? setPaneSqlPaneOpen(current, pane.id, open) : current,
+                                    );
+                                  }}
+                                  sqlPaneWidth={sqlPaneWidth}
+                                  onSqlPaneWidthChange={setSqlPaneWidth}
+                                  sqlPreviewAuto={sqlPreviewAuto}
+                                  onSqlPreviewAutoChange={setSqlPreviewAuto}
+                                  connectionSettings={paneConnectionSettings}
+                                  searchDirectory={paneSearchDirectory}
+                                  autoPreviewAllowed={engineAllowed}
+                                  running={running}
+                                  onEngineBusyChange={adjustEngineBusy}
+                                  onRequestEngine={allowEngine}
+                                  onRun={(text) => void handleRun(false, text, pane.id)}
+                                  keybindings={keybindings}
+                                />
+                              }
+                              results={
+                                <ResultsTabs
+                                  payload={panePayload}
+                                  activeTab={paneResultsTab}
+                                  onTabChange={(tab) =>
+                                    updateQueryTab(paneTab.id, { activeResultsTab: tab })
+                                  }
+                                  onExport={(format) => void handleExport(format)}
+                                  onSaveRows={async (rows) => {
+                                    if (
+                                      !paneConnectionSettings ||
+                                      !paneSearchDirectory ||
+                                      !paneTab.lastPayload
+                                    ) {
+                                      const message =
+                                        "Configure a connection before saving result changes.";
+                                      setStatus(message);
+                                      throw new Error(message);
+                                    }
+
+                                    const baseline = paneTab.resultRowsBaseline;
+                                    const entity = paneTab.resultEntity;
+
+                                    if (!baseline || !entity) {
+                                      const message =
+                                        "These results cannot be saved to the database. Run a DbSet LINQ query (for example db.Products.Take(10).ToList()) that returns entity rows with primary keys.";
+                                      setStatus(message);
+                                      throw new Error(message);
+                                    }
+
+                                    try {
+                                      const message = await persistResultChanges(
+                                        paneConnectionSettings,
+                                        paneSearchDirectory,
+                                        paneSearchDirectory,
+                                        entity,
+                                        baseline,
+                                        rows,
+                                      );
+
+                                      updateQueryTab(paneTab.id, {
+                                        lastPayload: {
+                                          ...paneTab.lastPayload,
+                                          rows: rows.map((row) => ({ ...row })),
+                                          metrics: {
+                                            ...paneTab.lastPayload.metrics,
+                                            rowCount: rows.length,
+                                          },
+                                        },
+                                        resultRowsBaseline: rows.map((row) => ({ ...row })),
+                                      });
+                                      setStatus(message);
+                                    } catch (error) {
+                                      const message =
+                                        error instanceof Error ? error.message : String(error);
+                                      setStatus(message);
+                                      throw error;
+                                    }
+                                  }}
+                                />
+                              }
+                            />
+                          </>
+                        );
+                      }}
+                    />
+                  ) : null}
                 </div>
               </div>
             </>

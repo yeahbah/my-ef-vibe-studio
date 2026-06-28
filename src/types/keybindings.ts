@@ -19,5 +19,5 @@ export const DEFAULT_KEYBINDINGS: KeybindingSettings = {
   nextQueryTab: "Ctrl+Tab",
   previousQueryTab: "Ctrl+Shift+Tab",
   newQueryTab: "Ctrl+Shift+T",
-  closeQueryTab: "Ctrl+F4",
+  closeQueryTab: "Ctrl+W",
 };

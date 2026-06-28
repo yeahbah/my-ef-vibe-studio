@@ -11,6 +11,7 @@ import type { QueryTab } from "../types/query";
 import type { AppMainView } from "../types/mainView";
 import type { NotebookCell } from "../types/notebook";
 import type { SnippetDefinition } from "../types/snippets";
+import type { PaneLayoutNode } from "../types/queryPaneLayout";
 import type { QueryLibraryState } from "../types/queryLibrary";
 
 export type SidebarTab =
@@ -28,6 +29,8 @@ export interface StudioSession {
   activeConnectionId: string;
   queryTabs: QueryTab[];
   activeQueryTabId: string;
+  paneLayout?: PaneLayoutNode;
+  focusedPaneId?: string;
   resultsDockHeight?: number;
   /** @deprecated Use explorerExpandedNodes */
   sidebarTab?: SidebarTab;

@@ -147,7 +147,7 @@ An example file lives at `examples/sample.efvibe-workspace`.
 | Ctrl+Tab | Next query tab |
 | Ctrl+Shift+Tab | Previous query tab |
 | Ctrl+Shift+T | New query tab |
-| Ctrl+F4 | Close query tab |
+| Ctrl+W | Close query tab |
 | Ctrl+B | Toggle explorer sidebar |
 | Ctrl+S | Save query tab (when bound to a file) |
 
@@ -162,4 +162,16 @@ An example file lives at `examples/sample.efvibe-workspace`.
 
 ## License
 
-Apache 2.0 (engine compatibility with efvibe). Studio UI licensing TBD.
+MyEFvibe Studio is **proprietary software**. Copyright © 2026 Yeahbah. All rights reserved.
+
+See [LICENSE](LICENSE) for the full MyEFvibe Studio Software License Agreement (v1.1). Summary:
+
+| Tier | Who | Limit |
+|------|-----|-------|
+| **Personal** | Individuals | Non-commercial use only |
+| **Small team** | Organizations | Commercial use, up to **5 licensed developers** |
+| **Commercial** | Organizations | **Per-seat license** required for 6+ developers |
+
+A **Licensed Developer** is any individual who uses Studio to write, edit, run, or debug LINQ/SQL queries. Count unique people—not machines or concurrent sessions.
+
+The bundled [efvibe](https://github.com/yeahbah/my-ef-vibe) CLI remains licensed under [Apache 2.0](https://github.com/yeahbah/my-ef-vibe/blob/main/LICENSE). Third-party open source dependencies used by Studio retain their respective licenses.

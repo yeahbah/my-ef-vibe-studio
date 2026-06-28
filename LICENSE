@@ -1,0 +1,195 @@
+MyEFvibe Studio Software License Agreement
+Version 1.1 — June 27, 2026
+
+Copyright (c) 2026 Yeahbah. All rights reserved.
+
+IMPORTANT: READ CAREFULLY BEFORE USING THIS SOFTWARE. BY INSTALLING,
+ACCESSING, OR USING MYEFVIBE STUDIO (THE "SOFTWARE"), YOU AGREE TO BE
+BOUND BY THE TERMS OF THIS AGREEMENT. IF YOU DO NOT AGREE, DO NOT USE
+THE SOFTWARE.
+
+1. Definitions
+
+   "Licensor" means Yeahbah, the copyright owner of the Software.
+
+   "Software" means MyEFvibe Studio, including its source code, object
+   code, documentation, updates, and all related materials provided by
+   Licensor.
+
+   "Organization" means any company, corporation, partnership, government
+   agency, non-profit, educational institution, or other legal entity, and
+   any group of individuals acting in a coordinated commercial or
+   professional capacity.
+
+   "Licensed Developer" means an individual human who installs, accesses,
+   or uses the Software to write, edit, run, or debug LINQ, SQL, or related
+   database queries. Licensed Developers are counted by unique individuals,
+   not by machines, installations, or concurrent sessions.
+
+   "Personal Use" means use of the Software by a natural person acting on
+   their own behalf, not on behalf of an Organization, solely for personal
+   learning, hobby, or non-commercial purposes.
+
+   "Commercial Use" means any use of the Software in connection with an
+   Organization, a business, revenue-generating activity, paid service, or
+   product, or any use that is not Personal Use.
+
+   "Small Team Limit" means five (5) Licensed Developers within a single
+   Organization.
+
+   "Authorized Copy" means a copy of the Software obtained directly from
+   Licensor or through an authorized distribution channel designated by
+   Licensor.
+
+   "Commercial License Agreement" means a separate written agreement with
+   Licensor that grants per-seat commercial rights beyond this Agreement.
+
+2. Ownership
+
+   The Software is licensed, not sold. Licensor retains all right, title,
+   and interest in and to the Software, including all copyrights, patents,
+   trade secrets, trademarks, and other intellectual property rights.
+
+3. License Tiers
+
+   You may use the Software only under one of the tiers below. If more than
+   one tier could apply, the most restrictive tier that you do not satisfy
+   controls.
+
+   3.1 Personal License
+
+   Licensor grants a natural person a limited, non-exclusive,
+   non-transferable, non-sublicensable, revocable license to install and
+   use one Authorized Copy of the Software for Personal Use only.
+
+   Personal Use does not include use on behalf of an Organization, use in
+   the course of employment or contract work, or any Commercial Use.
+
+   3.2 Small Team License
+
+   Licensor grants an Organization a limited, non-exclusive,
+   non-transferable, non-sublicensable, revocable license to install and
+   use Authorized Copies of the Software for Commercial Use, provided that
+   the Organization does not exceed the Small Team Limit of Licensed
+   Developers at any time.
+
+   Each Licensed Developer must be a named individual. You may not rotate,
+   share, or pool accounts or installations among multiple people to stay
+   within the Small Team Limit.
+
+   3.3 Commercial License (Per Seat)
+
+   If your Organization has more than the Small Team Limit of Licensed
+   Developers, or if Licensor otherwise requires it, Commercial Use
+   requires a Commercial License Agreement with Licensor on a per-seat
+   basis—one paid seat for each Licensed Developer.
+
+   Licensor expressly reserves the right to offer, sell, license, and
+   distribute the Software, derivative works, and related services on
+   commercial terms, including per-seat pricing, volume discounts, and
+   enterprise agreements.
+
+4. Counting Licensed Developers
+
+   Count every individual in an Organization who uses the Software, even
+   occasionally. Contractors, consultants, and temporary staff who use the
+   Software while working for or with the Organization count toward the
+   limit.
+
+   Automated systems, build agents, and shared service accounts do not
+   count as Licensed Developers unless a human uses the Software through
+   that account as their primary means of access.
+
+5. Restrictions
+
+   Except as expressly permitted in Section 3 or in a Commercial License
+   Agreement with Licensor, you may not:
+
+   (a) copy, distribute, publish, or make the Software available to any
+       third party outside your Organization;
+
+   (b) modify, adapt, translate, or create derivative works based on the
+       Software;
+
+   (c) reverse engineer, decompile, disassemble, or otherwise attempt to
+       derive the source code of any part of the Software, except to the
+       extent such restriction is prohibited by applicable law;
+
+   (d) remove, alter, or obscure any proprietary notices or labels on the
+       Software;
+
+   (e) sublicense, rent, lease, lend, or transfer the Software or any
+       rights under this Agreement; or
+
+   (f) use the Software in violation of applicable law.
+
+6. Open Source Dependencies
+
+   The Software may incorporate or depend on third-party open source
+   components that are licensed under their own terms (for example MIT,
+   Apache-2.0, or BSD licenses). Those components remain governed by
+   their respective licenses. Nothing in this Agreement limits your rights
+   under those third-party licenses with respect to the third-party
+   components themselves.
+
+   The efvibe command-line tool is a separate product and is licensed
+   under the Apache License, Version 2.0. Use of efvibe is governed by
+   that license, not this Agreement.
+
+7. Feedback
+
+   If you provide suggestions, ideas, or feedback about the Software,
+   Licensor may use them without restriction or compensation to you.
+
+8. Updates and Support
+
+   Licensor is not obligated to provide updates, support, maintenance, or
+   future versions of the Software. Any updates provided may be subject to
+   additional or updated terms.
+
+9. Disclaimer of Warranties
+
+   THE SOFTWARE IS PROVIDED "AS IS" AND "AS AVAILABLE", WITHOUT WARRANTY
+   OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE
+   WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE,
+   TITLE, AND NON-INFRINGEMENT. LICENSOR DOES NOT WARRANT THAT THE
+   SOFTWARE WILL BE ERROR-FREE, UNINTERRUPTED, OR SECURE.
+
+10. Limitation of Liability
+
+    TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, IN NO EVENT SHALL
+    LICENSOR BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL,
+    OR PUNITIVE DAMAGES, OR ANY LOSS OF PROFITS, DATA, USE, GOODWILL, OR
+    OTHER INTANGIBLE LOSSES, ARISING OUT OF OR RELATED TO THIS AGREEMENT
+    OR YOUR USE OF THE SOFTWARE, EVEN IF LICENSOR HAS BEEN ADVISED OF THE
+    POSSIBILITY OF SUCH DAMAGES.
+
+    LICENSOR'S TOTAL LIABILITY ARISING OUT OF OR RELATED TO THIS AGREEMENT
+    SHALL NOT EXCEED THE GREATER OF (A) THE AMOUNT YOU PAID LICENSOR FOR
+    THE SOFTWARE IN THE TWELVE (12) MONTHS PRECEDING THE CLAIM, OR (B)
+    FIFTY US DOLLARS (US $50).
+
+11. Termination
+
+    This Agreement is effective until terminated. Licensor may terminate
+    this Agreement at any time if you breach any term. Upon termination,
+    you must cease all use of the Software and destroy all copies in your
+    possession or control. Sections 2, 3.3, 5, 7, 9, 10, 12, and 13
+    survive termination.
+
+12. Export Compliance
+
+    You agree to comply with all applicable export control and sanctions
+    laws and regulations.
+
+13. General
+
+    This Agreement constitutes the entire agreement between you and
+    Licensor regarding the Software and supersedes prior or contemporaneous
+    understandings on that subject. If any provision is held unenforceable,
+    the remaining provisions remain in full force and effect. Licensor's
+    failure to enforce any right is not a waiver of that right.
+
+    For Commercial License Agreement inquiries (per-seat licensing for
+    teams larger than the Small Team Limit), contact Licensor through the
+    project repository at https://github.com/yeahbah/my-ef-vibe-studio.
