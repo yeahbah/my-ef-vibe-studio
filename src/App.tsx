@@ -13,6 +13,7 @@ import { NotebookView, type NotebookRunScope } from "./components/NotebookView";
 import { QueryWorkspace, type QueryWorkspaceHandle } from "./components/QueryWorkspace";
 import { ReplView } from "./components/ReplView";
 import { QueryPaneLayout } from "./components/QueryPaneLayout";
+import { TabDragController } from "./components/TabDragController";
 import { QueryTabBar } from "./components/QueryTabBar";
 import { QueryTabToolbar } from "./components/QueryTabToolbar";
 import { ResizableResultsDock, DEFAULT_RESULTS_DOCK_HEIGHT } from "./components/ResizableResultsDock";
@@ -2050,6 +2051,7 @@ function App() {
 
   return (
     <main className="app">
+      <TabDragController onDrop={handleTabDrop} />
       <header className="topbar">
         <button
           type="button"
@@ -2336,7 +2338,6 @@ function App() {
                         );
                       }}
                       onFocusedPaneChange={setFocusedPaneId}
-                      onTabDrop={handleTabDrop}
                       renderLeaf={(pane) => {
                         const paneTabs = queryTabs.filter((tab) => pane.tabIds.includes(tab.id));
                         const paneTab = queryTabs.find((tab) => tab.id === pane.activeTabId);

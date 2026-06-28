@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import type { PaneDropSide, PaneLayoutNode, PaneLeaf, TabDragPayload } from "../types/queryPaneLayout";
+import type { PaneLayoutNode, PaneLeaf } from "../types/queryPaneLayout";
 import { QueryPaneShell } from "./QueryPaneShell";
 import { ResizablePaneSplit } from "./ResizablePaneSplit";
 
@@ -8,7 +8,6 @@ interface QueryPaneLayoutProps {
   focusedPaneId: string;
   onSplitRatioChange: (splitId: string, ratio: number) => void;
   onFocusedPaneChange: (paneId: string) => void;
-  onTabDrop: (payload: TabDragPayload, targetPaneId: string, side: PaneDropSide) => void;
   renderLeaf: (pane: PaneLeaf, isFocused: boolean) => ReactNode;
 }
 
@@ -17,7 +16,6 @@ export function QueryPaneLayout({
   focusedPaneId,
   onSplitRatioChange,
   onFocusedPaneChange,
-  onTabDrop,
   renderLeaf,
 }: QueryPaneLayoutProps) {
   const renderNode = (node: PaneLayoutNode): ReactNode => {
@@ -30,7 +28,6 @@ export function QueryPaneLayout({
           pane={node}
           isFocused={isFocused}
           onFocus={() => onFocusedPaneChange(node.id)}
-          onTabDrop={(payload, side) => onTabDrop(payload, node.id, side)}
         >
           {renderLeaf(node, isFocused)}
         </QueryPaneShell>

@@ -1,7 +1,5 @@
 import type { QueryTab } from "../types/query";
-import type { TabDragPayload } from "../types/queryPaneLayout";
-import { TAB_DRAG_MIME } from "../types/queryPaneLayout";
-import { encodeTabDragPayload } from "./QueryPaneShell";
+import { beginTabDragSession, consumeTabClickSuppression } from "../lib/tabDragSession";
 import { IconOpen, IconPlus, IconSave } from "./icons";
 
 interface QueryTabBarProps {
@@ -27,31 +25,53 @@ export function QueryTabBar({
   onSave,
   onToggleFavorite,
 }: QueryTabBarProps) {
-  function startTabDrag(event: React.DragEvent<HTMLButtonElement>, tabId: string) {
-    const payload: TabDragPayload = { tabId, sourcePaneId: paneId };
-    event.dataTransfer.setData(TAB_DRAG_MIME, encodeTabDragPayload(payload));
-    event.dataTransfer.effectAllowed = "move";
+  function handleTabSelect(tabId: string) {
+    if (consumeTabClickSuppression()) {
+      return;
+    }
+
+    onSelect(tabId);
+  }
+
+  function startTabDrag(event: React.MouseEvent<HTMLElement>, tabId: string) {
+    if (event.button !== 0) {
+      return;
+    }
+
+    beginTabDragSession(
+      { tabId, sourcePaneId: paneId },
+      event.clientX,
+      event.clientY,
+    );
   }
 
   return (
     <div className="query-tab-bar">
-      <div className="query-tabs">
+      <div className="query-tabs" role="tablist">
         {tabs.map((tab) => (
           <div
             key={tab.id}
             className={tab.id === activeTabId ? "query-tab active" : "query-tab"}
           >
-            <button
-              type="button"
+            <div
+              role="tab"
+              aria-selected={tab.id === activeTabId}
+              tabIndex={0}
               className="query-tab-label"
-              draggable
-              onDragStart={(event) => startTabDrag(event, tab.id)}
-              onClick={() => onSelect(tab.id)}
+              title="Drag to split pane"
+              onMouseDown={(event) => startTabDrag(event, tab.id)}
+              onClick={() => handleTabSelect(tab.id)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  handleTabSelect(tab.id);
+                }
+              }}
             >
               {tab.favorite ? "★ " : ""}
               {tab.name}
               {tab.filePath ? "" : " *"}
-            </button>
+            </div>
             <button
               type="button"
               className={tab.favorite ? "query-tab-fav active" : "query-tab-fav"}

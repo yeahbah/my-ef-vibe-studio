@@ -1065,14 +1065,6 @@ button:disabled {
   min-height: 120px;
 }
 
-.query-tab-label[draggable="true"] {
-  cursor: grab;
-}
-
-.query-tab-label[draggable="true"]:active {
-  cursor: grabbing;
-}
-
 .query-pane-layout {
   display: flex;
   flex: 1 1 auto;
@@ -1123,6 +1115,19 @@ button:disabled {
   display: flex;
   pointer-events: none;
   z-index: 4;
+}
+
+.tab-drag-floating {
+  z-index: 10000;
+}
+
+body.tab-dragging {
+  cursor: grabbing;
+  user-select: none;
+}
+
+body.tab-dragging .query-tab-label {
+  cursor: grabbing;
 }
 
 .query-pane-drop-zone {
@@ -1190,6 +1195,21 @@ button:disabled {
   border: none;
   padding: 4px 8px;
   font-size: 12px;
+}
+
+.query-tab-label {
+  cursor: grab;
+  color: inherit;
+  touch-action: none;
+}
+
+body.tab-dragging .query-tab-label {
+  cursor: grabbing;
+}
+
+.query-tab-label:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--accent) 65%, transparent);
+  outline-offset: 1px;
 }
 
 .query-tab-add,
