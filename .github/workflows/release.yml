@@ -129,9 +129,25 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
+      - name: Import Apple signing certificate
+        if: matrix.platform == 'macos-latest'
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+        run: |
+          chmod +x .github/scripts/import-apple-certificate.sh
+          .github/scripts/import-apple-certificate.sh
+
       - name: Build Tauri bundles
         env:
           NO_STRIP: 'true'
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
         run: npm run tauri build -- ${{ matrix.args }}
 
       - name: Stage release artifacts
@@ -217,10 +233,10 @@ jobs:
             | Platform | Artifacts |
             |----------|-----------|
             | **Linux** | `.deb` (Debian/Ubuntu), `.rpm` (Fedora/RHEL), `.AppImage` (portable) |
-            | **macOS** | `.dmg` (**Apple Silicon only** — Intel Mac not supported) |
-            | **Windows** | `.msi` (recommended) and `.exe` (NSIS) |
+            | **macOS** | `.dmg` (**Apple Silicon only** — Intel Mac not supported). Signed + notarized when Apple secrets are configured. |
+            | **Windows** | `.msi` (recommended) and `.exe` (NSIS). Authenticode-signed when `WINDOWS_CERTIFICATE` is configured. |
 
-            **macOS unsigned builds:** If macOS reports the DMG is “damaged”, clear quarantine: `xattr -cr ~/Downloads/efvibe*.dmg` then open the DMG. See [INSTALL.md](https://github.com/${{ github.repository }}/blob/main/INSTALL.md#troubleshooting).
+            **macOS without notarization:** If the DMG is unsigned, Gatekeeper may report “damaged”. Clear quarantine: `xattr -cr ~/Downloads/efvibe*.dmg` then open the DMG. See [INSTALL.md](https://github.com/${{ github.repository }}/blob/main/INSTALL.md#troubleshooting).
 
             ### Prerequisites
             Studio still requires the [efvibe](https://www.nuget.org/packages/efvibe) CLI and .NET SDK on the machine. See [INSTALL.md](https://github.com/${{ github.repository }}/blob/main/INSTALL.md).

@@ -1633,14 +1633,33 @@ body.tab-dragging .query-tab-label {
 }
 
 .notebook-markdown-render h1,
+.notebook-output-markdown h1 {
+  margin: 0 0 10px;
+  font-size: 1.75em;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
 .notebook-markdown-render h2,
+.notebook-output-markdown h2 {
+  margin: 0 0 9px;
+  font-size: 1.4em;
+  font-weight: 650;
+  line-height: 1.3;
+}
+
 .notebook-markdown-render h3,
-.notebook-output-markdown h1,
-.notebook-output-markdown h2,
-.notebook-output-markdown h3 {
+.notebook-markdown-render h4,
+.notebook-markdown-render h5,
+.notebook-markdown-render h6,
+.notebook-output-markdown h3,
+.notebook-output-markdown h4,
+.notebook-output-markdown h5,
+.notebook-output-markdown h6 {
   margin: 0 0 8px;
   font-size: 1.1em;
   font-weight: 600;
+  line-height: 1.35;
 }
 
 .notebook-markdown-render p,

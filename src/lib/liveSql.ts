@@ -479,6 +479,26 @@ function splitTopLevelCommaSeparated(argumentsText: string): string[] {
   return parts;
 }
 
+/** Stable key for auto preview deduplication (editor + connection context). */
+export function buildAutoPreviewKey(
+  expression: string,
+  editorIsSql: boolean,
+  connectionSettings: ConnectionSettings | undefined,
+  searchDirectory: string,
+): string {
+  const context =
+    !connectionSettings || !searchDirectory.trim()
+      ? ""
+      : [
+          searchDirectory.trim(),
+          connectionSettings.project,
+          connectionSettings.context,
+          connectionSettings.toolPath,
+        ].join("\0");
+
+  return `${context}\n${editorIsSql ? "sql" : "linq"}\n${expression}`;
+}
+
 export async function fetchLiveEditorPreview(
   settings: ConnectionSettings,
   searchDirectory: string,

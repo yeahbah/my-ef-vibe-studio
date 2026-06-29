@@ -41,4 +41,14 @@ describe("renderNotebookMarkdown", () => {
     expect(html).toContain("<h3>Title</h3>");
     expect(html).toContain("<p>Use `db.Products`</p>");
   });
+
+  it("renders h1 without a space after #", () => {
+    const html = renderNotebookMarkdown("#Hello World");
+    expect(html).toContain("<h1>Hello World</h1>");
+  });
+
+  it("renders h1 with a space after #", () => {
+    const html = renderNotebookMarkdown("# Hello World");
+    expect(html).toContain("<h1>Hello World</h1>");
+  });
 });

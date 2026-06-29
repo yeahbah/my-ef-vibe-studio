@@ -55,6 +55,9 @@
         "desktopTemplate": "efvibe-studio.desktop",
         "postInstallScript": "scripts/linux-postinstall.sh"
       }
+    },
+    "macOS": {
+      "entitlements": "entitlements.plist"
     }
   }
 }

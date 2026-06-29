@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { fetchLiveEditorPreview, type EditorPreviewMode } from "../lib/liveSql";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { buildAutoPreviewKey, fetchLiveEditorPreview, type EditorPreviewMode } from "../lib/liveSql";
 import { looksLikeRawSql } from "../lib/sqlDetect";
 import { yieldToUi } from "../lib/yieldToUi";
 import type { ConnectionSettings } from "../types/connection";
@@ -23,6 +23,8 @@ interface LiveSqlPaneProps {
   theme?: AppTheme;
   keybindings?: KeybindingSettings;
 }
+
+const AUTO_PREVIEW_DEBOUNCE_MS = 600;
 
 function formatPreviewStatus(input: {
   loading: boolean;
@@ -67,9 +69,24 @@ export function LiveSqlPane({
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [dirty, setDirty] = useState(false);
-  const skipInitialPreviewRef = useRef(true);
+  const lastAutoPreviewKeyRef = useRef("");
+  const programmaticPreviewTextRef = useRef<string | null>(null);
+  const previewRequestIdRef = useRef(0);
+  const connectionSettingsRef = useRef(connectionSettings);
+  connectionSettingsRef.current = connectionSettings;
 
   const editorIsSql = useMemo(() => looksLikeRawSql(expression), [expression]);
+  const autoPreviewKey = useMemo(
+    () => buildAutoPreviewKey(expression, editorIsSql, connectionSettings, searchDirectory),
+    [
+      connectionSettings?.context,
+      connectionSettings?.project,
+      connectionSettings?.toolPath,
+      editorIsSql,
+      expression,
+      searchDirectory,
+    ],
+  );
 
   useEffect(() => {
     if (!dirty) {
@@ -77,91 +94,107 @@ export function LiveSqlPane({
     }
   }, [dirty, editorIsSql]);
 
-  useEffect(() => {
-    if (skipInitialPreviewRef.current) {
-      skipInitialPreviewRef.current = false;
-      return;
-    }
+  const refreshPreview = useCallback(
+    async (options?: { force?: boolean }) => {
+      const settings = connectionSettingsRef.current;
+      if (
+        !settings ||
+        !searchDirectory.trim() ||
+        (!options?.force && autoPreviewKey === lastAutoPreviewKeyRef.current)
+      ) {
+        return;
+      }
 
+      lastAutoPreviewKeyRef.current = autoPreviewKey;
+      const requestId = ++previewRequestIdRef.current;
+
+      onRequestEngine?.();
+      setLoading(true);
+      onEngineBusyChange?.(1);
+      await yieldToUi();
+
+      try {
+        const preview = await fetchLiveEditorPreview(settings, searchDirectory, expression);
+
+        if (requestId !== previewRequestIdRef.current) {
+          return;
+        }
+
+        setPreviewMode(preview.mode);
+        programmaticPreviewTextRef.current = preview.content ?? "";
+        setPreviewText(programmaticPreviewTextRef.current);
+        setError(preview.error ?? "");
+        setConfidence(preview.confidence);
+        setUnsupported(preview.unsupported ?? []);
+      } catch (previewError) {
+        if (requestId !== previewRequestIdRef.current) {
+          return;
+        }
+
+        programmaticPreviewTextRef.current = "";
+        setPreviewText("");
+        setUnsupported([]);
+        setConfidence(undefined);
+        setError(previewError instanceof Error ? previewError.message : String(previewError));
+      } finally {
+        if (requestId === previewRequestIdRef.current) {
+          onEngineBusyChange?.(-1);
+          setLoading(false);
+        }
+      }
+    },
+    [autoPreviewKey, expression, onEngineBusyChange, onRequestEngine, searchDirectory],
+  );
+
+  const refreshPreviewRef = useRef(refreshPreview);
+  refreshPreviewRef.current = refreshPreview;
+
+  useEffect(() => {
     if (
       !autoPreviewEnabled ||
       !autoPreviewAllowed ||
       !enabled ||
       dirty ||
-      !connectionSettings ||
+      !connectionSettingsRef.current ||
       !searchDirectory.trim()
     ) {
-      if (!dirty) {
-        if (!enabled || !connectionSettings || !searchDirectory.trim()) {
-          setPreviewText("");
-          setError("");
-          setUnsupported([]);
-          setConfidence(undefined);
-        }
+      if (
+        !dirty &&
+        (!enabled || !connectionSettingsRef.current || !searchDirectory.trim())
+      ) {
+        setPreviewText("");
+        setError("");
+        setUnsupported([]);
+        setConfidence(undefined);
+        lastAutoPreviewKeyRef.current = "";
       }
 
       return;
     }
 
-    const handle = window.setTimeout(() => {
-      void refreshPreview();
-    }, 600);
-
-    return () => window.clearTimeout(handle);
-  }, [
-    autoPreviewEnabled,
-    autoPreviewAllowed,
-    connectionSettings,
-    dirty,
-    enabled,
-    expression,
-    searchDirectory,
-  ]);
-
-  async function refreshPreview() {
-    onRequestEngine?.();
-
-    if (!connectionSettings || !searchDirectory.trim()) {
+    if (autoPreviewKey === lastAutoPreviewKeyRef.current) {
       return;
     }
 
-    setLoading(true);
-    onEngineBusyChange?.(1);
-    await yieldToUi();
+    const handle = window.setTimeout(() => {
+      void refreshPreviewRef.current();
+    }, AUTO_PREVIEW_DEBOUNCE_MS);
 
-    try {
-      const preview = await fetchLiveEditorPreview(
-        connectionSettings,
-        searchDirectory,
-        expression,
-      );
-
-      setPreviewMode(preview.mode);
-      setPreviewText(preview.content ?? "");
-      setError(preview.error ?? "");
-      setConfidence(preview.confidence);
-      setUnsupported(preview.unsupported ?? []);
-    } catch (previewError) {
-      setPreviewText("");
-      setUnsupported([]);
-      setConfidence(undefined);
-      setError(previewError instanceof Error ? previewError.message : String(previewError));
-    } finally {
-      onEngineBusyChange?.(-1);
-      setLoading(false);
-    }
-  }
+    return () => window.clearTimeout(handle);
+  }, [autoPreviewAllowed, autoPreviewEnabled, autoPreviewKey, dirty, enabled, searchDirectory]);
 
   async function syncFromEditor() {
     setDirty(false);
-    await refreshPreview();
+    lastAutoPreviewKeyRef.current = "";
+    await refreshPreview({ force: true });
   }
 
   function handleAutoPreviewToggle() {
     const next = !autoPreviewEnabled;
     onAutoPreviewEnabledChange(next);
     if (next && !dirty && enabled && connectionSettings && searchDirectory.trim()) {
-      void refreshPreview();
+      lastAutoPreviewKeyRef.current = "";
+      void refreshPreview({ force: true });
     }
   }
 
@@ -172,6 +205,18 @@ export function LiveSqlPane({
     }
 
     onRun(trimmed);
+  }
+
+  function handlePreviewChange(next: string) {
+    setPreviewText(next);
+
+    if (programmaticPreviewTextRef.current !== null && next === programmaticPreviewTextRef.current) {
+      programmaticPreviewTextRef.current = null;
+      return;
+    }
+
+    programmaticPreviewTextRef.current = null;
+    setDirty(true);
   }
 
   const previewTitle = previewMode === "linq" ? "LINQ" : "SQL";
@@ -207,10 +252,7 @@ export function LiveSqlPane({
           language={previewMode === "sql" ? "sql" : "csharp"}
           keybindings={keybindings}
           enableRunShortcuts={false}
-          onChange={(next) => {
-            setPreviewText(next);
-            setDirty(true);
-          }}
+          onChange={handlePreviewChange}
         />
       </div>
 

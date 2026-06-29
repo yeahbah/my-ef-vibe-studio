@@ -84,18 +84,94 @@ When **Store connection strings in the local secret vault** is enabled (default)
 
 ### Windows code signing (maintainers)
 
-To sign Windows installers in CI, add repository secrets:
+Windows installers need an **Authenticode** certificate from a CA (DigiCert, Sectigo, etc.). An Apple Developer account does **not** cover Windows signing.
+
+Add these repository secrets (Settings → Secrets and variables → Actions):
 
 | Secret | Value |
 |--------|--------|
 | `WINDOWS_CERTIFICATE` | Base64-encoded `.pfx` code-signing certificate |
 | `WINDOWS_CERTIFICATE_PASSWORD` | PFX password |
 
+Encode a PFX:
+
+```bash
+openssl base64 -A -in your-codesign.pfx -out windows-cert-base64.txt
+```
+
 When these secrets are absent, the release workflow skips signing. Signed builds reduce SmartScreen warnings for end users.
 
-### macOS code signing (maintainers)
+### macOS code signing and notarization (maintainers)
 
-Release DMGs are **unsigned and not notarized**. Users may see “damaged” or “unidentified developer” until quarantine is cleared (see Troubleshooting). Proper fix: Apple Developer ID signing + notarization in CI.
+Release DMGs are **signed and notarized in CI** when the Apple secrets below are configured. Without them, builds are unsigned and users may see “damaged” or “unidentified developer” until quarantine is cleared (see Troubleshooting).
+
+#### 1. Create a Developer ID Application certificate
+
+1. On a Mac, open **Keychain Access → Certificate Assistant → Request a Certificate From a Certificate Authority** and save a CSR.
+2. In [Apple Developer → Certificates](https://developer.apple.com/account/resources/certificates/list), create **Developer ID Application** (not “Apple Distribution” — that is for the Mac App Store).
+3. Download the `.cer` and double-click to install it in your login keychain.
+
+Find your signing identity:
+
+```bash
+security find-identity -v -p codesigning
+```
+
+Copy the full name, e.g. `Developer ID Application: Your Name (TEAMID1234)`.
+
+#### 2. Export the certificate for CI
+
+1. **Keychain Access → My Certificates** → expand your Developer ID Application entry.
+2. Right-click the private key → **Export** → save as `.p12` with a password.
+3. Base64-encode for GitHub:
+
+```bash
+openssl base64 -A -in DeveloperID.p12 -out apple-cert-base64.txt
+```
+
+#### 3. App-specific password (for notarization)
+
+1. Sign in at [appleid.apple.com](https://appleid.apple.com) → **App-Specific Passwords**.
+2. Generate a password for “GitHub Actions notarization”.
+
+#### 4. GitHub repository secrets
+
+| Secret | Value |
+|--------|--------|
+| `APPLE_CERTIFICATE` | Contents of `apple-cert-base64.txt` |
+| `APPLE_CERTIFICATE_PASSWORD` | Password used when exporting the `.p12` |
+| `KEYCHAIN_PASSWORD` | Any strong random string (CI-only keychain) |
+| `APPLE_SIGNING_IDENTITY` | Full identity from `security find-identity`, e.g. `Developer ID Application: …` |
+| `APPLE_ID` | Your Apple ID email |
+| `APPLE_PASSWORD` | App-specific password (not your Apple ID login password) |
+| `APPLE_TEAM_ID` | Team ID from [Membership details](https://developer.apple.com/account#MembershipDetailsCard) |
+
+#### 5. Publish a signed release
+
+Tag push (recommended):
+
+```bash
+git tag v0.2.1
+git push origin v0.2.1
+```
+
+Or run **Actions → Release → Run workflow**, set a version, and optionally mark as draft.
+
+The workflow builds `.dmg` (Apple Silicon), signs + notarizes on macOS, signs `.msi`/`.exe` on Windows when configured, and uploads everything to a GitHub Release.
+
+#### Local signed DMG (optional)
+
+With the certificate in your Mac keychain:
+
+```bash
+export APPLE_SIGNING_IDENTITY="Developer ID Application: Your Name (TEAMID)"
+export APPLE_ID="you@example.com"
+export APPLE_PASSWORD="xxxx-xxxx-xxxx-xxxx"
+export APPLE_TEAM_ID="TEAMID"
+npm run tauri build -- --target aarch64-apple-darwin
+```
+
+Output: `src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/*.dmg`
 
 ### Cloud sync
 
@@ -123,7 +199,7 @@ Built-in packs ship offline. Registry packs under **Team → Snippet packs** dow
   kbuildsycoca6 --noincremental
   ```
   Then log out and back in (or restart Plasma). If you still see the generic Wayland icon, fully quit Studio and launch it from the app menu (not an old pinned taskbar entry).
-- **macOS says the app or DMG is “damaged”** — the file is usually fine. GitHub release builds are **not Apple-notarized** yet, and Safari/Chrome attach a quarantine flag that Gatekeeper treats as broken. Try:
+- **macOS says the app or DMG is “damaged”** — on **unsigned** builds, the file is usually fine: Safari/Chrome attach a quarantine flag that Gatekeeper treats as broken. Signed + notarized releases from GitHub should open normally. For unsigned builds, try:
   1. Remove quarantine, then open the DMG:
      ```bash
      xattr -cr ~/Downloads/efvibe*.dmg

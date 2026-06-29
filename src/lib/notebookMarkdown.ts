@@ -53,22 +53,15 @@ export function renderNotebookMarkdown(markdown: string): string {
       continue;
     }
 
-    if (line.startsWith("### ")) {
-      parts.push(`<h3>${inlineMarkdown(line.slice(4))}</h3>`);
-      index += 1;
-      continue;
-    }
-
-    if (line.startsWith("## ")) {
-      parts.push(`<h2>${inlineMarkdown(line.slice(3))}</h2>`);
-      index += 1;
-      continue;
-    }
-
-    if (line.startsWith("# ")) {
-      parts.push(`<h1>${inlineMarkdown(line.slice(2))}</h1>`);
-      index += 1;
-      continue;
+    const headingMatch = line.match(/^(#{1,6})\s*(.+)$/u);
+    if (headingMatch) {
+      const level = headingMatch[1].length;
+      const content = headingMatch[2].replace(/\s+#+\s*$/u, "").trim();
+      if (content) {
+        parts.push(`<h${level}>${inlineMarkdown(content)}</h${level}>`);
+        index += 1;
+        continue;
+      }
     }
 
     parts.push(`<p>${inlineMarkdown(line)}</p>`);
