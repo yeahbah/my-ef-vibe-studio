@@ -78,6 +78,12 @@ import {
 import { buildExportContent } from "./lib/resultFormat";
 import { inferResultEntity, persistResultChanges } from "./lib/resultPersist";
 import { runScanJson } from "./lib/schema";
+import { SampleWorkspaceDialog } from "./components/SampleWorkspaceDialog";
+import {
+  getSampleParentDirectory,
+  provisionSampleWorkspace,
+  sampleWorkspaceDetail,
+} from "./lib/sampleWorkspace";
 import { appendScriptLoad } from "./lib/scripts";
 import { findingsToReviewItems } from "./lib/scan";
 import {
@@ -175,6 +181,8 @@ function App() {
   const [status, setStatus] = useState("Ready");
   const [running, setRunning] = useState(false);
   const [engineBusyCount, setEngineBusyCount] = useState(0);
+  const [sampleWorkspaceOfferOpen, setSampleWorkspaceOfferOpen] = useState(false);
+  const [sampleWorkspaceCreating, setSampleWorkspaceCreating] = useState(false);
   const [sessionLoaded, setSessionLoaded] = useState(false);
   const keybindings = useMemo(
     () => resolveKeybindings(settings?.keybindings),
@@ -532,6 +540,76 @@ function App() {
     });
   }, []);
 
+  const completeOnboarding = useCallback(async () => {
+    if (!settings) {
+      setSampleWorkspaceOfferOpen(false);
+      return;
+    }
+
+    const nextSettings = { ...settings, onboardingCompleted: true };
+    setSettings(nextSettings);
+    await saveAppSettings(nextSettings);
+    setSampleWorkspaceOfferOpen(false);
+  }, [settings]);
+
+  const handleDeclineSampleWorkspace = useCallback(() => {
+    void completeOnboarding();
+  }, [completeOnboarding]);
+
+  const handleCreateSampleWorkspace = useCallback(async () => {
+    if (!settings || sampleWorkspaceCreating) {
+      return;
+    }
+
+    setSampleWorkspaceCreating(true);
+    setStatus("Downloading AdventureWorks SQLite sample…");
+    await yieldToUi();
+
+    try {
+      const sample = await provisionSampleWorkspace(settings.defaultWorkspaceRoot);
+      await invalidateEfvibeDaemon();
+
+      setDocument({
+        path: sample.workspacePath,
+        workspace: sample.workspace,
+      });
+      setQueryTabs(sample.queryTabs);
+      setPaneLayout(sample.paneLayout);
+      setFocusedPaneId(sample.paneLayout.id);
+      setNotebookName(sample.notebookName);
+      setNotebookPath(sample.notebookPath);
+      setNotebookConnectionId(sample.connectionId);
+      setNotebookCells(sample.notebookCells);
+      setMainView("query");
+      setExplorerExpandedNodes(
+        normalizeExplorerExpandedNodes(
+          resolveExplorerExpandedNodes(undefined, undefined),
+          sample.connectionId,
+        ),
+      );
+
+      const nextSettings = { ...settings, onboardingCompleted: true };
+      setSettings(nextSettings);
+      await saveAppSettings(nextSettings);
+      setSampleWorkspaceOfferOpen(false);
+      setStatus(`Sample workspace ready in ${sample.studioRoot}`);
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : String(error));
+    } finally {
+      setSampleWorkspaceCreating(false);
+    }
+  }, [sampleWorkspaceCreating, settings]);
+
+  const sampleWorkspaceTargetDetail = useMemo(() => {
+    if (!settings?.defaultWorkspaceRoot) {
+      return undefined;
+    }
+
+    return sampleWorkspaceDetail(
+      `${getSampleParentDirectory(settings.defaultWorkspaceRoot)}/AdventureWorks-sqlite`,
+    );
+  }, [settings?.defaultWorkspaceRoot]);
+
   useEffect(() => {
     void (async () => {
       const loaded = await loadAppSettings();
@@ -541,6 +619,10 @@ function App() {
       }
 
       const savedSession = await loadStudioSession();
+      if (savedSession?.workspacePath || savedSession?.workspace.connections.length) {
+        loaded.onboardingCompleted = true;
+      }
+
       if (savedSession?.workspace.connections.length) {
         const hydratedWorkspace = await hydrateWorkspaceSecrets(
           savedSession.workspacePath,
@@ -656,6 +738,10 @@ function App() {
         const layout = createSinglePaneLayout([tab.id], tab.id);
         setPaneLayout(layout);
         setFocusedPaneId(layout.id);
+      }
+
+      if (!savedSession?.workspace.connections.length && !loaded.onboardingCompleted) {
+        setSampleWorkspaceOfferOpen(true);
       }
 
       setSettings(loaded);
@@ -2615,6 +2701,14 @@ function App() {
           onConnectionChange={updateConnection}
         />
       ) : null}
+
+      <SampleWorkspaceDialog
+        open={sampleWorkspaceOfferOpen}
+        busy={sampleWorkspaceCreating}
+        detail={sampleWorkspaceTargetDetail}
+        onConfirm={() => void handleCreateSampleWorkspace()}
+        onClose={handleDeclineSampleWorkspace}
+      />
 
     </main>
   );

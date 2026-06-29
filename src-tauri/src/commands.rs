@@ -245,6 +245,11 @@ pub fn git_commit_files(
 }
 
 #[tauri::command]
+pub fn clone_adventureworks_sqlite(parent_directory: String) -> Result<String, String> {
+    crate::sample_workspace::clone_adventureworks_sqlite(parent_directory)
+}
+
+#[tauri::command]
 pub fn open_in_ide(
     file: String,
     line: u32,

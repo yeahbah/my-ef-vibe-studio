@@ -7,6 +7,7 @@ interface ConfirmDialogProps {
   detail?: string;
   confirmLabel?: string;
   cancelLabel?: string;
+  busy?: boolean;
   onConfirm: () => void;
   onClose: () => void;
 }
@@ -18,6 +19,7 @@ export function ConfirmDialog({
   detail,
   confirmLabel = "Confirm",
   cancelLabel = "Cancel",
+  busy = false,
   onConfirm,
   onClose,
 }: ConfirmDialogProps) {
@@ -40,10 +42,10 @@ export function ConfirmDialog({
             <pre className="confirm-dialog-detail">{detail}</pre>
           ) : null}
           <div className="confirm-dialog-actions">
-            <button type="button" onClick={onClose}>
+            <button type="button" onClick={onClose} disabled={busy}>
               {cancelLabel}
             </button>
-            <button type="button" onClick={onConfirm}>
+            <button type="button" onClick={onConfirm} disabled={busy}>
               {confirmLabel}
             </button>
           </div>

@@ -29,6 +29,8 @@ export interface AppSettings {
   theme?: AppTheme;
   /** When true, connection strings are stored in the OS-backed vault instead of workspace files. */
   vaultConnectionSecrets?: boolean;
+  /** When true, the first-run sample workspace prompt has already been handled. */
+  onboardingCompleted?: boolean;
   keybindings?: Partial<KeybindingSettings>;
 }
 
@@ -40,6 +42,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   teamSyncDirectory: "",
   cloudSyncDirectory: "",
   vaultConnectionSecrets: true,
+  onboardingCompleted: false,
 };
 
 export interface ToolInvocation {

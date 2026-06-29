@@ -1,6 +1,7 @@
 mod commands;
 mod daemon;
 mod git;
+mod sample_workspace;
 mod tool;
 
 #[cfg(target_os = "linux")]
@@ -48,6 +49,7 @@ pub fn run() {
             commands::start_repl,
             commands::git_status,
             commands::git_commit_files,
+            commands::clone_adventureworks_sqlite,
             commands::set_window_title,
             commands::file_manager_label,
             commands::repl_spawn_spec,
