@@ -3,6 +3,7 @@ import {
   connectionDisplayName,
   createSampleConnection,
   duplicateConnection,
+  resolveScriptSearchPath,
   resolveSearchDirectory,
   workspaceConnectionToSettings,
 } from "./workspace";
@@ -79,7 +80,7 @@ describe("workspaceConnectionToSettings", () => {
     expect(settings.scriptUsings).toEqual(["MyApp.Helpers", "System.Linq"]);
   });
 
-  it("resolves relative script paths", () => {
+  it("keeps script search path relative to the workspace file", () => {
     const settings = workspaceConnectionToSettings(
       {
         ...createSampleConnection(),
@@ -91,8 +92,16 @@ describe("workspaceConnectionToSettings", () => {
       "/workspace",
     );
 
-    expect(settings.scriptSearchPath).toBe("/workspace/scripts");
+    expect(settings.workspaceFileDirectory).toBe("/workspace");
+    expect(settings.scriptSearchPath).toBe("./scripts");
     expect(settings.scriptLoads).toEqual(["helpers.csx"]);
+    expect(resolveScriptSearchPath(
+      {
+        ...createSampleConnection(),
+        scriptSearchPath: "./scripts",
+      },
+      "/workspace",
+    )).toBe("/workspace/scripts");
   });
 
   it("defaults script search path to scripts beside the workspace file", () => {
@@ -103,6 +112,7 @@ describe("workspaceConnectionToSettings", () => {
       "/workspace",
     );
 
-    expect(settings.scriptSearchPath).toBe("/workspace/scripts");
+    expect(settings.scriptSearchPath).toBe("scripts");
+    expect(resolveScriptSearchPath(createSampleConnection(), "/workspace")).toBe("/workspace/scripts");
   });
 });

@@ -136,10 +136,14 @@ export function workspaceConnectionToSettings(
   toolPath: string,
   defaultWorkspaceRoot: string,
 ): import("./connection").ConnectionSettings {
+  const configuredScriptSearchPath = connection.scriptSearchPath?.trim();
+  const scriptSearchPath = configuredScriptSearchPath || DEFAULT_SCRIPT_SEARCH_PATH;
+
   return {
     workspaceRoot:
       resolveWorkspaceRelativePath(connection.workspaceRoot, workspaceDirectory) ||
       defaultWorkspaceRoot,
+    workspaceFileDirectory: workspaceDirectory !== "." ? workspaceDirectory : "",
     project: resolveWorkspaceRelativePath(connection.efProject, workspaceDirectory),
     startupProject: resolveWorkspaceRelativePath(connection.startupProject, workspaceDirectory),
     context: connection.context ?? "",
@@ -147,7 +151,7 @@ export function workspaceConnectionToSettings(
     toolPath,
     dbLog: connection.dbLog ?? true,
     dotnetFramework: connection.dotnetFramework ?? "",
-    scriptSearchPath: resolveScriptSearchPath(connection, workspaceDirectory),
+    scriptSearchPath,
     scriptLoads: connection.scriptLoads ?? [],
     scriptUsings: (connection.scriptUsings ?? []).map(normalizeScriptUsing),
   };

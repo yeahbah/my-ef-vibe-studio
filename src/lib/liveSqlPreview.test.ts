@@ -4,6 +4,7 @@ import type { ConnectionSettings } from "../types/connection";
 
 const settings: ConnectionSettings = {
   workspaceRoot: "/workspace",
+  workspaceFileDirectory: "/workspace",
   project: "/workspace/App.csproj",
   startupProject: "",
   context: "AppDbContext",

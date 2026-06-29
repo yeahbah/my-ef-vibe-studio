@@ -3,6 +3,7 @@ import type { AppTheme } from "./theme";
 
 export interface ConnectionSettings {
   workspaceRoot: string;
+  workspaceFileDirectory: string;
   project: string;
   startupProject: string;
   context: string;

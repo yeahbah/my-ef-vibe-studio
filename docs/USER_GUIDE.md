@@ -141,9 +141,16 @@ const decimal MinListPrice = 0m;
 ```csharp
 #load "constants.csx"
 
-IQueryable<Product> ActiveProducts() =>
-    db.Products.Where(p => !p.DiscontinuedDate.HasValue && p.ListPrice > MinListPrice);
+using AdventureWorks.Domain.Entities.Production;
+
+IQueryable<Product> ActiveProducts()
+{
+    IQueryable<Product> products = db.Products;
+    return products.Where(p => !p.DiscontinuedDate.HasValue && p.ListPrice > MinListPrice);
+}
 ```
+
+Use an explicit `IQueryable<Product>` local when defining script helpers. In Roslyn script loads, expression-bodied helpers like `=> db.Products.Where(...)` can bind `Where` to `Enumerable` instead of `Queryable`, which fails when the declared return type is `IQueryable<T>`.
 
 In the connection editor:
 

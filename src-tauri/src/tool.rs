@@ -6,6 +6,7 @@ use std::path::{Path, PathBuf};
 #[serde(rename_all = "camelCase")]
 pub struct ConnectionSettings {
     pub workspace_root: String,
+    pub workspace_file_directory: String,
     pub project: String,
     pub startup_project: String,
     pub context: String,
@@ -225,12 +226,37 @@ pub fn build_efvibe_args(
     args
 }
 
+fn resolve_script_base_directory(
+    settings: &ConnectionSettings,
+    base_directory: Option<&Path>,
+) -> Option<std::path::PathBuf> {
+    let workspace_file_directory = settings.workspace_file_directory.trim();
+    if !workspace_file_directory.is_empty() {
+        return Some(Path::new(workspace_file_directory).to_path_buf());
+    }
+
+    base_directory.map(|path| path.to_path_buf())
+}
+
 fn append_script_args(
     settings: &ConnectionSettings,
     base_directory: Option<&Path>,
     args: &mut Vec<String>,
 ) {
-    let script_search_path = resolve_cli_path(&settings.script_search_path, base_directory);
+    let script_base_directory = resolve_script_base_directory(settings, base_directory);
+
+    if let Some(script_base) = script_base_directory.as_ref() {
+        let script_base_path = script_base.to_string_lossy().to_string();
+        if !script_base_path.is_empty() {
+            args.push("--script-base-path".to_string());
+            args.push(script_base_path);
+        }
+    }
+
+    let script_search_path = resolve_cli_path(
+        &settings.script_search_path,
+        script_base_directory.as_deref().or(base_directory),
+    );
     if !script_search_path.is_empty() {
         args.push("--script-search-path".to_string());
         args.push(script_search_path);
@@ -284,6 +310,7 @@ pub fn settings_key(
         "context": settings.context,
         "connectionString": settings.connection_string,
         "toolPath": settings.tool_path,
+        "workspaceFileDirectory": settings.workspace_file_directory,
         "dbLog": settings.db_log,
         "dotnetFramework": settings.dotnet_framework,
         "scriptSearchPath": settings.script_search_path,
@@ -301,6 +328,7 @@ mod tests {
     fn sample_settings() -> ConnectionSettings {
         ConnectionSettings {
             workspace_root: "workspace".to_string(),
+            workspace_file_directory: "/tmp/workspace".to_string(),
             project: "src/App.csproj".to_string(),
             startup_project: "src/Api.csproj".to_string(),
             context: "AppDbContext".to_string(),
@@ -316,13 +344,37 @@ mod tests {
 
     #[test]
     fn build_efvibe_args_includes_script_flags() {
-        let base = Path::new("/tmp/workspace");
-        let args = build_efvibe_args(&sample_settings(), Some(base), false);
+        let project_base = Path::new("/tmp/workspace/src");
+        let args = build_efvibe_args(&sample_settings(), Some(project_base), false);
 
+        assert!(args.windows(2).any(|pair| pair == ["--script-base-path", "/tmp/workspace"]));
         assert!(args.windows(2).any(|pair| pair == ["--script-search-path", "/tmp/workspace/scripts"]));
         assert!(args.windows(2).any(|pair| pair == ["--script-load", "helpers.csx;filters.csx"]));
         assert!(args.windows(2).any(|pair| {
             pair == ["--script-using", "MyApp.Helpers;System.Globalization"]
+        }));
+    }
+
+    #[test]
+    fn build_efvibe_args_resolves_script_search_path_against_workspace_file_directory() {
+        let mut settings = sample_settings();
+        settings.script_search_path = "scripts".to_string();
+        settings.workspace_file_directory = "/home/user/docs/my-ef-vibe".to_string();
+
+        let args = build_efvibe_args(
+            &settings,
+            Some(Path::new("/home/user/projects/AdventureWorks.API")),
+            false,
+        );
+
+        assert!(args
+            .windows(2)
+            .any(|pair| pair == ["--script-base-path", "/home/user/docs/my-ef-vibe"]));
+        assert!(args.windows(2).any(|pair| {
+            pair == [
+                "--script-search-path",
+                "/home/user/docs/my-ef-vibe/scripts",
+            ]
         }));
     }
 

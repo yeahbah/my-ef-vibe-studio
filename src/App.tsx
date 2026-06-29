@@ -123,6 +123,7 @@ import {
   connectionDisplayName,
   duplicateConnection,
   getActiveConnection,
+  resolveScriptSearchPath,
   resolveSearchDirectory,
   workspaceConnectionToSettings,
   type EfvibeWorkspace,
@@ -2316,7 +2317,11 @@ function App() {
                       onDismissFinding={(note) => void handleDismissScanFinding(note)}
                       onSaveFindingNote={(note) => void handleSaveScanFindingNote(note)}
                       running={running}
-                      scriptSearchPath={connectionSettings?.scriptSearchPath ?? ""}
+                      scriptSearchPath={
+                        activeConnection
+                          ? resolveScriptSearchPath(activeConnection, workspaceDirectory)
+                          : ""
+                      }
                       scriptLoads={activeConnection?.scriptLoads ?? []}
                       scriptUsings={activeConnection?.scriptUsings ?? []}
                       onScriptsChanged={() => void resetDaemonSessions()}
