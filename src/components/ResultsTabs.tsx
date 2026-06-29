@@ -1,7 +1,8 @@
 import type { EvaluationJsonPayload } from "../types/evaluation";
-import { ResultRowsView, ResultValueView } from "./ResultExplorer";
+import { ResultRowsView, ResultValueView, ConsoleOutputView, ReturnValueSummary } from "./ResultExplorer";
 import { canExportPayload, escapeHtml, formatMetrics } from "../lib/resultFormat";
 import { resolveResultView } from "../lib/resultView";
+import { hasConsoleOutput } from "../lib/consoleOutput";
 import type { ResultsTab } from "../types/query";
 import { normalizeResultsTab } from "../types/query";
 
@@ -92,6 +93,15 @@ function ResultBody({
   onSaveRows?: (rows: Array<Record<string, string>>) => Promise<void>;
 }) {
   const view = resolveResultView(payload);
+  const consoleBlock = hasConsoleOutput(payload.consoleOutput) ? (
+    <ConsoleOutputView output={payload.consoleOutput!.trim()} />
+  ) : null;
+  const returnValue =
+    payload.value?.trim() &&
+    view === "grid" &&
+    !/^\d+\s+rows$/u.test(payload.value.trim()) ? (
+      <ReturnValueSummary value={payload.value} />
+    ) : null;
 
   switch (view) {
     case "pending":
@@ -122,16 +132,25 @@ function ResultBody({
       return <pre className="error-block">{payload.error ?? "Evaluation failed."}</pre>;
     case "grid":
       return (
-        <ResultRowsView
-          rows={payload.rows!}
-          onSave={onSaveRows}
-          exportEnabled={exportEnabled}
-          onExport={onExport}
-        />
+        <div className="stack">
+          {consoleBlock}
+          {returnValue}
+          <ResultRowsView
+            rows={payload.rows!}
+            onSave={onSaveRows}
+            exportEnabled={exportEnabled}
+            onExport={onExport}
+          />
+        </div>
       );
+    case "console":
+      return consoleBlock ?? <pre className="value-block">(null)</pre>;
     case "scalar":
       return (
-        <ResultValueView value={payload.value!} exportEnabled={exportEnabled} onExport={onExport} />
+        <div className="stack">
+          {consoleBlock}
+          <ResultValueView value={payload.value!} exportEnabled={exportEnabled} onExport={onExport} />
+        </div>
       );
     case "empty":
       return <pre className="value-block">(null)</pre>;

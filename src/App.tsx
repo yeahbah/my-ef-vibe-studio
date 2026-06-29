@@ -271,7 +271,11 @@ function App() {
     return connectionForTab(document.workspace, activeQueryTab, activeConnectionId);
   }, [document, activeQueryTab, activeConnectionId]);
 
-  const appReady = !!(settings && activeConnection && document && activeQueryTab);
+  const appReady = !!(
+    settings &&
+    document &&
+    (!settings.onboardingCompleted || (activeConnection && activeQueryTab))
+  );
 
   const connectionSettings = useMemo(() => {
     if (!activeConnection || !settings) {
@@ -553,8 +557,24 @@ function App() {
   }, [settings]);
 
   const handleDeclineSampleWorkspace = useCallback(() => {
+    if (document && document.workspace.connections.length === 0) {
+      const connection = createSampleConnection();
+      const tab = createQueryTab(connection.id);
+      setDocument({
+        path: document.path,
+        workspace: {
+          ...document.workspace,
+          connections: [connection],
+        },
+      });
+      setQueryTabs([tab]);
+      const layout = createSinglePaneLayout([tab.id], tab.id);
+      setPaneLayout(layout);
+      setFocusedPaneId(layout.id);
+    }
+
     void completeOnboarding();
-  }, [completeOnboarding]);
+  }, [completeOnboarding, document]);
 
   const handleCreateSampleWorkspace = useCallback(async () => {
     if (!settings || sampleWorkspaceCreating) {
@@ -722,7 +742,7 @@ function App() {
         if (savedSession.explorerOpen !== undefined) {
           setExplorerOpen(savedSession.explorerOpen);
         }
-      } else {
+      } else if (loaded.onboardingCompleted) {
         const connection = createSampleConnection();
         const tab = createQueryTab(connection.id);
         setDocument({
@@ -738,9 +758,22 @@ function App() {
         const layout = createSinglePaneLayout([tab.id], tab.id);
         setPaneLayout(layout);
         setFocusedPaneId(layout.id);
+      } else {
+        setDocument({
+          path: "",
+          workspace: {
+            version: 1,
+            name: "Untitled workspace",
+            projects: [],
+            connections: [],
+          },
+        });
+        setQueryTabs([]);
+        setPaneLayout(undefined);
+        setFocusedPaneId("");
       }
 
-      if (!savedSession?.workspace.connections.length && !loaded.onboardingCompleted) {
+      if (!loaded.onboardingCompleted) {
         setSampleWorkspaceOfferOpen(true);
       }
 
@@ -813,7 +846,7 @@ function App() {
 
   useDebouncedEffect(
     () => {
-      if (!sessionLoaded || !document) {
+      if (!sessionLoaded || !document || !settings?.onboardingCompleted) {
         return;
       }
 
@@ -849,6 +882,7 @@ function App() {
     },
     [
       sessionLoaded,
+      settings?.onboardingCompleted,
       document,
       activeConnectionId,
       queryTabs,
@@ -2129,7 +2163,18 @@ function App() {
 
   if (!splashDone) {
     const splashMessage = appReady ? "Opening workspace…" : "Loading workspace…";
-    return <SplashScreen message={splashMessage} exiting={splashExiting} />;
+    return (
+      <>
+        <SplashScreen message={splashMessage} exiting={splashExiting} />
+        <SampleWorkspaceDialog
+          open={sampleWorkspaceOfferOpen}
+          busy={sampleWorkspaceCreating}
+          detail={sampleWorkspaceTargetDetail}
+          onConfirm={() => void handleCreateSampleWorkspace()}
+          onClose={handleDeclineSampleWorkspace}
+        />
+      </>
+    );
   }
 
   if (!appReady) {

@@ -39,6 +39,7 @@ export interface EvaluationJsonBenchmarkResult {
 export interface EvaluationJsonPayload {
   success: boolean;
   value?: string | null;
+  consoleOutput?: string | null;
   rows?: Array<Record<string, string>>;
   sql: string[];
   translatedSql?: string;

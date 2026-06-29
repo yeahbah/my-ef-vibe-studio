@@ -1,0 +1,6 @@
+{
+  "version": 1,
+  "name": "Compare variants",
+  "connectionId": "sample-adventureworks-sqlite",
+  "expression": "#[Compare(\"With tracking\")]\nActiveProducts()\n  .OrderBy(p => p.Name)\n  .Take(10)\n  .Select(p => new { p.ProductId, p.Name, p.ListPrice })\n  .ToList();\n\n#[Compare(\"No tracking\")]\nActiveProducts()\n  .AsNoTracking()\n  .OrderBy(p => p.Name)\n  .Take(10)\n  .Select(p => new { p.ProductId, p.Name, p.ListPrice })\n  .ToList();"
+}

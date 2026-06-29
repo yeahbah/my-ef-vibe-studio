@@ -1,0 +1,6 @@
+{
+  "version": 1,
+  "name": "Raw SQL",
+  "connectionId": "sample-adventureworks-sqlite",
+  "expression": "SELECT p.ProductID, p.Name, p.ListPrice\nFROM \"Production.Product\" AS p\nWHERE p.DiscontinuedDate IS NULL\n  AND p.ListPrice > 0\nORDER BY p.Name\nLIMIT 10;"
+}

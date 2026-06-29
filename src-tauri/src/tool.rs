@@ -1,6 +1,9 @@
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::process::Command;
+use std::sync::{Mutex, OnceLock};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -245,14 +248,6 @@ fn append_script_args(
 ) {
     let script_base_directory = resolve_script_base_directory(settings, base_directory);
 
-    if let Some(script_base) = script_base_directory.as_ref() {
-        let script_base_path = script_base.to_string_lossy().to_string();
-        if !script_base_path.is_empty() {
-            args.push("--script-base-path".to_string());
-            args.push(script_base_path);
-        }
-    }
-
     let script_search_path = resolve_cli_path(
         &settings.script_search_path,
         script_base_directory.as_deref().or(base_directory),
@@ -290,10 +285,122 @@ pub fn build_serve_args(
     settings: &ConnectionSettings,
     base_directory: Option<&Path>,
     force_build: bool,
+    invocation: Option<&ToolInvocation>,
 ) -> Vec<String> {
     let mut args = vec!["serve".to_string()];
     args.extend(build_efvibe_args(settings, base_directory, force_build));
+    if let Some(invocation) = invocation {
+        args = filter_supported_serve_flags(invocation, args);
+    }
     args
+}
+
+static SERVE_HELP_CACHE: OnceLock<Mutex<HashMap<String, String>>> = OnceLock::new();
+
+fn serve_help_cache() -> &'static Mutex<HashMap<String, String>> {
+    SERVE_HELP_CACHE.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+fn serve_help_cache_key(invocation: &ToolInvocation) -> String {
+    format!(
+        "{}::{}",
+        invocation.command(),
+        invocation.prefix_args().join(" ")
+    )
+}
+
+pub fn fetch_serve_help_text(invocation: &ToolInvocation) -> Option<String> {
+    let cache_key = serve_help_cache_key(invocation);
+    if let Ok(cache) = serve_help_cache().lock() {
+        if let Some(text) = cache.get(&cache_key) {
+            return Some(text.clone());
+        }
+    }
+
+    let mut args = invocation.prefix_args().to_vec();
+    args.push("serve".to_string());
+    args.push("--help".to_string());
+
+    let output = Command::new(invocation.command())
+        .args(&args)
+        .output()
+        .ok()?;
+
+    if !output.status.success() {
+        return None;
+    }
+
+    let mut text = String::from_utf8_lossy(&output.stdout).into_owned();
+    if text.trim().is_empty() {
+        text = String::from_utf8_lossy(&output.stderr).into_owned();
+    }
+
+    if text.trim().is_empty() {
+        return None;
+    }
+
+    if let Ok(mut cache) = serve_help_cache().lock() {
+        cache.insert(cache_key, text.clone());
+    }
+
+    Some(text)
+}
+
+pub fn filter_supported_serve_flags(
+    invocation: &ToolInvocation,
+    args: Vec<String>,
+) -> Vec<String> {
+    let Some(help) = fetch_serve_help_text(invocation) else {
+        return args;
+    };
+
+    let mut filtered = Vec::with_capacity(args.len());
+    let mut index = 0;
+
+    while index < args.len() {
+        let arg = &args[index];
+        if arg.starts_with("--")
+            && !help.contains(arg.as_str())
+            && matches!(
+                arg.as_str(),
+                "--script-base-path"
+                    | "--script-search-path"
+                    | "--script-load"
+                    | "--script-using"
+            )
+        {
+            index += 1;
+            if index < args.len() && !args[index].starts_with('-') {
+                index += 1;
+            }
+            continue;
+        }
+
+        filtered.push(arg.clone());
+        index += 1;
+    }
+
+    filtered
+}
+
+pub fn describe_missing_serve_script_support(invocation: &ToolInvocation) -> Option<String> {
+    let help = fetch_serve_help_text(invocation)?;
+    let required = ["--script-search-path", "--script-load", "--script-using"];
+    let missing: Vec<&str> = required
+        .into_iter()
+        .filter(|flag| !help.contains(flag))
+        .collect();
+
+    if missing.is_empty() {
+        return None;
+    }
+
+    Some(format!(
+        "The configured efvibe build is too old for script sessions (missing {}).\n\
+         Point Settings → efvibe path to a current myefvibe build, or run:\n\
+         dotnet tool update -g efvibe",
+        missing.join(", ")
+    ))
 }
 
 pub fn settings_key(
@@ -347,8 +454,8 @@ mod tests {
         let project_base = Path::new("/tmp/workspace/src");
         let args = build_efvibe_args(&sample_settings(), Some(project_base), false);
 
-        assert!(args.windows(2).any(|pair| pair == ["--script-base-path", "/tmp/workspace"]));
         assert!(args.windows(2).any(|pair| pair == ["--script-search-path", "/tmp/workspace/scripts"]));
+        assert!(!args.iter().any(|arg| arg == "--script-base-path"));
         assert!(args.windows(2).any(|pair| pair == ["--script-load", "helpers.csx;filters.csx"]));
         assert!(args.windows(2).any(|pair| {
             pair == ["--script-using", "MyApp.Helpers;System.Globalization"]
@@ -367,20 +474,18 @@ mod tests {
             false,
         );
 
-        assert!(args
-            .windows(2)
-            .any(|pair| pair == ["--script-base-path", "/home/user/docs/my-ef-vibe"]));
         assert!(args.windows(2).any(|pair| {
             pair == [
                 "--script-search-path",
                 "/home/user/docs/my-ef-vibe/scripts",
             ]
         }));
+        assert!(!args.iter().any(|arg| arg == "--script-base-path"));
     }
 
     #[test]
     fn build_serve_args_prefixes_serve_command() {
-        let args = build_serve_args(&sample_settings(), Some(Path::new("/tmp/workspace")), false);
+        let args = build_serve_args(&sample_settings(), Some(Path::new("/tmp/workspace")), false, None);
 
         assert_eq!(args.first().map(String::as_str), Some("serve"));
         assert!(args.windows(2).any(|pair| pair == ["--script-load", "helpers.csx;filters.csx"]));

@@ -87,7 +87,7 @@ select product;`,
     name: "Raw SQL",
     fileName: "04-raw-sql.efvibe-query",
     expression: `SELECT p.ProductID, p.Name, p.ListPrice
-FROM Production.Product AS p
+FROM "Production.Product" AS p
 WHERE p.DiscontinuedDate IS NULL
   AND p.ListPrice > 0
 ORDER BY p.Name
@@ -121,6 +121,65 @@ ActiveProducts()
   .Take(10)
   .Select(p => new { p.ProductId, p.Name, p.ListPrice })
   .ToList();`,
+  },
+  {
+    name: "C# program",
+    fileName: "07-csharp-program.efvibe-query",
+    expression: `// Full C# — press F5 (Run all) so every statement runs in one script session.
+// Ctrl+Enter runs only the current line or selection.
+
+Func<decimal, decimal, string> bar = (value, max) =>
+{
+    const int width = 20;
+    var filled = max <= 0m ? 0 : (int)Math.Round((double)(value / max) * width);
+    return new string('█', filled) + new string('░', Math.Max(0, width - filled));
+};
+
+var tiers = (
+    from product in ActiveProducts()
+    where product.ProductSubcategoryId != null
+    join sub in db.ProductSubcategories on product.ProductSubcategoryId equals sub.ProductSubcategoryId
+    join cat in db.ProductCategories on sub.ProductCategoryId equals cat.ProductCategoryId
+    group product by new { Category = cat.Name, Subcategory = sub.Name } into bucket
+    select new
+    {
+        bucket.Key.Category,
+        bucket.Key.Subcategory,
+        Count = bucket.Count(),
+        AvgPrice = bucket.Average(p => p.ListPrice),
+        PeakPrice = bucket.Max(p => p.ListPrice),
+        ShelfValue = bucket.Sum(p => p.ListPrice),
+    })
+    .OrderByDescending(t => t.ShelfValue)
+    .Take(8)
+    .ToList();
+
+var maxShelf = tiers.Count == 0 ? 0m : tiers.Max(t => t.ShelfValue);
+var activeCount = ActiveProducts().Count();
+
+Console.WriteLine();
+Console.WriteLine("╔══════════════════════════════════════════════════════╗");
+Console.WriteLine("║       AdventureWorks · Catalog Spotlight Radar       ║");
+Console.WriteLine("╚══════════════════════════════════════════════════════╝");
+Console.WriteLine();
+Console.WriteLine($"  Active SKUs: {activeCount:N0}   ·   Top tiers by shelf value");
+Console.WriteLine();
+
+foreach (var tier in tiers)
+{
+    var label = $"{tier.Category} › {tier.Subcategory}";
+    if (label.Length > 34)
+    {
+        label = label[..31] + "...";
+    }
+
+    Console.WriteLine($"  {label,-34} {bar(tier.ShelfValue, maxShelf)}  {tier.ShelfValue,10:C0}");
+    Console.WriteLine($"    └ {tier.Count,3} items · avg {tier.AvgPrice,8:C0} · peak {tier.PeakPrice,8:C0}");
+}
+
+Console.WriteLine();
+
+tiers`,
   },
 ];
 
@@ -158,7 +217,7 @@ select new ProductSummaryDto
     },
     {
       kind: "markdown" as const,
-      value: `Open the **Compare** and **Benchmark** query tabs, then use **Run all** (\`F5\`) to see multi-variant and timed results.`,
+      value: `Open the **Compare**, **Benchmark**, and **C# program** query tabs. Use **Run all** (\`F5\`) for multi-statement scripts and variant runs.`,
     },
   ],
 };

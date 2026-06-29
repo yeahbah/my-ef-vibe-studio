@@ -22,7 +22,10 @@ describe("sample workspace content", () => {
       "helpers.csx",
       "product-filters.csx",
     ]);
-    expect(SAMPLE_QUERIES.length).toBeGreaterThanOrEqual(6);
+    expect(SAMPLE_QUERIES.length).toBeGreaterThanOrEqual(7);
+    expect(SAMPLE_QUERIES.some((query) => query.fileName === "07-csharp-program.efvibe-query")).toBe(
+      true,
+    );
     expect(workspace.connections[0]?.scriptSearchPath).toBe("scripts");
     expect(workspace.connections[0]?.scriptLoads).toEqual([
       "constants.csx",

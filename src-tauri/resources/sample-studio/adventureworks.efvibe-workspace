@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "name": "AdventureWorks SQLite",
+  "projects": [],
+  "connections": [
+    {
+      "id": "sample-adventureworks-sqlite",
+      "name": "AdventureWorks SQLite",
+      "efProject": "../apps/api-dotnet/src/AdventureWorks.Infrastructure.Persistence/AdventureWorks.Infrastructure.Persistence.csproj",
+      "startupProject": "../apps/api-dotnet/src/AdventureWorks.API/AdventureWorks.API.csproj",
+      "context": "",
+      "dotnetFramework": "net10.0",
+      "dbLog": true,
+      "scriptSearchPath": "scripts",
+      "scriptLoads": [
+        "constants.csx",
+        "product-filters.csx",
+        "helpers.csx"
+      ],
+      "scriptUsings": [
+        "AdventureWorks.Domain.Entities.Production",
+        "System.Linq.Expressions"
+      ]
+    }
+  ]
+}

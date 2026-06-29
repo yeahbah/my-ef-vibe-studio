@@ -1,7 +1,8 @@
 import { emptyEvaluationPayload, type EvaluationJsonPayload } from "../types/evaluation";
 import type { QueryTab } from "../types/query";
+import { hasConsoleOutput } from "./consoleOutput";
 
-export type ResultViewKind = "pending" | "compare" | "benchmark" | "grid" | "scalar" | "error" | "empty";
+export type ResultViewKind = "pending" | "compare" | "benchmark" | "grid" | "scalar" | "console" | "error" | "empty";
 
 export function resolveResultView(payload: EvaluationJsonPayload): ResultViewKind {
   if (payload.metrics.resultKind === "pending") {
@@ -24,8 +25,16 @@ export function resolveResultView(payload: EvaluationJsonPayload): ResultViewKin
     return "grid";
   }
 
+  if (hasConsoleOutput(payload.consoleOutput) && !payload.value?.trim()) {
+    return "console";
+  }
+
   if (payload.value !== undefined && payload.value !== null && payload.value !== "") {
     return "scalar";
+  }
+
+  if (hasConsoleOutput(payload.consoleOutput)) {
+    return "console";
   }
 
   return "empty";

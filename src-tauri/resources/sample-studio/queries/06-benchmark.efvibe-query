@@ -1,0 +1,6 @@
+{
+  "version": 1,
+  "name": "Benchmark",
+  "connectionId": "sample-adventureworks-sqlite",
+  "expression": "#[Benchmark(10)]\nActiveProducts()\n  .AsNoTracking()\n  .OrderBy(p => p.Name)\n  .Take(10)\n  .Select(p => new { p.ProductId, p.Name, p.ListPrice })\n  .ToList();"
+}

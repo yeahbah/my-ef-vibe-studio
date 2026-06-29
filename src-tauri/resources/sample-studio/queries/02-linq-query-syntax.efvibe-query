@@ -1,0 +1,6 @@
+{
+  "version": 1,
+  "name": "LINQ query syntax",
+  "connectionId": "sample-adventureworks-sqlite",
+  "expression": "from product in db.Products\nwhere product.ListPrice > MinListPrice\norderby product.Name\nselect product;"
+}

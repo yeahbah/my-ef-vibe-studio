@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { ResultGrid } from "./ResultGrid";
 import { buildResultTree, type ResultTreeNode } from "../lib/resultTree";
+import { shouldRenderStructuredScalar } from "../lib/consoleOutput";
 
 const PAGE_SIZE = 100;
 
@@ -217,6 +218,24 @@ export function ResultRowsView({ rows, onSave, exportEnabled = false, onExport }
   );
 }
 
+export function ConsoleOutputView({ output }: { output: string }) {
+  return (
+    <section className="console-output-panel" aria-label="Program output">
+      <header className="console-output-header">Output</header>
+      <pre className="console-output">{output}</pre>
+    </section>
+  );
+}
+
+export function ReturnValueSummary({ value }: { value: string }) {
+  return (
+    <section className="return-value-panel" aria-label="Return value">
+      <header className="return-value-header">Return value</header>
+      <ResultValueView value={value} />
+    </section>
+  );
+}
+
 export function ResultValueView({
   value,
   exportEnabled = false,
@@ -226,7 +245,6 @@ export function ResultValueView({
   exportEnabled?: boolean;
   onExport?: (format: "csv" | "json") => void;
 }) {
-  const nodes = buildResultTree(value);
   const exportButtons =
     exportEnabled && onExport ? (
       <>
@@ -239,7 +257,35 @@ export function ResultValueView({
       </>
     ) : null;
 
+  if (!shouldRenderStructuredScalar(value)) {
+    return (
+      <div className="result-explorer">
+        {exportButtons ? (
+          <div className="result-view-toolbar">
+            <div className="result-view-toolbar-group">{exportButtons}</div>
+          </div>
+        ) : null}
+        <pre className="value-block console-output">{value}</pre>
+      </div>
+    );
+  }
+
+  const nodes = buildResultTree(value);
+
   if (nodes.length === 0) {
+    return (
+      <div className="result-explorer">
+        {exportButtons ? (
+          <div className="result-view-toolbar">
+            <div className="result-view-toolbar-group">{exportButtons}</div>
+          </div>
+        ) : null}
+        <pre className="value-block">{value}</pre>
+      </div>
+    );
+  }
+
+  if (nodes.length === 1 && nodes[0].key === "value" && nodes[0].children.length === 0) {
     return (
       <div className="result-explorer">
         {exportButtons ? (

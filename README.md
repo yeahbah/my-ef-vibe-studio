@@ -1,6 +1,6 @@
 # MyEFvibe Studio
 
-Standalone desktop app for EF Core LINQ exploration — a LINQPad-style scratchpad wired to your real `DbContext`, with translated SQL, query plans, and multi-project workspace management.
+Standalone desktop app for EF Core LINQ exploration — a LINQPad-style scratchpad wired to your real `DbContext`, with translated SQL, query plans, and multi-project workspace management. Write single LINQ expressions, raw SQL, or **multi-statement C# programs** with `Console.WriteLine` in query tabs.
 
 Built with **Tauri 2** + **React** + **Monaco**. The [efvibe](https://github.com/yeahbah/my-ef-vibe) CLI remains the evaluation engine; Studio is orchestration and UX.
 
@@ -56,7 +56,8 @@ See [docs/PHASE6_CHECKLIST.md](docs/PHASE6_CHECKLIST.md) for the current develop
 
 ## Phase 1
 
-- **Query tabs** — multiple `.efvibe-query` tabs with per-tab connection binding
+- **Query tabs** — multiple `.efvibe-query` tabs with per-tab connection binding; fluent LINQ, query syntax, raw SQL, and **C# programs** (multi-statement scripts with console output)
+- **Sample workspace** — first-run onboarding clones AdventureWorks SQLite with starter tabs, scripts, and a bundled database
 - **Connection manager** — add, edit, duplicate connections in the sidebar
 - **Schema explorer** — list DbSets; Count, Sample, and Describe actions
 - **Scan** — lite/deep scan with review UI (findings from `efvibe scan`)

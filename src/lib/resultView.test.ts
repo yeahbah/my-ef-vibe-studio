@@ -57,6 +57,17 @@ describe("resolveResultView", () => {
     ).toBe("scalar");
   });
 
+  it("returns console for program output without rows or value", () => {
+    expect(
+      resolveResultView(
+        samplePayload({
+          rows: undefined,
+          consoleOutput: "Catalog Spotlight\n========",
+        }),
+      ),
+    ).toBe("console");
+  });
+
   it("returns benchmark when benchmark results are present", () => {
     expect(
       resolveResultView({

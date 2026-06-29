@@ -1,0 +1,6 @@
+{
+  "version": 1,
+  "name": "Fluent helper query",
+  "connectionId": "sample-adventureworks-sqlite",
+  "expression": "ActiveProducts()\n  .OrderBy(p => p.Name)\n  .Take(DefaultTake)\n  .Select(p => new ProductSummaryDto\n  {\n    ProductId = p.ProductId,\n    Name = p.Name,\n    ListPrice = p.ListPrice,\n  })\n  .ToList();"
+}

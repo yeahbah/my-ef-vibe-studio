@@ -1,6 +1,6 @@
 # MyEFvibe Studio — User Guide
 
-MyEFvibe Studio is a desktop LINQ scratchpad for Entity Framework Core. It runs real queries against your project's `DbContext`, shows translated SQL and execution plans, and helps you explore schema, scan for performance issues, and share queries with your team.
+MyEFvibe Studio is a desktop LINQ scratchpad for Entity Framework Core. It runs real queries against your project's `DbContext`, shows translated SQL and execution plans, and helps you explore schema, scan for performance issues, and share queries with your team. You can run single LINQ expressions, raw SQL, or **multi-statement C# programs** with `Console.WriteLine`, loops, and local helpers — all in the same query editor.
 
 This guide covers day-to-day use of the Studio app. For installation and release builds, see [INSTALL.md](../INSTALL.md). For the underlying CLI and REPL commands, see the [efvibe features](https://github.com/yeahbah/my-ef-vibe/blob/main/features.md) document.
 
@@ -15,6 +15,7 @@ This guide covers day-to-day use of the Studio app. For installation and release
    - [Script session: loads, `#load`, and additional usings](#script-session-loads-load-and-additional-usings)
 5. [Query view](#query-view)
    - [Three ways to write a query](#three-ways-to-write-a-query)
+   - [C# programs (multi-statement scripts)](#c-programs-multi-statement-scripts)
    - [Script attributes (`#[Compare]`, `#[Benchmark]`)](#script-attributes-compare-benchmark)
    - [Using project types in queries](#using-project-types-in-queries)
 6. [Editor tools](#editor-tools)
@@ -54,6 +55,10 @@ Studio spawns `efvibe serve` in the background to evaluate queries. If prerequis
 ---
 
 ## First session
+
+On first launch (with no saved session), Studio offers to **create a sample workspace** — it clones the AdventureWorks SQLite repo, provisions script helpers and starter query tabs (LINQ, SQL, compare, benchmark, a **C# program** demo, and a notebook), and includes a bundled sample database so queries work immediately.
+
+Alternatively:
 
 1. **Open or create a workspace** — use the sidebar toolbar: **New**, **Open**, or **Save** for `.efvibe-workspace` files.
 2. **Configure a connection** — under **Connections** in the explorer, right-click a connection and choose **Edit…**. Set at least a **search directory** (folder containing your solution) so efvibe can discover `.csproj` files.
@@ -281,8 +286,8 @@ Each query tab has its own toolbar (connection picker, **Run all**, **Run curren
 
 | Action | How |
 |--------|-----|
-| **Run all** | Tab toolbar or `F5` — evaluates the full editor text (required for `#[Compare]` / `#[Benchmark]` scripts) |
-| **Run current line** | Tab toolbar or `Ctrl+Enter` — runs the statement at the cursor |
+| **Run all** | Tab toolbar or `F5` — evaluates the full editor text (required for `#[Compare]` / `#[Benchmark]` scripts and **multi-statement C# programs**) |
+| **Run current line** | Tab toolbar or `Ctrl+Enter` — runs the statement at the cursor (best for single LINQ/SQL expressions) |
 | **Run plan** | Tab toolbar or `Ctrl+Shift+Enter` |
 | **Stop** | Tab toolbar or status bar while a query is running |
 
@@ -434,13 +439,66 @@ For SQL preview on a bare comprehension, wrap it:
 - `join`, `group`, `let`, and `into` clauses are supported when EF can translate them.
 - Studio treats lines starting with `from … in` as C#/LINQ, not raw SQL.
 
+#### 4. C# programs (multi-statement scripts)
+
+Beyond one-liner LINQ, you can write **real C#** in a query tab — multiple statements, `var`, `foreach`, local functions, and `Console.WriteLine` — while still using the same script session (`db`, preloaded `.csx` helpers, and extra usings).
+
+Use **Run all** (`F5`) so the entire script runs in one Roslyn submission. **Run current line** (`Ctrl+Enter`) is for single expressions or the line at the cursor.
+
+Example (from the sample workspace **C# program** tab):
+
+```csharp
+Func<decimal, decimal, string> bar = (value, max) =>
+{
+    const int width = 20;
+    var filled = max <= 0m ? 0 : (int)Math.Round((double)(value / max) * width);
+    return new string('█', filled) + new string('░', Math.Max(0, width - filled));
+};
+
+var tiers = (
+    from product in ActiveProducts()
+    where product.ProductSubcategoryId != null
+    join sub in db.ProductSubcategories on product.ProductSubcategoryId equals sub.ProductSubcategoryId
+    join cat in db.ProductCategories on sub.ProductCategoryId equals cat.ProductCategoryId
+    group product by new { Category = cat.Name, Subcategory = sub.Name } into bucket
+    select new
+    {
+        bucket.Key.Category,
+        bucket.Key.Subcategory,
+        Count = bucket.Count(),
+        AvgPrice = bucket.Average(p => p.ListPrice),
+        ShelfValue = bucket.Sum(p => p.ListPrice),
+    })
+    .OrderByDescending(t => t.ShelfValue)
+    .Take(8)
+    .ToList();
+
+foreach (var tier in tiers)
+{
+    Console.WriteLine($"  {tier.Category} › {tier.Subcategory}: {tier.Count} items");
+}
+
+tiers
+```
+
+**Results for C# programs:**
+
+| Panel | What you see |
+|-------|----------------|
+| **Output** | Captured `Console.WriteLine` / `Console.Write` text, preserved with line breaks in a monospace block |
+| **Return value** | Summary of the final expression (for example `8 rows`) |
+| **Grid** | Tabular data when the final result materializes as rows (lists of entities, anonymous projections, etc.) |
+
+The last non-empty line is the script’s **return value** — omit a trailing semicolon on that line if you want it treated as an expression result rather than a void statement.
+
 #### Quick comparison
 
-| Style | Example start | Editor language | Translated by EF |
-|-------|---------------|-----------------|----------------|
-| **Raw SQL** | `SELECT …` | SQL | No — executed directly |
-| **Method (fluent) LINQ** | `db.Products.Where(…)` | C# | Yes |
-| **Query syntax LINQ** | `from x in db.Products` | C# | Yes |
+| Style | Example start | Editor language | Run with | Translated by EF |
+|-------|---------------|-----------------|----------|------------------|
+| **Raw SQL** | `SELECT …` | SQL | Run all or current line | No — executed directly |
+| **Method (fluent) LINQ** | `db.Products.Where(…)` | C# | Usually current line | Yes |
+| **Query syntax LINQ** | `from x in db.Products` | C# | Usually current line | Yes |
+| **C# program** | `var`, `foreach`, `Console.WriteLine` | C# | **Run all** (`F5`) | LINQ parts only |
 
 All three styles work in **notebooks** as code cells. Command cells (`:dbinfo`, `:tables`) and markdown cells are separate.
 
@@ -525,6 +583,7 @@ After each run, inspect output in four tabs:
 **Result** view features:
 
 - **Compare / benchmark layouts** — when a run used `#[Compare]` or `#[Benchmark]`, the Result tab switches to a dedicated table or timing summary (no separate Compare tab)
+- **Output panel** — for multi-statement C# programs, captured `Console.WriteLine` / `Console.Write` text appears in a monospace **Output** block (separate from the return value summary and grid)
 - **Grid / Tree toggle** — flat table or nested Dump-style object explorer (normal queries)
 - **# column** — row numbers in the grid
 - **Export** — CSV or JSON when the result is tabular

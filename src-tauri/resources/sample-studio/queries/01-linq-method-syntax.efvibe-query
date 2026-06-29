@@ -1,0 +1,6 @@
+{
+  "version": 1,
+  "name": "LINQ method syntax",
+  "connectionId": "sample-adventureworks-sqlite",
+  "expression": "db.Products\n  .Where(p => p.ListPrice > MinListPrice)\n  .OrderBy(p => p.Name)\n  .Take(10)\n  .ToList();"
+}

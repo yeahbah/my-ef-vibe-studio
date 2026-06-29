@@ -111,8 +111,7 @@ export function HelpDialog({ open, settings, onClose }: HelpDialogProps) {
           <h3>Main views</h3>
           <ul className="help-list">
             <li>
-              <strong>Query</strong> — run LINQ against your DbContext; Result, SQL, and Plan tabs
-              show output.
+              <strong>Query</strong> — run LINQ, raw SQL, or multi-statement C# programs against your DbContext; Result tab shows grid, console Output, and return value; SQL and Plan tabs show execution details.
             </li>
             <li>
               <strong>ER Diagram</strong> — Mermaid entity-relationship view; filter by table from
@@ -135,6 +134,22 @@ export function HelpDialog({ open, settings, onClose }: HelpDialogProps) {
             <li>Right-click a DbSet for Query, ER Diagram, or Properties.</li>
             <li>Use Scan from the editor tools panel for LINQ performance findings.</li>
             <li>Configure connections and the efvibe tool path in Settings.</li>
+          </ul>
+        </section>
+
+        <section>
+          <h3>Query styles</h3>
+          <ul className="help-list">
+            <li>
+              <strong>Single expression</strong> — fluent or query-syntax LINQ; use <kbd>{keybindings.runQuery}</kbd> (Run current line).
+            </li>
+            <li>
+              <strong>C# program</strong> — multiple statements, <code>foreach</code>, local functions, and{" "}
+              <code>Console.WriteLine</code>; use <kbd>{keybindings.runAll}</kbd> (Run all). Console text appears in the Result tab <strong>Output</strong> panel.
+            </li>
+            <li>
+              <strong>Raw SQL</strong> — paste <code>SELECT</code> statements; executed directly against the connection.
+            </li>
           </ul>
         </section>
 

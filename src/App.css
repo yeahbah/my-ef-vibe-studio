@@ -2443,6 +2443,38 @@ pre,
   color: var(--error);
 }
 
+.console-output-panel,
+.return-value-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.console-output-header,
+.return-value-header {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.console-output {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 6px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New",
+    monospace;
+  font-size: 12px;
+  line-height: 1.45;
+  overflow: auto;
+}
+
 .stack section + section {
   margin-top: 10px;
 }

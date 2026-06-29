@@ -1,6 +1,7 @@
 import type { EvaluationJsonPayload } from "../types/evaluation";
 import { escapeHtml } from "../lib/resultFormat";
 import { renderNotebookMarkdown } from "../lib/notebookMarkdown";
+import { hasConsoleOutput } from "../lib/consoleOutput";
 
 interface NotebookCellOutputProps {
   payload: EvaluationJsonPayload;
@@ -45,6 +46,13 @@ export function NotebookCellOutput({ payload, markdown = false }: NotebookCellOu
 
       {payload.error ? <pre className="notebook-output-error">{payload.error}</pre> : null}
 
+      {hasConsoleOutput(payload.consoleOutput) ? (
+        <section className="notebook-output-section">
+          <h4>Output</h4>
+          <pre className="console-output">{payload.consoleOutput}</pre>
+        </section>
+      ) : null}
+
       {rows.length > 0 ? (
         <div className="notebook-output-table-wrap">
           <table className="notebook-output-table">
@@ -69,7 +77,7 @@ export function NotebookCellOutput({ payload, markdown = false }: NotebookCellOu
           </table>
         </div>
       ) : payload.value ? (
-        <p className="notebook-output-scalar">{payload.value}</p>
+        <pre className="notebook-output-scalar console-output">{payload.value}</pre>
       ) : null}
 
       {warnings.length > 0 ? (

@@ -14,6 +14,7 @@
     "test:watch": "vitest",
     "test:rust": "cargo test --manifest-path src-tauri/Cargo.toml",
     "test:all": "npm run test && npm run test:rust",
+    "sync:sample-studio": "node --input-type=module -e \"import './scripts/sync-sample-studio.mjs'\"",
     "tauri": "tauri"
   },
   "dependencies": {

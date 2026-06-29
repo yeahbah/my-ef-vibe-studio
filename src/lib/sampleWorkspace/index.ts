@@ -1,10 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
-import { mkdir, writeTextFile } from "@tauri-apps/plugin-fs";
 import { createSinglePaneLayout } from "../queryPaneLayout";
 import { notebookCellFromFile } from "../../types/notebook";
 import { createQueryTab } from "../../types/query";
-import type { EfvibeNotebookFile } from "../../types/notebook";
-import type { EfvibeQueryFile } from "../../types/query";
 import type { EfvibeWorkspace } from "../../types/workspace";
 import type { QueryTab } from "../../types/query";
 import type { NotebookCell } from "../../types/notebook";
@@ -14,7 +11,6 @@ import {
   SAMPLE_NOTEBOOK,
   SAMPLE_QUERIES,
   SAMPLE_REPO_FOLDER,
-  SAMPLE_SCRIPT_FILES,
   SAMPLE_STUDIO_FOLDER,
   SAMPLE_WORKSPACE_NAME,
   buildSampleWorkspaceJson,
@@ -44,11 +40,6 @@ function joinPath(base: string, ...segments: string[]): string {
   return tail ? `${normalizedBase}/${tail}` : normalizedBase;
 }
 
-async function writeText(path: string, content: string): Promise<void> {
-  const payload = content.endsWith("\n") ? content : `${content}\n`;
-  await writeTextFile(path, payload);
-}
-
 export function getSampleParentDirectory(defaultWorkspaceRoot: string): string {
   const trimmed = defaultWorkspaceRoot.trim().replace(/\\/g, "/").replace(/\/$/, "");
   return joinPath(trimmed || ".", "samples");
@@ -63,31 +54,14 @@ export async function provisionSampleWorkspace(
   });
 
   const studioRoot = joinPath(repoRoot, SAMPLE_STUDIO_FOLDER);
-  const scriptsRoot = joinPath(studioRoot, "scripts");
   const queriesRoot = joinPath(studioRoot, "queries");
   const notebooksRoot = joinPath(studioRoot, "notebooks");
   const workspacePath = joinPath(studioRoot, "adventureworks.efvibe-workspace");
-
-  await mkdir(scriptsRoot, { recursive: true });
-  await mkdir(queriesRoot, { recursive: true });
-  await mkdir(notebooksRoot, { recursive: true });
-
-  for (const script of SAMPLE_SCRIPT_FILES) {
-    await writeText(joinPath(scriptsRoot, script.fileName), script.content);
-  }
 
   const queryTabs: QueryTab[] = [];
 
   for (const sample of SAMPLE_QUERIES) {
     const filePath = joinPath(queriesRoot, sample.fileName);
-    const payload: EfvibeQueryFile = {
-      version: 1,
-      name: sample.name,
-      connectionId: SAMPLE_CONNECTION_ID,
-      expression: sample.expression,
-    };
-
-    await writeText(filePath, JSON.stringify(payload, null, 2));
 
     queryTabs.push(
       createQueryTab(SAMPLE_CONNECTION_ID, {
@@ -99,16 +73,6 @@ export async function provisionSampleWorkspace(
   }
 
   const notebookPath = joinPath(notebooksRoot, SAMPLE_NOTEBOOK.fileName);
-  const notebookPayload: EfvibeNotebookFile = {
-    version: 1,
-    name: SAMPLE_NOTEBOOK.name,
-    connectionId: SAMPLE_CONNECTION_ID,
-    cells: SAMPLE_NOTEBOOK.cells,
-  };
-
-  await writeText(notebookPath, JSON.stringify(notebookPayload, null, 2));
-
-  await writeText(workspacePath, buildSampleWorkspaceJson(SAMPLE_CONNECTION_ID));
 
   const workspace = JSON.parse(buildSampleWorkspaceJson(SAMPLE_CONNECTION_ID)) as EfvibeWorkspace;
   const activeQueryTabId = queryTabs[0]?.id ?? "";

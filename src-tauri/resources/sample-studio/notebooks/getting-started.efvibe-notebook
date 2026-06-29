@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "name": "Getting started",
+  "connectionId": "sample-adventureworks-sqlite",
+  "cells": [
+    {
+      "kind": "markdown",
+      "value": "# AdventureWorks sample notebook\n\nThis notebook uses the same script session as the workspace connection:\n`constants.csx`, `product-filters.csx`, and `helpers.csx`.\n\nRun cells with **Run cell** or **Run all**."
+    },
+    {
+      "kind": "code",
+      "value": ":dbinfo"
+    },
+    {
+      "kind": "code",
+      "value": "db.Products.Take(5).Select(p => new { p.ProductId, p.Name }).ToList();"
+    },
+    {
+      "kind": "code",
+      "value": "from product in ActiveProducts()\norderby product.Name\nselect new ProductSummaryDto\n{\n  ProductId = product.ProductId,\n  Name = product.Name,\n  ListPrice = product.ListPrice,\n};"
+    },
+    {
+      "kind": "markdown",
+      "value": "Open the **Compare**, **Benchmark**, and **C# program** query tabs. Use **Run all** (`F5`) for multi-statement scripts and variant runs."
+    }
+  ]
+}

@@ -1,4 +1,7 @@
-use crate::tool::{build_serve_args, resolve_tool_invocation, settings_key, ConnectionSettings};
+use crate::tool::{
+    build_serve_args, describe_missing_serve_script_support, resolve_tool_invocation, settings_key,
+    ConnectionSettings,
+};
 use std::io::{BufRead, BufReader, Write};
 use std::path::Path;
 use std::process::{Child, Command, Stdio};
@@ -131,6 +134,54 @@ fn write_request_and_wait(
     }
 }
 
+fn strip_ansi(text: &str) -> String {
+    let mut cleaned = String::with_capacity(text.len());
+    let mut chars = text.chars().peekable();
+
+    while let Some(ch) = chars.next() {
+        if ch == '\u{1b}' {
+            if chars.next_if(|&next| next == '[').is_some() {
+                for next in chars.by_ref() {
+                    if next.is_ascii_alphabetic() {
+                        break;
+                    }
+                }
+            }
+            continue;
+        }
+
+        cleaned.push(ch);
+    }
+
+    cleaned
+}
+
+fn format_serve_startup_error(raw_line: &str, invocation: &crate::tool::ToolInvocation) -> String {
+    let line = strip_ansi(raw_line).trim().to_string();
+
+    if line.contains("UnknownOptionError") {
+        if let Some(details) = describe_missing_serve_script_support(invocation) {
+            return details;
+        }
+
+        return format!(
+            "The configured efvibe build rejected a command-line option.\n\
+             {line}\n\
+             Point Settings → efvibe path to a current myefvibe build, or run:\n\
+             dotnet tool update -g efvibe"
+        );
+    }
+
+    if line.starts_with('{') {
+        return format!("Unexpected serve handshake: {line}");
+    }
+
+    format!(
+        "efvibe serve failed to start.\n{line}\n\
+         Check Settings → efvibe path and run `efvibe serve --help`."
+    )
+}
+
 fn ensure_daemon_ready(
     settings: &ConnectionSettings,
     search_directory: &Path,
@@ -155,7 +206,21 @@ fn ensure_daemon_ready(
         &settings.dotnet_framework,
     );
     let mut args = invocation.prefix_args().to_vec();
-    args.extend(build_serve_args(settings, Some(search_directory), force_build));
+    args.extend(build_serve_args(
+        settings,
+        Some(search_directory),
+        force_build,
+        Some(&invocation),
+    ));
+
+    if let Some(details) = describe_missing_serve_script_support(&invocation) {
+        if !settings.script_loads.is_empty()
+            || !settings.script_usings.is_empty()
+            || !settings.script_search_path.trim().is_empty()
+        {
+            return Err(details);
+        }
+    }
 
     let mut child = Command::new(invocation.command())
         .args(&args)
@@ -189,8 +254,9 @@ fn ensure_daemon_ready(
     });
 
     let ready_line = wait_for_line(&line_rx, READY_TIMEOUT)?;
-    let payload: serde_json::Value =
-        serde_json::from_str(&ready_line).map_err(|_| format!("Unexpected serve handshake: {ready_line}"))?;
+    let payload: serde_json::Value = serde_json::from_str(&ready_line).map_err(|_| {
+        format_serve_startup_error(&ready_line, &invocation)
+    })?;
 
     match payload.get("type").and_then(|value| value.as_str()) {
         Some("ready") => {}
@@ -201,7 +267,7 @@ fn ensure_daemon_ready(
                 .unwrap_or("efvibe serve failed to start.");
             return Err(message.to_string());
         }
-        _ => return Err(format!("Unexpected serve handshake: {ready_line}")),
+        _ => return Err(format_serve_startup_error(&ready_line, &invocation)),
     }
 
     let mut guard = daemon_mutex().lock().expect("daemon lock");
