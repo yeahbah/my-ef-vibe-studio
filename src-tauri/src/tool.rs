@@ -110,7 +110,7 @@ pub fn resolve_tool_invocation(
                     };
 
                     return ToolInvocation::DotnetTool {
-                        command: "dotnet".to_string(),
+                        command: crate::path_env::resolve_dotnet_executable(),
                         prefix_args,
                         framework: if framework.is_empty() {
                             None
@@ -124,7 +124,7 @@ pub fn resolve_tool_invocation(
     }
 
     ToolInvocation::Global {
-        command: "efvibe".to_string(),
+        command: crate::path_env::resolve_global_efvibe_executable(),
         prefix_args: vec![],
     }
 }

@@ -1,4 +1,5 @@
 use crate::daemon::{cancel_inflight_request, invalidate_daemon, rebuild_daemon, run_daemon_json, run_expression};
+use crate::path_env::resolve_dotnet_executable;
 use crate::tool::{
     build_efvibe_args, resolve_tool_invocation, ConnectionSettings, ToolInvocation,
 };
@@ -88,7 +89,7 @@ fn check_prerequisites_sync(
         },
     };
 
-    match run_version("dotnet", &["--version".to_string()]) {
+    match run_version(&resolve_dotnet_executable(), &["--version".to_string()]) {
         Ok(version) => {
             result.dotnet.found = true;
             result.dotnet.version = Some(version);
