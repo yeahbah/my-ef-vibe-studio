@@ -19,29 +19,17 @@ cleanup() {
 trap cleanup EXIT
 
 find_macos_app_bundle() {
-  local -a candidates=()
+  find "$TARGET_ROOT" -type d -name '*.app' 2>/dev/null |
+    { grep '/bundle/macos' || true; } |
+    sort |
+    head -n 1
+}
 
-  while IFS= read -r app_path; do
-    candidates+=("$app_path")
-  done < <(
-    find "$TARGET_ROOT" -type d -name '*.app' 2>/dev/null |
-      grep '/bundle/' |
-      sort
-  )
-
-  for app_path in "${candidates[@]}"; do
-    if [[ "$app_path" == *"/bundle/macos/"* ]] || [[ "$app_path" == *"/bundle/macos-"* ]]; then
-      echo "$app_path"
-      return 0
-    fi
-  done
-
-  if [[ ${#candidates[@]} -gt 0 ]]; then
-    echo "${candidates[0]}"
-    return 0
-  fi
-
-  return 1
+find_any_app_bundle() {
+  find "$TARGET_ROOT" -type d -name '*.app' 2>/dev/null |
+    { grep '/bundle/' || true; } |
+    sort |
+    head -n 1
 }
 
 find_app_bundle_from_dmg() {
@@ -59,6 +47,10 @@ find_app_bundle_from_dmg() {
 }
 
 APP_PATH="$(find_macos_app_bundle || true)"
+
+if [[ -z "$APP_PATH" ]]; then
+  APP_PATH="$(find_any_app_bundle || true)"
+fi
 
 if [[ -z "$APP_PATH" ]]; then
   APP_PATH="$(find_app_bundle_from_dmg || true)"
