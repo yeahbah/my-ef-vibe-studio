@@ -1203,6 +1203,24 @@ body.tab-dragging .query-tab-label {
   touch-action: none;
 }
 
+.query-tab-rename-input {
+  min-width: 6rem;
+  max-width: 16rem;
+  margin: 2px 4px;
+  padding: 2px 6px;
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  background: var(--bg-surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+}
+
+.query-tab-rename-input:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 35%, transparent);
+}
+
 body.tab-dragging .query-tab-label {
   cursor: grabbing;
 }

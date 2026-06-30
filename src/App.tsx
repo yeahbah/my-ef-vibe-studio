@@ -14,7 +14,7 @@ import { QueryWorkspace, type QueryWorkspaceHandle } from "./components/QueryWor
 import { ReplView } from "./components/ReplView";
 import { QueryPaneLayout } from "./components/QueryPaneLayout";
 import { TabDragController } from "./components/TabDragController";
-import { QueryTabBar } from "./components/QueryTabBar";
+import { QueryTabBar, type QueryTabRenameRequest } from "./components/QueryTabBar";
 import { QueryTabToolbar } from "./components/QueryTabToolbar";
 import { ResizableResultsDock, DEFAULT_RESULTS_DOCK_HEIGHT } from "./components/ResizableResultsDock";
 import {
@@ -61,6 +61,7 @@ import {
 import { keybindingLabel, matchesKeybinding, resolveKeybindings } from "./lib/keybindings";
 import { formatPrerequisitesStatus } from "./lib/prerequisitesStatus";
 import { cycleQueryTabId } from "./lib/queryTabs";
+import { normalizeQueryTabName } from "./lib/queryTabName";
 import {
   addTabToPane,
   createSinglePaneLayout,
@@ -184,6 +185,7 @@ function App() {
   const [sampleWorkspaceOfferOpen, setSampleWorkspaceOfferOpen] = useState(false);
   const [sampleWorkspaceCreating, setSampleWorkspaceCreating] = useState(false);
   const [sessionLoaded, setSessionLoaded] = useState(false);
+  const [renameTabRequest, setRenameTabRequest] = useState<QueryTabRenameRequest | undefined>();
   const keybindings = useMemo(
     () => resolveKeybindings(settings?.keybindings),
     [settings?.keybindings],
@@ -1007,6 +1009,13 @@ function App() {
         event.preventDefault();
         event.stopImmediatePropagation();
         addQueryTab();
+        return;
+      }
+
+      if (event.key === "F2" && activeQueryTabId) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        requestRenameQueryTab(activeQueryTabId);
         return;
       }
 
@@ -1985,6 +1994,29 @@ function App() {
     );
   }
 
+  const handleRenameQueryTab = useCallback(
+    (tabId: string, name: string) => {
+      setQueryTabs((tabs) => {
+        const tab = tabs.find((entry) => entry.id === tabId);
+
+        if (!tab) {
+          return tabs;
+        }
+
+        return tabs.map((entry) =>
+          entry.id === tabId
+            ? { ...entry, name: normalizeQueryTabName(name, entry.name) }
+            : entry,
+        );
+      });
+    },
+    [],
+  );
+
+  function requestRenameQueryTab(tabId: string) {
+    setRenameTabRequest({ tabId, nonce: Date.now() });
+  }
+
   function handleOpenQueryInNewTab(expression: string, connectionId: string, name?: string) {
     const tab = createQueryTab(connectionId, {
       expression,
@@ -2525,12 +2557,16 @@ function App() {
                               paneId={pane.id}
                               tabs={paneTabs}
                               activeTabId={pane.activeTabId}
+                              renameTabRequest={
+                                focusedPaneId === pane.id ? renameTabRequest : undefined
+                              }
                               onSelect={(tabId) => selectQueryTab(tabId, pane.id)}
                               onAdd={() => addQueryTab(pane.id)}
                               onClose={closeQueryTab}
                               onOpen={() => void handleOpenQuery()}
                               onSave={() => void handleSaveQuery()}
                               onToggleFavorite={handleToggleFavorite}
+                              onRename={handleRenameQueryTab}
                             />
 
                             <QueryTabToolbar

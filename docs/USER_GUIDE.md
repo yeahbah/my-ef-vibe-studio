@@ -92,7 +92,7 @@ Use the tabs at the top of the editor area:
 | View | Purpose |
 |------|---------|
 | **Query** | Primary LINQ editor with results dock |
-| **ER Diagram** | Mermaid entity-relationship diagram for the active connection |
+| **ER Diagram** | Mermaid ER diagram from EF metadata; filter by DbSet for first-level relationships |
 | **Notebook** | Multi-cell scratchpad saved as `.efvibe-notebook` |
 | **REPL** | Embedded interactive `efvibe repl` session |
 
@@ -278,6 +278,7 @@ Each pane has its own tab bar, toolbar, editor, and results dock. Click inside a
 
 Session layout (splits and tab placement) is restored when you reopen Studio.
 - Use the tab bar **Open** and **Save** buttons (or `Ctrl+S`) to work with query files.
+- **Rename** a tab with `F2`, double-click the tab label, or right-click → **Rename**. The name is used when saving `.efvibe-query` files and in favorites/team packs.
 - Star a tab to add it to **Favorites** in the editor tools panel.
 
 ### Running queries
@@ -666,7 +667,7 @@ Right-click a **DbSet**:
 | Action | Effect |
 |--------|--------|
 | **Query** | Open a sample query tab for that DbSet |
-| **ER Diagram** | Open diagram filtered to that entity |
+| **ER Diagram** | Open diagram focused on that DbSet (first-level relationships only) |
 | **Properties** | Show entity column and navigation details |
 
 ### Team
@@ -690,11 +691,43 @@ Collaboration tools (right-click **Team**):
 
 ## ER Diagram view
 
-A Mermaid entity-relationship diagram for the active connection's model.
+A **Mermaid entity-relationship diagram** for the active connection's EF Core model. Studio asks efvibe to build the diagram from live metadata (entity types, columns, primary/foreign keys, and navigation relationships).
 
-- Open from the main view switcher, a connection context menu, or a DbSet context menu
-- Filter by table/entity using the dropdown or by opening from a specific DbSet
-- Useful for understanding relationships before writing LINQ
+### Opening the diagram
+
+- **Main view switcher** — select **ER Diagram**
+- **Connection context menu** — **ER Diagram** (full model)
+- **DbSet context menu** — **ER Diagram** (focused on that entity)
+
+### Table filter
+
+Use the **Table** dropdown in the diagram header to choose a DbSet or **All tables**.
+
+| Mode | What you see |
+|------|----------------|
+| **All tables** | Every entity in the model and all relationships between them |
+| **Specific DbSet** | **First-level relationships only** — the selected entity plus tables directly linked to it |
+
+When a table is selected, Studio does **not** expand through neighbors. For example, if `Product` relates to `ProductSubcategory`, and `ProductSubcategory` relates to `ProductCategory`, choosing **Product** shows `Product` and `ProductSubcategory` only — not `ProductCategory` or the subcategory→category link.
+
+Each entity box lists scalar columns with **PK** / **FK** markers. Relationship lines show cardinality (for example `||--o{`) and the foreign-key property name.
+
+### Diagram viewport
+
+- **Drag** the canvas to pan
+- **Scroll wheel** to zoom
+- Toolbar: **Zoom in/out**, **Reset**, **Fit**, and arrow **Pan** buttons
+- The info overlay shows the focused DbSet, entity type, and `showing N of M tables` when filtered
+
+### Toolbar actions
+
+| Button | Action |
+|--------|--------|
+| **Refresh tables** | Reload the DbSet list from efvibe |
+| **Refresh diagram** | Rebuild the full diagram from the current model |
+| **Export…** | Save the currently displayed diagram as a `.mmd` (Mermaid) file |
+
+Use the diagram to understand how entities connect before writing LINQ with `Include`, joins, or filters.
 
 ---
 
@@ -851,6 +884,7 @@ Default bindings (customizable in Settings):
 | `Ctrl+Tab` | Next query tab |
 | `Ctrl+Shift+Tab` | Previous query tab |
 | `Ctrl+Shift+T` | New query tab |
+| `F2` | Rename active query tab |
 | `Ctrl+W` | Close query tab |
 | `Ctrl+S` | Save query tab |
 | `Ctrl+B` | Toggle explorer sidebar |

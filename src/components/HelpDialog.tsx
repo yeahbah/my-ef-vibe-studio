@@ -98,6 +98,12 @@ export function HelpDialog({ open, settings, onClose }: HelpDialogProps) {
               </dd>
             </div>
             <div>
+              <dt>Rename query tab</dt>
+              <dd>
+                <kbd>F2</kbd> (also double-click the tab, or right-click → Rename)
+              </dd>
+            </div>
+            <div>
               <dt>Close query tab</dt>
               <dd>
                 <kbd>{keybindings.closeQueryTab}</kbd>
@@ -114,8 +120,7 @@ export function HelpDialog({ open, settings, onClose }: HelpDialogProps) {
               <strong>Query</strong> — run LINQ, raw SQL, or multi-statement C# programs against your DbContext; Result tab shows grid, console Output, and return value; SQL and Plan tabs show execution details.
             </li>
             <li>
-              <strong>ER Diagram</strong> — Mermaid entity-relationship view; filter by table from
-              the dropdown or explorer context menu.
+              <strong>ER Diagram</strong> — Mermaid entity-relationship view from your EF model; filter by DbSet to show first-level relationships only (selected table and direct neighbors).
             </li>
             <li>
               <strong>Notebook</strong> — multi-cell scratchpad saved as <code>.efvibe-notebook</code>

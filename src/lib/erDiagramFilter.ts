@@ -119,21 +119,18 @@ export function filterErDiagramByEntity(
     };
   }
 
+  const firstLevelRelationships = parsed.relationships.filter(
+    (relationship) => relationship.left === focalLabel || relationship.right === focalLabel,
+  );
+
   const included = new Set<string>([focalLabel]);
 
-  for (const relationship of parsed.relationships) {
-    if (included.has(relationship.left)) {
-      included.add(relationship.right);
-    }
-
-    if (included.has(relationship.right)) {
-      included.add(relationship.left);
-    }
+  for (const relationship of firstLevelRelationships) {
+    included.add(relationship.left);
+    included.add(relationship.right);
   }
 
-  const filteredRelationships = parsed.relationships.filter(
-    (relationship) => included.has(relationship.left) && included.has(relationship.right),
-  );
+  const filteredRelationships = firstLevelRelationships;
 
   const filteredBlocks = entityLabels
     .filter((label) => included.has(label))
