@@ -216,9 +216,11 @@ pub async fn daemon_eval(
     cwd: String,
     expression: String,
     with_plan: bool,
+    skip: Option<i32>,
+    page_size: Option<i32>,
 ) -> Result<String, String> {
     tauri::async_runtime::spawn_blocking(move || {
-        run_expression(settings, search_directory, cwd, expression, with_plan)
+        run_expression(settings, search_directory, cwd, expression, with_plan, skip, page_size)
     })
     .await
     .map_err(|error| error.to_string())?

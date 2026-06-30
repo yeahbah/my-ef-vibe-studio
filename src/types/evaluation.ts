@@ -51,6 +51,17 @@ export interface EvaluationJsonPayload {
   snippet?: string;
   compareResults?: EvaluationJsonCompareEntry[];
   benchmarkResult?: EvaluationJsonBenchmarkResult;
+  pageIndex?: number;
+  pageSize?: number;
+  hasMore?: boolean;
+  pagingSupported?: boolean;
+}
+
+export const DEFAULT_RESULT_PAGE_SIZE = 100;
+
+export interface ResultPagingRequest {
+  skip: number;
+  pageSize: number;
 }
 
 export function parseEvaluationJson(stdout: string): EvaluationJsonPayload | undefined {

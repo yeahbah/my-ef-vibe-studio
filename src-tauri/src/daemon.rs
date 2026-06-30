@@ -356,12 +356,22 @@ pub fn run_expression(
     cwd: String,
     expression: String,
     with_plan: bool,
+    skip: Option<i32>,
+    page_size: Option<i32>,
 ) -> Result<String, String> {
-    let request = serde_json::json!({
+    let mut request = serde_json::json!({
         "type": "eval",
         "expression": expression,
         "withPlan": with_plan,
     });
+
+    if let Some(value) = skip {
+        request["skip"] = serde_json::json!(value);
+    }
+
+    if let Some(value) = page_size {
+        request["pageSize"] = serde_json::json!(value);
+    }
 
     run_daemon_json(settings, search_directory, cwd, request, None)
 }

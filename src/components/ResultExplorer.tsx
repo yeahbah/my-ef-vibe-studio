@@ -3,27 +3,38 @@ import { ResultGrid } from "./ResultGrid";
 import { buildResultTree, type ResultTreeNode } from "../lib/resultTree";
 import { shouldRenderStructuredScalar } from "../lib/consoleOutput";
 
-const PAGE_SIZE = 100;
+export interface ResultRowsPaging {
+  pageIndex: number;
+  pageSize: number;
+  hasMore: boolean;
+  loading?: boolean;
+  onPageChange: (pageIndex: number) => void;
+}
 
 interface ResultRowsViewProps {
   rows: Array<Record<string, string>>;
+  paging?: ResultRowsPaging;
   onSave?: (rows: Array<Record<string, string>>) => Promise<void>;
   exportEnabled?: boolean;
   onExport?: (format: "csv" | "json") => void;
 }
 
-export function ResultRowsView({ rows, onSave, exportEnabled = false, onExport }: ResultRowsViewProps) {
+export function ResultRowsView({
+  rows,
+  paging,
+  onSave,
+  exportEnabled = false,
+  onExport,
+}: ResultRowsViewProps) {
   const [mode, setMode] = useState<"grid" | "tree">("grid");
   const [draftRows, setDraftRows] = useState(rows);
   const [isDirty, setIsDirty] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [page, setPage] = useState(0);
   const rowsKey = useMemo(() => JSON.stringify(rows), [rows]);
 
   useEffect(() => {
     setDraftRows(rows);
     setIsDirty(false);
-    setPage(0);
   }, [rowsKey, rows]);
 
   const columns = useMemo(() => {
@@ -42,20 +53,6 @@ export function ResultRowsView({ rows, onSave, exportEnabled = false, onExport }
     return ordered;
   }, [draftRows]);
 
-  const pageCount = Math.max(1, Math.ceil(draftRows.length / PAGE_SIZE));
-  const currentPage = Math.min(page, pageCount - 1);
-
-  useEffect(() => {
-    if (page !== currentPage) {
-      setPage(currentPage);
-    }
-  }, [currentPage, page]);
-
-  const pageRows = draftRows.slice(
-    currentPage * PAGE_SIZE,
-    currentPage * PAGE_SIZE + PAGE_SIZE,
-  );
-
   function handleCellChange(rowIndex: number, column: string, value: string) {
     setDraftRows((current) =>
       current.map((row, index) => (index === rowIndex ? { ...row, [column]: value } : row)),
@@ -64,12 +61,7 @@ export function ResultRowsView({ rows, onSave, exportEnabled = false, onExport }
   }
 
   function handleDeleteRow(rowIndex: number) {
-    setDraftRows((current) => {
-      const next = current.filter((_, index) => index !== rowIndex);
-      const nextPageCount = Math.max(1, Math.ceil(next.length / PAGE_SIZE));
-      setPage((currentPage) => Math.min(currentPage, nextPageCount - 1));
-      return next;
-    });
+    setDraftRows((current) => current.filter((_, index) => index !== rowIndex));
     setIsDirty(true);
   }
 
@@ -90,7 +82,6 @@ export function ResultRowsView({ rows, onSave, exportEnabled = false, onExport }
   function handleCancel() {
     setDraftRows(rows);
     setIsDirty(false);
-    setPage(0);
   }
 
   const exportButtons =
@@ -104,6 +95,9 @@ export function ResultRowsView({ rows, onSave, exportEnabled = false, onExport }
         </button>
       </>
     ) : null;
+
+  const pageIndex = paging?.pageIndex ?? 0;
+  const rowOffset = pageIndex * (paging?.pageSize ?? draftRows.length);
 
   return (
     <div className="result-explorer">
@@ -137,46 +131,41 @@ export function ResultRowsView({ rows, onSave, exportEnabled = false, onExport }
               {exportButtons}
             </div>
 
-            <div className="result-view-toolbar-group result-grid-paging">
-              <button
-                type="button"
-                disabled={currentPage <= 0}
-                onClick={() => setPage(0)}
-                aria-label="First page"
-              >
-                «
-              </button>
-              <button
-                type="button"
-                disabled={currentPage <= 0}
-                onClick={() => setPage((current) => Math.max(0, current - 1))}
-                aria-label="Previous page"
-              >
-                ‹
-              </button>
-              <span className="result-grid-page-label">
-                Page {currentPage + 1} of {pageCount}
-              </span>
-              <button
-                type="button"
-                disabled={currentPage >= pageCount - 1}
-                onClick={() => setPage((current) => Math.min(pageCount - 1, current + 1))}
-                aria-label="Next page"
-              >
-                ›
-              </button>
-              <button
-                type="button"
-                disabled={currentPage >= pageCount - 1}
-                onClick={() => setPage(pageCount - 1)}
-                aria-label="Last page"
-              >
-                »
-              </button>
-              <span className="muted result-grid-row-count">
-                {draftRows.length} row{draftRows.length === 1 ? "" : "s"}
-              </span>
-            </div>
+            {paging ? (
+              <div className="result-view-toolbar-group result-grid-paging">
+                <button
+                  type="button"
+                  disabled={paging.loading || pageIndex <= 0}
+                  onClick={() => paging.onPageChange(0)}
+                  aria-label="First page"
+                >
+                  «
+                </button>
+                <button
+                  type="button"
+                  disabled={paging.loading || pageIndex <= 0}
+                  onClick={() => paging.onPageChange(pageIndex - 1)}
+                  aria-label="Previous page"
+                >
+                  ‹
+                </button>
+                <span className="result-grid-page-label">
+                  Page {pageIndex + 1}
+                  {paging.loading ? " · loading…" : ""}
+                </span>
+                <button
+                  type="button"
+                  disabled={paging.loading || !paging.hasMore}
+                  onClick={() => paging.onPageChange(pageIndex + 1)}
+                  aria-label="Next page"
+                >
+                  ›
+                </button>
+                <span className="muted result-grid-row-count">
+                  {draftRows.length} row{draftRows.length === 1 ? "" : "s"} on this page
+                </span>
+              </div>
+            ) : null}
           </>
         ) : exportButtons ? (
           <div className="result-view-toolbar-group">{exportButtons}</div>
@@ -186,17 +175,17 @@ export function ResultRowsView({ rows, onSave, exportEnabled = false, onExport }
       {mode === "grid" ? (
         <ResultGrid
           columns={columns}
-          rows={pageRows}
+          rows={draftRows}
           editable
           resetKey={rowsKey}
-          rowOffset={currentPage * PAGE_SIZE}
+          rowOffset={rowOffset}
           onCellChange={handleCellChange}
           onDeleteRow={handleDeleteRow}
         />
       ) : (
         draftRows.map((row, index) => (
           <section key={index} className="explorer-row">
-            <h4>Row {index + 1}</h4>
+            <h4>Row {rowOffset + index + 1}</h4>
             {Object.entries(row).map(([key, value]) => {
               const nodes = buildResultTree(value);
               if (nodes.length === 1 && nodes[0].children.length > 0) {

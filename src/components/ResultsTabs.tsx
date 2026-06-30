@@ -1,4 +1,5 @@
 import type { EvaluationJsonPayload } from "../types/evaluation";
+import { DEFAULT_RESULT_PAGE_SIZE } from "../types/evaluation";
 import { ResultRowsView, ResultValueView, ConsoleOutputView, ReturnValueSummary } from "./ResultExplorer";
 import { canExportPayload, escapeHtml, formatMetrics } from "../lib/resultFormat";
 import { resolveResultView } from "../lib/resultView";
@@ -19,6 +20,8 @@ interface ResultsTabsProps {
   onTabChange: (tab: ResultsTab) => void;
   onExport: (format: "csv" | "json") => void;
   onSaveRows?: (rows: Array<Record<string, string>>) => Promise<void>;
+  pagingLoading?: boolean;
+  onPageChange?: (pageIndex: number) => void;
 }
 
 export function ResultsTabs({
@@ -27,6 +30,8 @@ export function ResultsTabs({
   onTabChange,
   onExport,
   onSaveRows,
+  pagingLoading = false,
+  onPageChange,
 }: ResultsTabsProps) {
   const exportEnabled = canExportPayload(payload);
   const messageCount = payload.warnings.length;
@@ -71,6 +76,8 @@ export function ResultsTabs({
             exportEnabled={exportEnabled}
             onExport={onExport}
             onSaveRows={onSaveRows}
+            pagingLoading={pagingLoading}
+            onPageChange={onPageChange}
           />
         )}
         {resolvedTab === "sql" && <SqlBody payload={payload} />}
@@ -86,13 +93,27 @@ function ResultBody({
   exportEnabled,
   onExport,
   onSaveRows,
+  pagingLoading = false,
+  onPageChange,
 }: {
   payload: EvaluationJsonPayload;
   exportEnabled: boolean;
   onExport: (format: "csv" | "json") => void;
   onSaveRows?: (rows: Array<Record<string, string>>) => Promise<void>;
+  pagingLoading?: boolean;
+  onPageChange?: (pageIndex: number) => void;
 }) {
   const view = resolveResultView(payload);
+  const paging =
+    payload.pagingSupported && onPageChange
+      ? {
+          pageIndex: payload.pageIndex ?? 0,
+          pageSize: payload.pageSize ?? DEFAULT_RESULT_PAGE_SIZE,
+          hasMore: payload.hasMore ?? false,
+          loading: pagingLoading,
+          onPageChange,
+        }
+      : undefined;
   const consoleBlock = hasConsoleOutput(payload.consoleOutput) ? (
     <ConsoleOutputView output={payload.consoleOutput!.trim()} />
   ) : null;
@@ -135,8 +156,10 @@ function ResultBody({
         <div className="stack">
           {consoleBlock}
           {returnValue}
+          <ResultLimitNotice warnings={payload.warnings} />
           <ResultRowsView
             rows={payload.rows!}
+            paging={paging}
             onSave={onSaveRows}
             exportEnabled={exportEnabled}
             onExport={onExport}
@@ -155,6 +178,16 @@ function ResultBody({
     case "empty":
       return <pre className="value-block">(null)</pre>;
   }
+}
+
+function ResultLimitNotice({ warnings }: { warnings: string[] }) {
+  const notice = warnings.find((warning) => /Take added automatically/i.test(warning));
+
+  if (!notice) {
+    return null;
+  }
+
+  return <p className="result-limit-notice">{notice}</p>;
 }
 
 function SqlBody({ payload }: { payload: EvaluationJsonPayload }) {

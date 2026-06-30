@@ -1,6 +1,6 @@
 import { runDaemonJson, type ExpressionRunResult } from "./daemonClient";
 import type { ConnectionSettings } from "../types/connection";
-import { parseEvaluationJson } from "../types/evaluation";
+import { parseEvaluationJson, type ResultPagingRequest } from "../types/evaluation";
 
 export async function runSqlViaDaemon(
   settings: ConnectionSettings,
@@ -8,11 +8,14 @@ export async function runSqlViaDaemon(
   cwd: string,
   sql: string,
   withPlan = false,
+  paging?: ResultPagingRequest,
 ): Promise<ExpressionRunResult> {
   const line = await runDaemonJson(settings, searchDirectory, cwd, {
     type: "executeSql",
     sql,
     withPlan,
+    skip: paging?.skip,
+    pageSize: paging?.pageSize,
   });
 
   const payload = parseEvaluationJson(line);

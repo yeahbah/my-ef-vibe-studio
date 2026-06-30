@@ -113,6 +113,7 @@ import {
 } from "./lib/workspace";
 import type { AppSettings, PrerequisiteCheckResult } from "./types/connection";
 import { type EvaluationJsonPayload } from "./types/evaluation";
+import { buildRunPaging, type RunPagingOptions } from "./lib/resultPaging";
 import { resolveDisplayPayload } from "./lib/resultView";
 import { createDefaultNotebook, createNotebookCell, type NotebookCell } from "./types/notebook";
 import { resolveSavedMainView, type AppMainView } from "./types/mainView";
@@ -1110,7 +1111,12 @@ function App() {
   }, [settings, searchDirectory, activeConnection?.dotnetFramework]);
 
   const handleRun = useCallback(
-    async (withPlan = false, expressionOverride?: string, paneId = focusedPaneId) => {
+    async (
+      withPlan = false,
+      expressionOverride?: string,
+      paneId = focusedPaneId,
+      pagingOptions?: RunPagingOptions,
+    ) => {
       if (!settings || !document || !paneLayout) {
         setStatus("Configure a connection before running.");
         return;
@@ -1143,7 +1149,10 @@ function App() {
       setFocusedPaneId(paneId);
       queryWorkspaceRefs.current.get(paneId)?.flush();
       const editorText = queryWorkspaceRefs.current.get(paneId)?.getDraft() ?? tab.expression;
-      const editorSnapshot = editorText.trim();
+      const isPageNavigation = pagingOptions?.pageNavigation === true;
+      const editorSnapshot = isPageNavigation
+        ? (tab.lastRunExpression ?? editorText.trim())
+        : editorText.trim();
       const runInput = (
         expressionOverride ??
         queryWorkspaceRefs.current.get(paneId)?.getRunText() ??
@@ -1152,6 +1161,9 @@ function App() {
       if (!runInput) {
         return;
       }
+
+      const resultPageIndex = pagingOptions?.pageIndex ?? 0;
+      const runPaging = buildRunPaging(pagingOptions);
 
       if (looksLikeRawSql(runInput)) {
         allowEngine(tab.connectionId);
@@ -1184,6 +1196,7 @@ function App() {
             paneSearchDirectory,
             runInput,
             withPlan,
+            runPaging,
           );
 
           if (result.payload) {
@@ -1191,6 +1204,7 @@ function App() {
             updateQueryTab(tab.id, {
               lastPayload: result.payload,
               lastRunExpression: editorSnapshot,
+              resultPageIndex,
               activeResultsTab: nextTab,
               resultRowsBaseline: result.payload.rows
                 ? result.payload.rows.map((row) => ({ ...row }))
@@ -1275,6 +1289,7 @@ function App() {
           paneSearchDirectory,
           runExpression,
           withPlan,
+          runPaging,
         );
 
         if (result.payload) {
@@ -1282,8 +1297,9 @@ function App() {
 
           updateQueryTab(tab.id, {
             lastPayload: result.payload,
-            expression: editorText,
+            expression: isPageNavigation ? tab.expression : editorText,
             lastRunExpression: editorSnapshot,
+            resultPageIndex,
             activeResultsTab: nextTab,
             resultRowsBaseline: result.payload.rows
               ? result.payload.rows.map((row) => ({ ...row }))
@@ -2626,6 +2642,17 @@ function App() {
                                     updateQueryTab(paneTab.id, { activeResultsTab: tab })
                                   }
                                   onExport={(format) => void handleExport(format)}
+                                  pagingLoading={running}
+                                  onPageChange={(pageIndex) => {
+                                    if (!paneTab.lastRunExpression) {
+                                      return;
+                                    }
+
+                                    void handleRun(false, paneTab.lastRunExpression, pane.id, {
+                                      pageIndex,
+                                      pageNavigation: true,
+                                    });
+                                  }}
                                   onSaveRows={async (rows) => {
                                     if (
                                       !paneConnectionSettings ||

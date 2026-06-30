@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import type { ConnectionSettings, PrerequisiteCheckResult } from "../types/connection";
 import type { AboutJsonPayload } from "../types/about";
-import type { EvaluationJsonPayload } from "../types/evaluation";
+import type { EvaluationJsonPayload, ResultPagingRequest } from "../types/evaluation";
 import { parseEvaluationJson } from "../types/evaluation";
 
 export interface ExpressionRunResult {
@@ -37,6 +37,7 @@ export async function runExpressionViaDaemon(
   cwd: string,
   expression: string,
   withPlan = false,
+  paging?: ResultPagingRequest,
 ): Promise<ExpressionRunResult> {
   const line = await invoke<string>("daemon_eval", {
     settings,
@@ -44,6 +45,8 @@ export async function runExpressionViaDaemon(
     cwd,
     expression,
     withPlan,
+    skip: paging?.skip,
+    pageSize: paging?.pageSize,
   });
 
   const payload = parseEvaluationJson(line);

@@ -28,6 +28,8 @@ export interface QueryTab {
   resultEntity?: string;
   /** Trimmed editor snapshot from the last run on this tab. */
   lastRunExpression?: string;
+  /** Current server-paged result page (0-based). */
+  resultPageIndex?: number;
 }
 
 export interface EfvibeQueryFile {
@@ -61,5 +63,6 @@ export function restoreQueryTabFromSession(tab: QueryTab): QueryTab {
     lastRunExpression: undefined,
     resultRowsBaseline: undefined,
     resultEntity: undefined,
+    resultPageIndex: undefined,
   };
 }
