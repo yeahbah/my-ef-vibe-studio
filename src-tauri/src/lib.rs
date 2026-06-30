@@ -1,6 +1,7 @@
 mod commands;
 mod daemon;
 mod git;
+mod path_env;
 mod sample_workspace;
 mod tool;
 
@@ -11,6 +12,8 @@ mod linux_window;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    path_env::augment_process_path();
+
     #[cfg(target_os = "linux")]
     linux_graphics::apply_workarounds();
 

@@ -69,6 +69,26 @@ You can also start a release manually from **Actions → Release → Run workflo
 
 Download builds from [GitHub Releases](https://github.com/yeahbah/my-ef-vibe-studio/releases).
 
+### macOS app users (DMG install)
+
+The Studio `.dmg` does **not** include the .NET SDK or efvibe. Install them once:
+
+```bash
+# .NET SDK 8+ (https://dotnet.microsoft.com/download)
+dotnet --version
+
+# efvibe global tool
+dotnet tool install --global efvibe
+
+# Ensure tools are on PATH for Terminal (add to ~/.zprofile if needed)
+export PATH="$PATH:$HOME/.dotnet/tools"
+```
+
+If Studio still reports prerequisites missing when launched from **Finder**, either:
+
+1. Quit Studio and launch from Terminal: `open -a "MyEFvibe Studio"`, or
+2. In Studio **Settings**, set **efvibe tool path** to the full path, e.g. `/Users/you/.dotnet/tools/efvibe` (run `which efvibe` in Terminal).
+
 **CI note:** Release publishing needs `contents: write` for `GITHUB_TOKEN`. In the repo go to **Settings → Actions → General → Workflow permissions** and choose **Read and write permissions** (or keep read-only defaults and rely on the workflow `permissions` block in `.github/workflows/release.yml`).
 
 ## First run checklist
