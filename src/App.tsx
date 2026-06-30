@@ -769,7 +769,7 @@ function App() {
           },
         });
         setQueryTabs([]);
-        setPaneLayout(undefined);
+        setPaneLayout(null);
         setFocusedPaneId("");
       }
 
@@ -2442,6 +2442,10 @@ function App() {
                       onScanIndexChange={setScanIndex}
                       onGoToSource={(file, line) => void handleGoToSource(file, line)}
                       onRunQuery={(expression) => {
+                        if (!activeQueryTab) {
+                          return;
+                        }
+
                         updateQueryTab(activeQueryTab.id, { expression });
                         void handleRun(false, expression);
                       }}
@@ -2650,7 +2654,7 @@ function App() {
             </>
           ) : null}
 
-          {diagramViewMounted && connectionSettings ? (
+          {diagramViewMounted && connectionSettings && activeConnection ? (
             <div
               className={
                 mainView === "diagram" ? "main-view-slot" : "main-view-slot main-view-hidden"
