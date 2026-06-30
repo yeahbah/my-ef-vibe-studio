@@ -152,6 +152,22 @@ Paste into the `APPLE_CERTIFICATE` secret with **no quotes** and no extra spaces
 | `APPLE_PASSWORD` | App-specific password (not your Apple ID login password) |
 | `APPLE_TEAM_ID` | Team ID from [Membership details](https://developer.apple.com/account#MembershipDetailsCard) |
 
+**Password mix-up (common):**
+
+| Secret | What it is |
+|--------|------------|
+| `APPLE_CERTIFICATE_PASSWORD` | Password you set when **exporting the `.p12`** from Keychain Access |
+| `APPLE_PASSWORD` | **App-specific password** from appleid.apple.com (for notarization only) |
+| `KEYCHAIN_PASSWORD` | Any random string you invent for the temporary CI keychain |
+
+If CI reports `MAC verification failed during PKCS12 import`, `APPLE_CERTIFICATE_PASSWORD` is wrong. Re-export the `.p12`, pick a new password, update both `APPLE_CERTIFICATE` and `APPLE_CERTIFICATE_PASSWORD`, and re-run the workflow.
+
+Test locally before updating GitHub:
+
+```bash
+security import DeveloperID.p12 -k ~/Library/Keychains/login.keychain-db -P 'your-export-password' -T /usr/bin/codesign
+```
+
 #### 5. Publish a signed release
 
 Tag push (recommended):

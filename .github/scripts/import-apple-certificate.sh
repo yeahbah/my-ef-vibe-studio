@@ -63,7 +63,16 @@ security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
 security default-keychain -s "$KEYCHAIN_PATH"
 security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
 security set-keychain-settings -t 3600 -u "$KEYCHAIN_PATH"
-security import "$CERT_PATH" -k "$KEYCHAIN_PATH" -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign -T /usr/bin/security
+
+if ! security import "$CERT_PATH" -k "$KEYCHAIN_PATH" -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign -T /usr/bin/security; then
+  echo "Failed to import the .p12 into the CI keychain." >&2
+  echo "APPLE_CERTIFICATE_PASSWORD must match the export password you chose in Keychain Access." >&2
+  echo "It is NOT your Apple ID password and NOT APPLE_PASSWORD (app-specific password for notarization)." >&2
+  echo "Re-export Developer ID Application as .p12, set a new password, then update both secrets:" >&2
+  echo "  APPLE_CERTIFICATE (openssl base64 -A -in DeveloperID.p12)" >&2
+  echo "  APPLE_CERTIFICATE_PASSWORD" >&2
+  exit 1
+fi
 security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
 security list-keychains -d user -s "$KEYCHAIN_PATH" login.keychain
 
