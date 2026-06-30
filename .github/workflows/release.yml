@@ -150,6 +150,14 @@ jobs:
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
         run: npm run tauri build -- ${{ matrix.args }}
 
+      - name: Verify macOS signing and notarization
+        if: matrix.platform == 'macos-latest'
+        env:
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+        run: |
+          chmod +x .github/scripts/verify-macos-artifact.sh
+          .github/scripts/verify-macos-artifact.sh
+
       - name: Stage release artifacts
         run: |
           chmod +x .github/scripts/stage-release-artifacts.sh

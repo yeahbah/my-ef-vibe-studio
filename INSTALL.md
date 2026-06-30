@@ -221,7 +221,29 @@ Built-in packs ship offline. Registry packs under **Team → Snippet packs** dow
   kbuildsycoca6 --noincremental
   ```
   Then log out and back in (or restart Plasma). If you still see the generic Wayland icon, fully quit Studio and launch it from the app menu (not an old pinned taskbar entry).
-- **macOS says the app or DMG is “damaged”** — on **unsigned** builds, the file is usually fine: Safari/Chrome attach a quarantine flag that Gatekeeper treats as broken. Signed + notarized releases from GitHub should open normally. For unsigned builds, try:
+- **macOS says the app or DMG is “damaged”** — try these in order:
+
+  **1. Clear download quarantine** (common after GitHub/browser download):
+  ```bash
+  xattr -cr ~/Downloads/*efvibe*.dmg
+  open ~/Downloads/*efvibe*.dmg
+  ```
+
+  **2. Check whether the build was notarized** (maintainers). Mount the DMG, then:
+  ```bash
+  spctl -a -vv -t install "/Volumes/MyEFvibe Studio/MyEFvibe Studio.app"
+  codesign -dv --verbose=4 "/Volumes/MyEFvibe Studio/MyEFvibe Studio.app"
+  ```
+
+  If `spctl` says `rejected` or `Unnotarized`, the GitHub release was **signed but not notarized**. Confirm all secrets are set:
+  - `APPLE_SIGNING_IDENTITY`
+  - `APPLE_ID`
+  - `APPLE_PASSWORD` — must be an **app-specific password** from [appleid.apple.com](https://appleid.apple.com), not your Apple ID login password
+  - `APPLE_TEAM_ID`
+
+  Re-run the Release workflow after fixing secrets. Newer workflows also run a **Verify macOS signing and notarization** step that fails CI if notarization did not complete.
+
+  **3. Unsigned workaround** (not recommended for distribution):
   1. Remove quarantine, then open the DMG:
      ```bash
      xattr -cr ~/Downloads/efvibe*.dmg
