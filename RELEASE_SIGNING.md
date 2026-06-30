@@ -18,7 +18,7 @@ Signed release builds are wired up in **my-ef-vibe-studio**. Here is what you ne
 
 | Secret | Value |
 |--------|--------|
-| `APPLE_CERTIFICATE` | `openssl base64 -A -in DeveloperID.p12` |
+| `APPLE_CERTIFICATE` | `openssl base64 -A -in DeveloperID.p12` (paste single line) |
 | `APPLE_CERTIFICATE_PASSWORD` | `.p12` export password |
 | `KEYCHAIN_PASSWORD` | any strong random string |
 | `APPLE_SIGNING_IDENTITY` | e.g. `Developer ID Application: Your Name (TEAMID)` from `security find-identity -v -p codesigning` |

@@ -19,7 +19,45 @@ fi
 KEYCHAIN_PATH="${RUNNER_TEMP:-/tmp}/efvibe-studio-build.keychain"
 CERT_PATH="${RUNNER_TEMP:-/tmp}/efvibe-studio-certificate.p12"
 
-echo "$APPLE_CERTIFICATE" | base64 --decode > "$CERT_PATH"
+# GitHub secrets are often pasted with line breaks; macOS base64 is strict about stdin.
+NORMALIZED_CERT="$(printf '%s' "$APPLE_CERTIFICATE" | tr -d '[:space:]')"
+
+if [[ -z "$NORMALIZED_CERT" ]]; then
+  echo "APPLE_CERTIFICATE is set but empty after stripping whitespace." >&2
+  echo "Re-encode your .p12 with: openssl base64 -A -in DeveloperID.p12 | pbcopy" >&2
+  exit 1
+fi
+
+decode_certificate() {
+  if printf '%s' "$NORMALIZED_CERT" | base64 --decode -o "$CERT_PATH" 2>/dev/null; then
+    return 0
+  fi
+
+  if printf '%s' "$NORMALIZED_CERT" | base64 -D -o "$CERT_PATH" 2>/dev/null; then
+    return 0
+  fi
+
+  if command -v openssl >/dev/null 2>&1; then
+    if printf '%s' "$NORMALIZED_CERT" | openssl base64 -d -A -out "$CERT_PATH" 2>/dev/null; then
+      return 0
+    fi
+  fi
+
+  return 1
+}
+
+if ! decode_certificate; then
+  echo "Failed to decode APPLE_CERTIFICATE." >&2
+  echo "Export Developer ID Application as .p12, then run:" >&2
+  echo "  openssl base64 -A -in DeveloperID.p12 | pbcopy" >&2
+  echo "Paste the single-line output into the APPLE_CERTIFICATE secret (no quotes)." >&2
+  exit 1
+fi
+
+if [[ ! -s "$CERT_PATH" ]]; then
+  echo "Decoded certificate file is empty. Check APPLE_CERTIFICATE encoding." >&2
+  exit 1
+fi
 
 security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
 security default-keychain -s "$KEYCHAIN_PATH"

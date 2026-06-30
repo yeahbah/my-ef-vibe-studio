@@ -127,11 +127,13 @@ Copy the full name, e.g. `Developer ID Application: Your Name (TEAMID1234)`.
 
 1. **Keychain Access → My Certificates** → expand your Developer ID Application entry.
 2. Right-click the private key → **Export** → save as `.p12` with a password.
-3. Base64-encode for GitHub:
+3. Base64-encode for GitHub (must be **one line**):
 
 ```bash
-openssl base64 -A -in DeveloperID.p12 -out apple-cert-base64.txt
+openssl base64 -A -in DeveloperID.p12 | pbcopy
 ```
+
+Paste into the `APPLE_CERTIFICATE` secret with **no quotes** and no extra spaces. Do not use `base64` without `-A` unless you strip all newlines.
 
 #### 3. App-specific password (for notarization)
 
@@ -142,7 +144,7 @@ openssl base64 -A -in DeveloperID.p12 -out apple-cert-base64.txt
 
 | Secret | Value |
 |--------|--------|
-| `APPLE_CERTIFICATE` | Contents of `apple-cert-base64.txt` |
+| `APPLE_CERTIFICATE` | Contents of `apple-cert-base64.txt` (single line; use `openssl base64 -A`) |
 | `APPLE_CERTIFICATE_PASSWORD` | Password used when exporting the `.p12` |
 | `KEYCHAIN_PASSWORD` | Any strong random string (CI-only keychain) |
 | `APPLE_SIGNING_IDENTITY` | Full identity from `security find-identity`, e.g. `Developer ID Application: …` |
