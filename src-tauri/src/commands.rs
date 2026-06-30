@@ -105,8 +105,10 @@ fn check_prerequisites_sync(
             result.efvibe.found = true;
             result.efvibe.version = Some(version.clone());
 
-            if !efvibe_version::meets_minimum_version(&version, MINIMUM_EFVIBE_VERSION) {
-                result.efvibe.error = Some(efvibe_version::format_version_too_old_error(&version));
+            if let Err(error) =
+                efvibe_version::check_minimum_version(&version, MINIMUM_EFVIBE_VERSION)
+            {
+                result.efvibe.error = Some(error);
             }
         }
         Err(error) => result.efvibe.error = Some(error),
