@@ -54,6 +54,7 @@ export interface ToolInvocation {
 
 export interface PrerequisiteCheckResult {
   ok: boolean;
+  minimumEfvibeVersion: string;
   dotnet: { found: boolean; version?: string; error?: string };
   efvibe: {
     found: boolean;

@@ -13,6 +13,8 @@ export function formatPrerequisitesStatus(result: PrerequisiteCheckResult): stri
     issues.push(
       result.efvibe.error ? `efvibe not found: ${result.efvibe.error}` : "efvibe not found",
     );
+  } else if (result.efvibe.error) {
+    issues.push(result.efvibe.error.replace(/\n/g, " "));
   }
 
   if (issues.length === 0) {

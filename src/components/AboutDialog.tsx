@@ -223,6 +223,18 @@ export function AboutDialog({
                     : (prerequisites?.dotnet.error ?? "Not found")}
               </dd>
             </div>
+            <div>
+              <dt>efvibe</dt>
+              <dd>
+                {prerequisitesLoading
+                  ? "Checking…"
+                  : prerequisites?.efvibe.found
+                    ? prerequisites.efvibe.error
+                      ? prerequisites.efvibe.error
+                      : `${prerequisites.efvibe.version ?? "unknown"} (requires ${prerequisites.minimumEfvibeVersion}+)`
+                    : (prerequisites?.efvibe.error ?? "Not found")}
+              </dd>
+            </div>
           </dl>
         </section>
       </div>

@@ -1,3 +1,4 @@
+use crate::efvibe_version;
 use crate::tool::{
     build_serve_args, describe_missing_serve_script_support, resolve_tool_invocation, settings_key,
     ConnectionSettings,
@@ -205,6 +206,9 @@ fn ensure_daemon_ready(
         &settings.tool_path,
         &settings.dotnet_framework,
     );
+
+    efvibe_version::ensure_efvibe_minimum_version(&invocation)?;
+
     let mut args = invocation.prefix_args().to_vec();
     args.extend(build_serve_args(
         settings,

@@ -1,5 +1,6 @@
 mod commands;
 mod daemon;
+mod efvibe_version;
 mod git;
 mod path_env;
 mod sample_workspace;

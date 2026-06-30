@@ -1,4 +1,5 @@
 use crate::daemon::{cancel_inflight_request, invalidate_daemon, rebuild_daemon, run_daemon_json, run_expression};
+use crate::efvibe_version::{self, MINIMUM_EFVIBE_VERSION};
 use crate::path_env::resolve_dotnet_executable;
 use crate::tool::{
     build_efvibe_args, resolve_tool_invocation, ConnectionSettings, ToolInvocation,
@@ -11,6 +12,7 @@ use std::process::Command;
 #[serde(rename_all = "camelCase")]
 pub struct PrerequisiteCheckResult {
     pub ok: bool,
+    pub minimum_efvibe_version: String,
     pub dotnet: PrerequisiteEntry,
     pub efvibe: PrerequisiteEfvibeEntry,
 }
@@ -76,6 +78,7 @@ fn check_prerequisites_sync(
 
     let mut result = PrerequisiteCheckResult {
         ok: false,
+        minimum_efvibe_version: MINIMUM_EFVIBE_VERSION.to_string(),
         dotnet: PrerequisiteEntry {
             found: false,
             version: None,
@@ -97,18 +100,21 @@ fn check_prerequisites_sync(
         Err(error) => result.dotnet.error = Some(error),
     }
 
-    let mut efvibe_args = result.efvibe.invocation.prefix_args().to_vec();
-    efvibe_args.push("--version".to_string());
-
-    match run_version(result.efvibe.invocation.command(), &efvibe_args) {
+    match efvibe_version::run_efvibe_version(&result.efvibe.invocation) {
         Ok(version) => {
             result.efvibe.found = true;
-            result.efvibe.version = Some(version);
+            result.efvibe.version = Some(version.clone());
+
+            if !efvibe_version::meets_minimum_version(&version, MINIMUM_EFVIBE_VERSION) {
+                result.efvibe.error = Some(efvibe_version::format_version_too_old_error(&version));
+            }
         }
         Err(error) => result.efvibe.error = Some(error),
     }
 
-    result.ok = result.dotnet.found && result.efvibe.found;
+    result.ok = result.dotnet.found
+        && result.efvibe.found
+        && result.efvibe.error.is_none();
     result
 }
 
@@ -351,6 +357,12 @@ pub fn repl_spawn_spec(
 ) -> Result<ReplSpawnSpec, String> {
     let search_path = Path::new(&search_directory);
     let cwd_path = Path::new(&cwd);
+    let invocation = resolve_tool_invocation(
+        search_path,
+        &settings.tool_path,
+        &settings.dotnet_framework,
+    );
+    efvibe_version::ensure_efvibe_minimum_version(&invocation)?;
     Ok(build_repl_spawn_spec(&settings, search_path, cwd_path))
 }
 
@@ -362,6 +374,12 @@ pub fn start_repl(
 ) -> Result<(), String> {
     let search_path = Path::new(&search_directory);
     let cwd_path = Path::new(&cwd);
+    let invocation = resolve_tool_invocation(
+        search_path,
+        &settings.tool_path,
+        &settings.dotnet_framework,
+    );
+    efvibe_version::ensure_efvibe_minimum_version(&invocation)?;
     let command_line = build_repl_command_line(&settings, search_path);
     let shell_script = format!(
         "cd {} && {}; exec $SHELL",
