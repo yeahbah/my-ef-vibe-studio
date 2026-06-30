@@ -6,6 +6,7 @@ import {
   dispatchRunQuery,
   resolveRunTextFromEditor,
 } from "../lib/editorRun";
+import { ensureEfvibeCompletionProvider } from "../lib/monacoEfvibeCompletion";
 import { keybindingToMonacoChord, resolveKeybindings } from "../lib/keybindings";
 import { resolveQueryEditorLanguage } from "../lib/sqlDetect";
 import { monacoTheme } from "../lib/theme";
@@ -61,6 +62,7 @@ export const MonacoEditor = forwardRef<MonacoEditorHandle, MonacoEditorProps>(fu
 
   const handleMount: OnMount = (editor, monaco) => {
     editorRef.current = editor;
+    ensureEfvibeCompletionProvider(monaco);
 
     if (!enableRunShortcuts) {
       return;

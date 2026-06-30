@@ -277,6 +277,30 @@ Each query tab belongs to a **pane**. By default all tabs live in one pane. **Dr
 Each pane has its own tab bar, toolbar, editor, and results dock. Click inside a pane to focus it — keyboard shortcuts and the shared tool rail apply to the focused pane. Drag the vertical divider between panes to resize. Closing the last tab in a pane collapses it automatically.
 
 Session layout (splits and tab placement) is restored when you reopen Studio.
+
+### Editor completion
+
+In the query editor, type **`db.`** (or continue a dotted chain like `db.Products.`) to get completions from the active connection’s loaded `DbContext`:
+
+- After `db.` — DbSet names with entity types in the detail
+- After `db.<DbSet>.` — common LINQ methods (`Where`, `Include`, `ToListAsync`, etc.)
+
+Completions require a configured **EF project** on the connection and **efvibe 0.6.26+**. Trigger with `.` or **Ctrl+Space**.
+
+### Automatic result limits
+
+Studio uses efvibe’s runtime safety defaults so accidental `SELECT *`-scale loads are less likely:
+
+| Query style | Limit |
+|-------------|-------|
+| LINQ `ToList` / `ToListAsync` / `ToArray` / `ToArrayAsync` without `Take` | Engine adds **`.Take(100)`** before execution |
+| Raw SQL `SELECT` | **250 rows** max |
+| Already has `.Take(n)` | Your limit is used |
+| `Include` / `ThenInclude` graphs | Not auto-capped — add `Take` manually |
+| Opt out | `#[Unbounded]` above the query |
+
+When auto-`Take` applies, check the **Messages** tab for a warning that results were capped.
+
 - Use the tab bar **Open** and **Save** buttons (or `Ctrl+S`) to work with query files.
 - **Rename** a tab with `F2`, double-click the tab label, or right-click → **Rename**. The name is used when saving `.efvibe-query` files and in favorites/team packs.
 - Star a tab to add it to **Favorites** in the editor tools panel.
@@ -586,6 +610,7 @@ After each run, inspect output in four tabs:
 - **Compare / benchmark layouts** — when a run used `#[Compare]` or `#[Benchmark]`, the Result tab switches to a dedicated table or timing summary (no separate Compare tab)
 - **Output panel** — for multi-statement C# programs, captured `Console.WriteLine` / `Console.Write` text appears in a monospace **Output** block (separate from the return value summary and grid)
 - **Grid / Tree toggle** — flat table or nested Dump-style object explorer (normal queries)
+- **Grid paging** — results are fetched with a row cap (see [Automatic result limits](#automatic-result-limits)); the grid shows **100 rows per page** with first/prev/next/last controls when there are more rows to browse
 - **# column** — row numbers in the grid
 - **Export** — CSV or JSON when the result is tabular
 - **Save to database** — edit grid cells and persist changes back to the database when the query returned tracked entity rows with primary keys

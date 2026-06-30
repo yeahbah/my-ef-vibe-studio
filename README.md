@@ -47,6 +47,8 @@ See [docs/PHASE6_CHECKLIST.md](docs/PHASE6_CHECKLIST.md) for the current develop
 ## Phase 2
 
 - **Result explorer** — Dump-style nested object tree (Explorer tab) with grid/tree toggle
+- **Editor completion** — `db.*` DbSet and LINQ member completions via `efvibe serve` (requires efvibe 0.6.26+)
+- **Automatic result limits** — unbounded LINQ materializers get `.Take(100)` at runtime; raw SQL capped at 250 rows (see [USER_GUIDE](docs/USER_GUIDE.md))
 - **Live SQL pane** — debounced `ToQueryString()` preview beside the editor
 - **SQL → LINQ draft** — rule-based converter dialog for simple SELECT queries
 - **Query library** — favorites, folders, and search across open tabs

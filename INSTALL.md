@@ -97,7 +97,7 @@ On first launch, Studio offers to **create a sample workspace** (AdventureWorks 
 
 1. Open or create a `.efvibe-workspace`
 2. Set **search directory** (or EF project) so efvibe can discover your `.csproj`
-3. Run a simple query: `db.Products.Take(5).ToList();` — or open the sample **C# program** tab and press **Run all** (`F5`) to see console output and a return-value grid
+3. Run a simple query: `db.Products.ToList();` — efvibe auto-limits unbounded materializers to **100 rows** (or use `.Take(n)` / `#[Unbounded]`). You can also open the sample **C# program** tab and press **Run all** (`F5`) to see console output and a return-value grid
 4. Optional: configure **Open in IDE**, **team sync directory**, **keybindings**, and **connection secret vault** in Settings
 
 Use a recent **efvibe** build (0.6.26+ recommended) so Studio can pass script session flags and receive separated `consoleOutput` in eval JSON.

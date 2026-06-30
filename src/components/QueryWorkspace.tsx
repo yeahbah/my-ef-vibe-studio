@@ -6,6 +6,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { setActiveCompletionContext } from "../lib/completions";
 import { dispatchRunAll, dispatchRunPlan, dispatchRunQuery } from "../lib/editorRun";
 import { matchesKeybinding, resolveKeybindings } from "../lib/keybindings";
 import { EditorWorkspace } from "./EditorWorkspace";
@@ -85,6 +86,21 @@ export const QueryWorkspace = forwardRef<QueryWorkspaceHandle, QueryWorkspacePro
         editorRef.current?.focus();
       }
     }, [sqlPaneOpen]);
+
+    useEffect(() => {
+      if (!connectionSettings?.project.trim()) {
+        setActiveCompletionContext(undefined);
+        return;
+      }
+
+      setActiveCompletionContext({
+        connectionSettings,
+        searchDirectory,
+        cwd: searchDirectory,
+      });
+
+      return () => setActiveCompletionContext(undefined);
+    }, [connectionSettings, searchDirectory]);
 
     useEffect(() => {
       const onKeyDown = (event: KeyboardEvent) => {
