@@ -385,6 +385,8 @@ pub fn start_repl(
     );
     efvibe_version::ensure_efvibe_minimum_version(&invocation)?;
     let command_line = build_repl_command_line(&settings, search_path);
+
+    #[cfg(any(target_os = "linux", target_os = "macos"))]
     let shell_script = format!(
         "cd {} && {}; exec $SHELL",
         quote_shell_arg(cwd_path.to_string_lossy().as_ref()),
@@ -443,7 +445,6 @@ pub fn start_repl(
 
     #[cfg(not(any(target_os = "linux", target_os = "macos", target_os = "windows")))]
     {
-        let _ = shell_script;
         return Err("REPL terminal launch is not supported on this platform.".to_string());
     }
 

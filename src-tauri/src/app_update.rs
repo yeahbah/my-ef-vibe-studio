@@ -242,7 +242,6 @@ fn install_windows_exe(path: &Path) -> Result<String, String> {
             Command::new("cmd")
                 .args(["/C", "start", "", &path.to_string_lossy()])
                 .spawn()
-                .map(|_| ())
         })
         .map_err(|error| format!("Could not start the installer: {error}"))?;
 
