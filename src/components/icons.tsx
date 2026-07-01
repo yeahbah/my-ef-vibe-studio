@@ -66,6 +66,36 @@ export function IconAbout(props: IconProps) {
   );
 }
 
+export function IconUpdate(props: IconProps) {
+  return (
+    <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" {...props}>
+      <path
+        d="M8 2.75v4.5M5.75 4.25 8 2.75 10.25 4.25"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.25"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M3.75 8.25a4.25 4.25 0 0 0 7.35 2.95M12.25 7.75a4.25 4.25 0 0 0-7.35-2.95"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.25"
+        strokeLinecap="round"
+      />
+      <path
+        d="M11.75 10.75h2.5v2.5M4.25 5.25H1.75V2.75"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.25"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 export function IconHelp(props: IconProps) {
   return (
     <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" {...props}>

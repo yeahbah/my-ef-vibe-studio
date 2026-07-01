@@ -496,3 +496,32 @@ pub fn file_manager_label() -> String {
         "file manager".to_string()
     }
 }
+
+#[tauri::command]
+pub async fn check_app_update() -> crate::app_update::AppUpdateCheckResult {
+    let current_version = env!("CARGO_PKG_VERSION").to_string();
+    tauri::async_runtime::spawn_blocking(move || crate::app_update::check_app_update(&current_version))
+        .await
+        .unwrap_or_else(|error| crate::app_update::AppUpdateCheckResult {
+            current_version: env!("CARGO_PKG_VERSION").to_string(),
+            latest_version: None,
+            update_available: false,
+            release_url: None,
+            release_notes: None,
+            download_url: None,
+            download_name: None,
+            error: Some(error.to_string()),
+        })
+}
+
+#[tauri::command]
+pub async fn download_and_install_app_update(
+    download_url: String,
+    file_name: String,
+) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        crate::app_update::download_and_install_app_update(&download_url, &file_name)
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}

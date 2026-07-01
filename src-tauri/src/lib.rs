@@ -1,3 +1,4 @@
+mod app_update;
 mod commands;
 mod daemon;
 mod efvibe_version;
@@ -57,6 +58,8 @@ pub fn run() {
             commands::set_window_title,
             commands::file_manager_label,
             commands::repl_spawn_spec,
+            commands::check_app_update,
+            commands::download_and_install_app_update,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

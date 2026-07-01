@@ -34,8 +34,9 @@ import { ContextMenu } from "./ContextMenu";
 import { DbInfoDialog } from "../DbInfoDialog";
 import { DbSetPropertiesDialog } from "../DbSetPropertiesDialog";
 import { WorkspacePropertiesDialog } from "../WorkspacePropertiesDialog";
-import { IconMoon, IconNew, IconOpen, IconSave, IconSettings, IconSun, IconAbout, IconHelp } from "../icons";
+import { IconMoon, IconNew, IconOpen, IconSave, IconSettings, IconSun, IconAbout, IconHelp, IconUpdate } from "../icons";
 import { AboutDialog } from "../AboutDialog";
+import { AppUpdateDialog } from "../AppUpdateDialog";
 import { HelpDialog } from "../HelpDialog";
 import { TreeView } from "./TreeView";
 import type { AppTheme } from "../../types/theme";
@@ -163,6 +164,7 @@ export function ExplorerSidebar(props: ExplorerSidebarProps) {
   const [workspacePropertiesOpen, setWorkspacePropertiesOpen] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
+  const [updateOpen, setUpdateOpen] = useState(false);
   const [fileManagerLabel, setFileManagerLabel] = useState("file manager");
   const [dbInfoDialog, setDbInfoDialog] = useState<
     | {
@@ -737,6 +739,15 @@ export function ExplorerSidebar(props: ExplorerSidebarProps) {
         <button
           type="button"
           className="sidebar-icon-btn"
+          onClick={() => setUpdateOpen(true)}
+          title="Check for updates"
+          aria-label="Check for updates"
+        >
+          <IconUpdate />
+        </button>
+        <button
+          type="button"
+          className="sidebar-icon-btn"
           onClick={onOpenSettings}
           title="Settings"
           aria-label="Settings"
@@ -787,6 +798,8 @@ export function ExplorerSidebar(props: ExplorerSidebarProps) {
       />
 
       <HelpDialog open={helpOpen} settings={appSettings} onClose={() => setHelpOpen(false)} />
+
+      <AppUpdateDialog open={updateOpen} onClose={() => setUpdateOpen(false)} />
     </aside>
   );
 }

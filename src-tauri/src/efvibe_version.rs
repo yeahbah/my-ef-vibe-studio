@@ -45,6 +45,16 @@ fn parse_semver(text: &str) -> Option<SemVer> {
     })
 }
 
+pub fn compare_semver_strings(left: &str, right: &str) -> Option<std::cmp::Ordering> {
+    let left = parse_efvibe_version(left)?;
+    let right = parse_efvibe_version(right)?;
+    Some(left.cmp(&right))
+}
+
+pub fn is_version_newer(candidate: &str, current: &str) -> Option<bool> {
+    compare_semver_strings(candidate, current).map(|ordering| ordering == std::cmp::Ordering::Greater)
+}
+
 pub fn check_minimum_version(found: &str, minimum: &str) -> Result<(), String> {
     let Some(found) = parse_efvibe_version(found) else {
         return Err(format!(
@@ -187,5 +197,17 @@ mod tests {
 
         assert!(error.contains("Could not determine efvibe version"));
         assert!(!error.contains("too old"));
+    }
+
+    #[test]
+    fn compare_semver_strings_orders_versions() {
+        assert_eq!(
+            compare_semver_strings("0.2.4", "0.2.3"),
+            Some(std::cmp::Ordering::Greater)
+        );
+        assert_eq!(
+            compare_semver_strings("0.2.3", "0.2.3"),
+            Some(std::cmp::Ordering::Equal)
+        );
     }
 }
