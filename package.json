@@ -1,7 +1,7 @@
 {
   "name": "efvibe-studio",
   "private": true,
-  "version": "0.2.3",
+  "version": "0.2.4",
   "description": "MyEFvibe Studio — EF Core database client and LINQ scratchpad",
   "author": "Yeahbah",
   "license": "SEE LICENSE IN LICENSE",
