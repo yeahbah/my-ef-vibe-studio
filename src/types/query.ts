@@ -1,4 +1,5 @@
 import type { EvaluationJsonPayload } from "./evaluation";
+import { sourceFileLabel } from "../lib/sourceFile";
 
 export type ResultsTab = "result" | "sql" | "plan" | "messages";
 
@@ -12,12 +13,17 @@ export function normalizeResultsTab(tab: LegacyResultsTab | undefined): ResultsT
   return tab;
 }
 
+export type QueryTabKind = "query" | "source";
+
 export interface QueryTab {
   id: string;
   name: string;
+  kind?: QueryTabKind;
   connectionId: string;
   expression: string;
   filePath: string;
+  sourceFilePath?: string;
+  sourceLine?: number;
   favorite?: boolean;
   folderId?: string;
   activeResultsTab: ResultsTab;
@@ -47,10 +53,35 @@ export function createQueryTab(
 ): QueryTab {
   return {
     id: crypto.randomUUID(),
+    kind: "query",
     name: options?.name ?? "Query 1",
     connectionId,
     expression: options?.expression ?? DEFAULT_QUERY_EXPRESSION,
     filePath: options?.filePath ?? "",
+    activeResultsTab: "result",
+  };
+}
+
+export function isSourceTab(
+  tab: Pick<QueryTab, "kind" | "sourceFilePath">,
+): tab is QueryTab & { kind: "source"; sourceFilePath: string; sourceLine: number } {
+  return tab.kind === "source" && typeof tab.sourceFilePath === "string" && tab.sourceFilePath.length > 0;
+}
+
+export function createSourceTab(
+  connectionId: string,
+  sourceFilePath: string,
+  sourceLine: number,
+): QueryTab {
+  return {
+    id: crypto.randomUUID(),
+    kind: "source",
+    name: `${sourceFileLabel(sourceFilePath)}:${sourceLine}`,
+    connectionId,
+    expression: "",
+    filePath: "",
+    sourceFilePath,
+    sourceLine,
     activeResultsTab: "result",
   };
 }

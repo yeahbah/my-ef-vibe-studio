@@ -9,6 +9,8 @@ import { yieldToUi } from "../lib/yieldToUi";
 import type { ConnectionSettings } from "../types/connection";
 import type { TablesJsonEntry } from "../types/schema";
 import type { AppTheme } from "../types/theme";
+import type { WorkspaceConnection } from "../types/workspace";
+import { ConnectionPicker } from "./ConnectionPicker";
 import { ErDiagramViewport } from "./ErDiagramViewport";
 
 const ALL_TABLES = "__all__";
@@ -19,6 +21,9 @@ export interface ErDiagramFocusRequest {
 }
 
 interface ErDiagramViewProps {
+  connections: WorkspaceConnection[];
+  connectionId: string;
+  onConnectionChange: (connectionId: string) => void;
   connectionName: string;
   connectionSettings: ConnectionSettings;
   searchDirectory: string;
@@ -30,6 +35,9 @@ interface ErDiagramViewProps {
 }
 
 export function ErDiagramView({
+  connections,
+  connectionId,
+  onConnectionChange,
   connectionName,
   connectionSettings,
   searchDirectory,
@@ -59,7 +67,7 @@ export function ErDiagramView({
 
     setTablesLoading(true);
     setTablesError(undefined);
-    onRequestEngine?.();
+    onRequestEngine?.(connectionId);
     onEngineBusyChange?.(1);
     await yieldToUi();
 
@@ -89,7 +97,7 @@ export function ErDiagramView({
       onEngineBusyChange?.(-1);
       setTablesLoading(false);
     }
-  }, [connectionSettings, onEngineBusyChange, onRequestEngine, searchDirectory]);
+  }, [connectionId, connectionSettings, onEngineBusyChange, onRequestEngine, searchDirectory]);
 
   const loadFullDiagram = useCallback(async () => {
     if (!searchDirectory) {
@@ -100,7 +108,7 @@ export function ErDiagramView({
 
     setDiagramLoading(true);
     setDiagramError(undefined);
-    onRequestEngine?.();
+    onRequestEngine?.(connectionId);
     onEngineBusyChange?.(1);
     await yieldToUi();
 
@@ -122,7 +130,7 @@ export function ErDiagramView({
       onEngineBusyChange?.(-1);
       setDiagramLoading(false);
     }
-  }, [connectionSettings, onEngineBusyChange, onRequestEngine, searchDirectory]);
+  }, [connectionId, connectionSettings, onEngineBusyChange, onRequestEngine, searchDirectory]);
 
   useEffect(() => {
     void loadTables();
@@ -208,7 +216,12 @@ export function ErDiagramView({
       <header className="er-diagram-view-header">
         <div className="er-diagram-view-title">
           <h2>ER Diagram</h2>
-          <p className="muted">{connectionName}</p>
+          <ConnectionPicker
+            connections={connections}
+            activeConnectionId={connectionId}
+            onChange={onConnectionChange}
+            ariaLabel="Connection for ER diagram"
+          />
         </div>
         <div className="er-diagram-view-actions">
           <label className="er-diagram-table-filter">

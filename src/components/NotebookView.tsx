@@ -1,14 +1,19 @@
 import { useState } from "react";
 import { NotebookCellOutput, NotebookCellOutputPlaceholder } from "./NotebookCellOutput";
 import { NotebookCodeEditor } from "./NotebookCodeEditor";
+import { ConnectionPicker } from "./ConnectionPicker";
 import { IconPlay, IconRunAbove, IconRunBelow } from "./icons";
 import { renderNotebookMarkdown } from "../lib/notebookMarkdown";
 import type { NotebookCell } from "../types/notebook";
 import type { AppTheme } from "../types/theme";
+import type { WorkspaceConnection } from "../types/workspace";
 
 export type NotebookRunScope = "above" | "cell" | "below";
 
 interface NotebookViewProps {
+  connections: WorkspaceConnection[];
+  connectionId: string;
+  onConnectionChange: (connectionId: string) => void;
   name: string;
   cells: NotebookCell[];
   theme: AppTheme;
@@ -28,6 +33,9 @@ interface NotebookViewProps {
 }
 
 export function NotebookView({
+  connections,
+  connectionId,
+  onConnectionChange,
   name,
   cells,
   theme,
@@ -59,6 +67,13 @@ export function NotebookView({
           />
         </div>
         <div className="notebook-toolbar">
+          <ConnectionPicker
+            connections={connections}
+            activeConnectionId={connectionId}
+            onChange={onConnectionChange}
+            ariaLabel="Connection for notebook"
+          />
+          <span className="notebook-toolbar-divider" aria-hidden="true" />
           <button type="button" disabled={running} onClick={onRunAll}>
             Run all
           </button>

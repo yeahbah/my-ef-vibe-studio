@@ -42,6 +42,7 @@ export interface StudioSession {
   notebookName?: string;
   notebookPath?: string;
   notebookConnectionId?: string;
+  diagramConnectionId?: string;
   notebookCells?: NotebookCell[];
   liveSqlEnabled?: boolean;
   sqlPaneOpen?: boolean;

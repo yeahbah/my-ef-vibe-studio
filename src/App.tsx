@@ -24,6 +24,7 @@ import {
 import { ResultsTabs } from "./components/ResultsTabs";
 import { ConnectionPanel } from "./components/ConnectionPanel";
 import { SettingsPanel } from "./components/SettingsPanel";
+import { SourceTabWorkspace } from "./components/SourceTabWorkspace";
 import { ExplorerSidebar } from "./components/explorer/ExplorerSidebar";
 import { resolveExplorerExpandedNodes, normalizeExplorerExpandedNodes } from "./components/explorer/types";
 import {
@@ -87,6 +88,7 @@ import {
 } from "./lib/sampleWorkspace";
 import { appendScriptLoad } from "./lib/scripts";
 import { findingsToReviewItems } from "./lib/scan";
+import { sourceFileLabel } from "./lib/sourceFile";
 import {
   dismissScanFinding,
   getScanSessionDirectory,
@@ -117,7 +119,14 @@ import { buildRunPaging, type RunPagingOptions } from "./lib/resultPaging";
 import { resolveDisplayPayload } from "./lib/resultView";
 import { createDefaultNotebook, createNotebookCell, type NotebookCell } from "./types/notebook";
 import { resolveSavedMainView, type AppMainView } from "./types/mainView";
-import { createQueryTab, restoreQueryTabFromSession, type QueryTab, type ResultsTab } from "./types/query";
+import {
+  createQueryTab,
+  createSourceTab,
+  isSourceTab,
+  restoreQueryTabFromSession,
+  type QueryTab,
+  type ResultsTab,
+} from "./types/query";
 import { createUserSnippet, type SnippetDefinition } from "./types/snippets";
 import type { ScanMode, ScanReviewItem } from "./types/scan";
 import type { PaneDropSide, PaneLayoutNode, TabDragPayload } from "./types/queryPaneLayout";
@@ -209,6 +218,7 @@ function App() {
   const [notebookName, setNotebookName] = useState("Notebook");
   const [notebookPath, setNotebookPath] = useState("");
   const [notebookConnectionId, setNotebookConnectionId] = useState("");
+  const [diagramConnectionId, setDiagramConnectionId] = useState("");
   const [notebookCells, setNotebookCells] = useState<NotebookCell[]>([]);
   const [notebookRunning, setNotebookRunning] = useState(false);
   const [runningNotebookCellId, setRunningNotebookCellId] = useState<string | undefined>();
@@ -342,6 +352,47 @@ function App() {
       notebookConnectionSettings.project,
     );
   }, [notebookConnection, notebookConnectionSettings, workspaceDirectory]);
+
+  const diagramConnection = useMemo(() => {
+    if (!document) {
+      return undefined;
+    }
+
+    const connectionId = diagramConnectionId || activeConnectionId;
+    if (!connectionId) {
+      return undefined;
+    }
+
+    return getActiveConnection(document.workspace, connectionId);
+  }, [document, diagramConnectionId, activeConnectionId]);
+
+  const diagramConnectionSettings = useMemo(() => {
+    if (!diagramConnection || !settings) {
+      return undefined;
+    }
+
+    return workspaceConnectionToSettings(
+      diagramConnection,
+      workspaceDirectory,
+      settings.toolPath,
+      settings.defaultWorkspaceRoot,
+    );
+  }, [diagramConnection, settings, workspaceDirectory]);
+
+  const diagramSearchDirectory = useMemo(() => {
+    if (!diagramConnection || !diagramConnectionSettings) {
+      return workspaceDirectory !== "." ? workspaceDirectory : "";
+    }
+
+    return resolveSearchDirectory(
+      diagramConnection,
+      workspaceDirectory,
+      diagramConnectionSettings.project,
+    );
+  }, [diagramConnection, diagramConnectionSettings, workspaceDirectory]);
+
+  const effectiveNotebookConnectionId = notebookConnectionId || activeConnectionId;
+  const effectiveDiagramConnectionId = diagramConnectionId || activeConnectionId;
 
   const payload = resolveDisplayPayload(activeQueryTab);
 
@@ -719,6 +770,7 @@ function App() {
           setNotebookName(savedSession.notebookName ?? "Notebook");
           setNotebookPath(savedSession.notebookPath ?? "");
           setNotebookConnectionId(savedSession.notebookConnectionId ?? connectionId);
+          setDiagramConnectionId(savedSession.diagramConnectionId ?? connectionId);
           setNotebookCells(savedSession.notebookCells ?? createDefaultNotebook(connectionId));
         }
         if (savedSession.sqlPaneWidth) {
@@ -870,6 +922,7 @@ function App() {
         notebookName,
         notebookPath,
         notebookConnectionId,
+        diagramConnectionId,
         notebookCells,
         liveSqlEnabled: focusedPane?.sqlPaneOpen ?? false,
         sqlPaneOpen: focusedPane?.sqlPaneOpen ?? false,
@@ -899,6 +952,7 @@ function App() {
       notebookName,
       notebookPath,
       notebookConnectionId,
+      diagramConnectionId,
       notebookCells,
       focusedPane?.sqlPaneOpen,
       sqlPaneWidth,
@@ -919,7 +973,7 @@ function App() {
   }, []);
 
   const handleSaveQuery = useCallback(async () => {
-    if (!activeQueryTab) {
+    if (!activeQueryTab || isSourceTab(activeQueryTab)) {
       return;
     }
 
@@ -1125,6 +1179,10 @@ function App() {
       const pane = findPaneById(paneLayout, paneId);
       const tab = queryTabs.find((item) => item.id === pane?.activeTabId);
       if (!tab) {
+        return;
+      }
+
+      if (isSourceTab(tab)) {
         return;
       }
 
@@ -1389,9 +1447,13 @@ function App() {
 
   const handleRunAll = useCallback(
     (paneId = focusedPaneId) => {
-      queryWorkspaceRefs.current.get(paneId)?.flush();
       const pane = paneLayout ? findPaneById(paneLayout, paneId) : undefined;
       const tab = queryTabs.find((item) => item.id === pane?.activeTabId);
+      if (tab && isSourceTab(tab)) {
+        return;
+      }
+
+      queryWorkspaceRefs.current.get(paneId)?.flush();
       const fullText =
         queryWorkspaceRefs.current.get(paneId)?.getDraft() ?? tab?.expression ?? "";
       void handleRun(false, fullText, paneId);
@@ -1610,6 +1672,9 @@ function App() {
     }
     if (view === "diagram") {
       setDiagramViewMounted(true);
+      if (!diagramConnectionId) {
+        setDiagramConnectionId(activeConnectionId);
+      }
     }
     if (view === "notebook" && notebookCells.length === 0) {
       setNotebookCells(createDefaultNotebook(activeConnectionId));
@@ -1619,9 +1684,10 @@ function App() {
 
   const handleOpenErDiagram = useCallback((dbSet?: string) => {
     setDiagramViewMounted(true);
+    setDiagramConnectionId((current) => current || activeConnectionId);
     setMainView("diagram");
     setDiagramFocusRequest((previous) => ({ dbSet, nonce: previous.nonce + 1 }));
-  }, []);
+  }, [activeConnectionId]);
 
   async function handleStartRepl() {
     if (!connectionSettings || !searchDirectory) {
@@ -1649,6 +1715,41 @@ function App() {
       setStatus(error instanceof Error ? error.message : String(error));
     }
   }
+
+  const handleOpenSourceTab = useCallback(
+    (filePath: string, line: number, connectionId = activeConnectionId) => {
+      if (!document || !paneLayout || !connectionId.trim()) {
+        setStatus("Configure a connection before opening source.");
+        return;
+      }
+
+      setMainView("query");
+
+      const existing = queryTabs.find(
+        (tab) => isSourceTab(tab) && tab.sourceFilePath === filePath,
+      );
+
+      if (existing) {
+        const name = `${sourceFileLabel(filePath)}:${line}`;
+        updateQueryTab(existing.id, { sourceLine: line, name });
+        const focused = focusTabInLayout(paneLayout, existing.id);
+        if (focused) {
+          setPaneLayout(focused.layout);
+          setFocusedPaneId(focused.focusedPaneId);
+        }
+        setStatus(`Opened ${name}`);
+        return;
+      }
+
+      const tab = createSourceTab(connectionId, filePath, line);
+      setQueryTabs((tabs) => [...tabs, tab]);
+      const next = addTabToPane(paneLayout, focusedPaneId, tab.id);
+      setPaneLayout(next.layout);
+      setFocusedPaneId(next.focusedPaneId);
+      setStatus(`Opened ${tab.name}`);
+    },
+    [activeConnectionId, document, focusedPaneId, paneLayout, queryTabs, updateQueryTab],
+  );
 
   function updateConnection(connection: WorkspaceConnection) {
     if (!document) {
@@ -1750,7 +1851,7 @@ function App() {
       const savedPath = await saveNotebookFile(
         notebookName,
         notebookPath,
-        notebookConnectionId,
+        effectiveNotebookConnectionId,
         notebookCells,
         options,
       );
@@ -2418,6 +2519,12 @@ function App() {
               ),
             );
             setDaemonConnectedIds((current) => current.filter((id) => id !== connectionId));
+            if (diagramConnectionId === connectionId) {
+              setDiagramConnectionId(nextId);
+            }
+            if (notebookConnectionId === connectionId) {
+              setNotebookConnectionId(nextId);
+            }
           }}
           onEditConnection={(connectionId) => {
             setConnectionEditorId(connectionId);
@@ -2488,6 +2595,7 @@ function App() {
                       onToggleFavorite={handleToggleFavorite}
                       onRunScan={(mode) => void runScan(mode)}
                       onScanIndexChange={setScanIndex}
+                      onOpenSourceTab={(file, line) => handleOpenSourceTab(file, line)}
                       onGoToSource={(file, line) => void handleGoToSource(file, line)}
                       onRunQuery={(expression) => {
                         if (!activeQueryTab) {
@@ -2566,6 +2674,7 @@ function App() {
                         );
                         const panePayload = resolveDisplayPayload(paneTab);
                         const paneResultsTab = paneTab.activeResultsTab ?? "result";
+                        const paneIsSource = isSourceTab(paneTab);
 
                         return (
                           <>
@@ -2585,6 +2694,14 @@ function App() {
                               onRename={handleRenameQueryTab}
                             />
 
+                            {paneIsSource ? (
+                              <SourceTabWorkspace
+                                filePath={paneTab.sourceFilePath}
+                                line={paneTab.sourceLine ?? 1}
+                                theme={settings.theme ?? "dark"}
+                              />
+                            ) : (
+                              <>
                             <QueryTabToolbar
                               connections={document.workspace.connections}
                               connectionId={paneTab.connectionId}
@@ -2707,6 +2824,8 @@ function App() {
                                 />
                               }
                             />
+                              </>
+                            )}
                           </>
                         );
                       }}
@@ -2717,16 +2836,19 @@ function App() {
             </>
           ) : null}
 
-          {diagramViewMounted && connectionSettings && activeConnection ? (
+          {diagramViewMounted && diagramConnectionSettings && diagramConnection ? (
             <div
               className={
                 mainView === "diagram" ? "main-view-slot" : "main-view-slot main-view-hidden"
               }
             >
               <ErDiagramView
-                connectionName={connectionDisplayName(activeConnection)}
-                connectionSettings={connectionSettings}
-                searchDirectory={searchDirectory}
+                connections={document.workspace.connections}
+                connectionId={effectiveDiagramConnectionId}
+                onConnectionChange={setDiagramConnectionId}
+                connectionName={connectionDisplayName(diagramConnection)}
+                connectionSettings={diagramConnectionSettings}
+                searchDirectory={diagramSearchDirectory}
                 theme={settings.theme ?? "dark"}
                 focusRequest={diagramFocusRequest}
                 onStatus={setStatus}
@@ -2738,6 +2860,9 @@ function App() {
 
           {mainView === "notebook" ? (
             <NotebookView
+              connections={document.workspace.connections}
+              connectionId={effectiveNotebookConnectionId}
+              onConnectionChange={setNotebookConnectionId}
               name={notebookName}
               cells={notebookCells}
               theme={settings?.theme ?? "dark"}

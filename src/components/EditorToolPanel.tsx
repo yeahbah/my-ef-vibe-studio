@@ -40,6 +40,7 @@ interface EditorToolPanelProps {
   onToggleFavorite: (tabId: string) => void;
   onRunScan: (mode: ScanMode) => void;
   onScanIndexChange: (index: number) => void;
+  onOpenSourceTab: (file: string, line: number) => void;
   onGoToSource: (file: string, line: number) => void;
   onRunQuery: (expression: string) => void;
   onDismissFinding: (note?: string) => void;
@@ -86,6 +87,7 @@ export function EditorToolPanel({
   onToggleFavorite,
   onRunScan,
   onScanIndexChange,
+  onOpenSourceTab,
   onGoToSource,
   onRunQuery,
   onDismissFinding,
@@ -160,6 +162,7 @@ export function EditorToolPanel({
             theme={theme}
             onRunScan={onRunScan}
             onIndexChange={onScanIndexChange}
+            onOpenSourceTab={onOpenSourceTab}
             onGoToSource={onGoToSource}
             onRunQuery={onRunQuery}
             onDismissFinding={onDismissFinding}
@@ -577,6 +580,7 @@ function ScanToolView({
   theme,
   onRunScan,
   onIndexChange,
+  onOpenSourceTab,
   onGoToSource,
   onRunQuery,
   onDismissFinding,
@@ -590,6 +594,7 @@ function ScanToolView({
   theme: AppTheme;
   onRunScan: (mode: ScanMode) => void;
   onIndexChange: (index: number) => void;
+  onOpenSourceTab: (file: string, line: number) => void;
   onGoToSource: (file: string, line: number) => void;
   onRunQuery: (expression: string) => void;
   onDismissFinding: (note?: string) => void;
@@ -661,13 +666,30 @@ function ScanToolView({
             </button>
             <button
               type="button"
-              onClick={() => onGoToSource(activeFinding.finding.filePath, activeFinding.finding.line)}
+              onClick={() =>
+                onOpenSourceTab(activeFinding.finding.filePath, activeFinding.finding.line)
+              }
             >
               Go to code
             </button>
+            <button
+              type="button"
+              className="scan-open-ide-btn"
+              onClick={() => onGoToSource(activeFinding.finding.filePath, activeFinding.finding.line)}
+            >
+              Open in IDE
+            </button>
           </div>
           <p className="tool-list-item-meta">
-            {activeFinding.finding.filePath}:{activeFinding.finding.line}
+            <button
+              type="button"
+              className="scan-location-link"
+              onClick={() =>
+                onOpenSourceTab(activeFinding.finding.filePath, activeFinding.finding.line)
+              }
+            >
+              {activeFinding.finding.filePath}:{activeFinding.finding.line}
+            </button>
           </p>
           <p className="tool-list-item-title">{formatFindingSummary(activeFinding.finding)}</p>
           {activeFinding.finding.recommendation ? (
