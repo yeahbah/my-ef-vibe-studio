@@ -401,7 +401,13 @@ fn open_path_in_file_manager(path: &Path) -> Result<(), String> {
 }
 
 fn select_release_asset(assets: &[GithubReleaseAsset]) -> Result<GithubReleaseAsset, String> {
-    let preferences = preferred_asset_patterns();
+    select_release_asset_with_patterns(assets, &preferred_asset_patterns())
+}
+
+fn select_release_asset_with_patterns(
+    assets: &[GithubReleaseAsset],
+    preferences: &[&str],
+) -> Result<GithubReleaseAsset, String> {
     let mut ranked: Vec<(usize, &GithubReleaseAsset)> = assets
         .iter()
         .filter_map(|asset| {
@@ -473,7 +479,14 @@ enum LinuxPackageFamily {
 
 #[cfg(target_os = "linux")]
 fn linux_package_family() -> LinuxPackageFamily {
-    let contents = fs::read_to_string("/etc/os-release").unwrap_or_default().to_ascii_lowercase();
+    linux_package_family_from_os_release(
+        &fs::read_to_string("/etc/os-release").unwrap_or_default(),
+    )
+}
+
+#[cfg(target_os = "linux")]
+fn linux_package_family_from_os_release(contents: &str) -> LinuxPackageFamily {
+    let contents = contents.to_ascii_lowercase();
 
     if contents.contains("id=fedora")
         || contents.contains("id=nobara")
@@ -545,8 +558,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(target_os = "linux")]
-    fn select_release_asset_prefers_rpm_when_rpm_is_first_preference() {
+    fn select_release_asset_prefers_first_matching_pattern() {
         let assets = vec![
             GithubReleaseAsset {
                 name: "MyEFvibe.Studio_0.2.3_amd64.deb".to_string(),
@@ -558,20 +570,26 @@ mod tests {
             },
         ];
 
-        let patterns = linux_asset_patterns();
-        let selected = assets
-            .iter()
-            .filter_map(|asset| {
-                let rank = patterns
-                    .iter()
-                    .position(|pattern| asset.name.to_ascii_lowercase().contains(pattern))?;
-                Some((rank, asset))
-            })
-            .min_by_key(|(rank, _)| *rank)
-            .map(|(_, asset)| asset.name.clone())
+        let rpm_first = select_release_asset_with_patterns(&assets, &[".rpm", ".appimage", ".deb"])
             .expect("asset");
+        assert!(rpm_first.name.ends_with(".rpm"));
 
-        assert!(selected.ends_with(".rpm"));
+        let deb_first = select_release_asset_with_patterns(&assets, &[".deb", ".appimage", ".rpm"])
+            .expect("asset");
+        assert!(deb_first.name.ends_with(".deb"));
+    }
+
+    #[test]
+    #[cfg(target_os = "linux")]
+    fn linux_package_family_detects_distro_from_os_release() {
+        assert_eq!(
+            linux_package_family_from_os_release("ID=fedora\nVERSION_ID=43"),
+            LinuxPackageFamily::Rpm
+        );
+        assert_eq!(
+            linux_package_family_from_os_release("ID=ubuntu\nID_LIKE=debian"),
+            LinuxPackageFamily::Deb
+        );
     }
 
     #[test]
