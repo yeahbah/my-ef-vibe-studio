@@ -48,11 +48,19 @@ Artifacts are written under `src-tauri/target/release/bundle/`:
 
 ## CI/CD and GitHub Releases
 
-GitHub Actions builds installers on every version tag:
+Every push to `main` runs CI (frontend build, Rust tests), then automatically:
+
+1. Computes the next patch version (max of latest `v*` git tag, GitHub Releases, and `package.json` / Tauri manifests)
+2. Creates and pushes a `v*` tag (e.g. `v0.2.5`)
+3. The **Release** workflow builds Linux, macOS, and Windows installers and publishes a [GitHub Release](https://github.com/yeahbah/my-ef-vibe-studio/releases)
+
+Version-bump commits from CI include `[skip ci]` so they do not trigger another release.
+
+Manual release: **Actions → Release → Run workflow** (optional version input), or push a tag:
 
 ```bash
-git tag v0.2.0
-git push origin v0.2.0
+git tag v0.2.5
+git push origin v0.2.5
 ```
 
 The **Release** workflow publishes:
@@ -65,7 +73,7 @@ The **Release** workflow publishes:
 
 You can also start a release manually from **Actions → Release → Run workflow** (optional version input; releases publish immediately by default).
 
-**CI** runs on pushes and pull requests to `main`: frontend build plus `cargo check` for the Tauri backend.
+**CI** runs on pushes and pull requests to `main`: frontend build, Rust tests, and (on `main` only) automatic version tagging when CI passes.
 
 Download builds from [GitHub Releases](https://github.com/yeahbah/my-ef-vibe-studio/releases).
 
