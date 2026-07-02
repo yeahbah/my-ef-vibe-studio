@@ -3393,10 +3393,17 @@ pre,
 }
 
 .er-diagram-view-title h2 {
-  margin: 0 0 4px;
+  margin: 0;
 }
 
-.er-diagram-view-title .connection-picker select {
+.er-diagram-connection-filter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.er-diagram-connection-filter .connection-picker select {
+  min-width: 180px;
   max-width: min(280px, 40vw);
 }
 

@@ -216,14 +216,17 @@ export function ErDiagramView({
       <header className="er-diagram-view-header">
         <div className="er-diagram-view-title">
           <h2>ER Diagram</h2>
-          <ConnectionPicker
-            connections={connections}
-            activeConnectionId={connectionId}
-            onChange={onConnectionChange}
-            ariaLabel="Connection for ER diagram"
-          />
         </div>
         <div className="er-diagram-view-actions">
+          <div className="er-diagram-connection-filter">
+            <span className="er-diagram-control-label">Connection</span>
+            <ConnectionPicker
+              connections={connections}
+              activeConnectionId={connectionId}
+              onChange={onConnectionChange}
+              ariaLabel="Connection for ER diagram"
+            />
+          </div>
           <label className="er-diagram-table-filter">
             <span className="er-diagram-control-label">Table</span>
             <select

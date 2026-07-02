@@ -2056,7 +2056,7 @@ dependencies = [
 
 [[package]]
 name = "my-ef-vibe-studio"
-version = "0.2.5"
+version = "0.2.6"
 dependencies = [
  "dirs",
  "gdk",
