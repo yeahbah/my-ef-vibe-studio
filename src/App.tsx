@@ -88,6 +88,7 @@ import {
 } from "./lib/sampleWorkspace";
 import { appendScriptLoad } from "./lib/scripts";
 import { findingsToReviewItems } from "./lib/scan";
+import { ensureWorkspaceFsScope } from "./lib/fsScope";
 import { sourceFileLabel } from "./lib/sourceFile";
 import {
   dismissScanFinding,
@@ -314,6 +315,16 @@ function App() {
       connectionSettings.project,
     );
   }, [activeConnection, connectionSettings, workspaceDirectory]);
+
+  useEffect(() => {
+    if (!document) {
+      return;
+    }
+
+    void ensureWorkspaceFsScope(workspaceDirectory, document.workspace).catch((error) => {
+      setStatus(error instanceof Error ? error.message : String(error));
+    });
+  }, [document, workspaceDirectory]);
 
   const notebookConnection = useMemo(() => {
     if (!document) {

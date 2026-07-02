@@ -50,6 +50,7 @@ pub fn run() {
             commands::cancel_efvibe_daemon_request,
             commands::daemon_eval,
             commands::daemon_request,
+            commands::allow_fs_directory,
             commands::open_in_ide,
             commands::start_repl,
             commands::git_status,

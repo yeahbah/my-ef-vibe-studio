@@ -15,6 +15,16 @@ pub fn augment_process_path() {
         extra.push("/usr/local/bin".to_string());
     }
 
+    if cfg!(target_os = "windows") {
+        if let Ok(local) = std::env::var("LOCALAPPDATA") {
+            extra.push(format!(r"{local}\Programs\Microsoft VS Code\bin"));
+            extra.push(format!(r"{local}\Programs\JetBrains\Toolbox\scripts"));
+        }
+        if let Ok(program_files) = std::env::var("ProgramFiles") {
+            extra.push(format!(r"{program_files}\Microsoft VS Code\bin"));
+        }
+    }
+
     if let Ok(home) = std::env::var("HOME") {
         if !home.is_empty() {
             extra.push(format!("{home}/.dotnet/tools"));

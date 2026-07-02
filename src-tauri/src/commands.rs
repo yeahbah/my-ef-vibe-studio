@@ -261,6 +261,153 @@ pub fn clone_adventureworks_sqlite(parent_directory: String) -> Result<String, S
 }
 
 #[tauri::command]
+pub fn allow_fs_directory(app: tauri::AppHandle, directory: String) -> Result<(), String> {
+    use std::path::Path;
+    use tauri_plugin_fs::FsExt;
+
+    let trimmed = directory.trim();
+    if trimmed.is_empty() {
+        return Err("Directory path is required.".to_string());
+    }
+
+    let path = Path::new(trimmed);
+    let directory_path = if path.is_file() {
+        path.parent()
+            .ok_or_else(|| format!("Invalid path: {trimmed}"))?
+    } else {
+        path
+    };
+
+    if !directory_path.is_dir() {
+        return Err(format!("Directory not found: {}", directory_path.display()));
+    }
+
+    app.fs_scope()
+        .allow_directory(directory_path, true)
+        .map_err(|error| error.to_string())
+}
+
+fn vscode_candidates() -> Vec<String> {
+    #[cfg(target_os = "windows")]
+    {
+        let mut candidates = vec!["code.cmd".to_string(), "code".to_string()];
+        if let Ok(local) = std::env::var("LOCALAPPDATA") {
+            candidates.push(format!(
+                r"{local}\Programs\Microsoft VS Code\bin\code.cmd"
+            ));
+        }
+        if let Ok(program_files) = std::env::var("ProgramFiles") {
+            candidates.push(format!(
+                r"{program_files}\Microsoft VS Code\bin\code.cmd"
+            ));
+        }
+        return candidates;
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        vec!["code".to_string()]
+    }
+}
+
+fn rider_candidates() -> Vec<String> {
+    #[cfg(target_os = "windows")]
+    {
+        let mut candidates = vec!["rider64.exe".to_string(), "rider".to_string()];
+        if let Ok(local) = std::env::var("LOCALAPPDATA") {
+            candidates.push(format!(
+                r"{local}\Programs\JetBrains\Toolbox\scripts\rider64.cmd"
+            ));
+        }
+        return candidates;
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        vec!["rider".to_string()]
+    }
+}
+
+fn editor_candidates(editor: &str) -> Result<Vec<String>, String> {
+    match editor {
+        "code" => Ok(vscode_candidates()),
+        "rider" => Ok(rider_candidates()),
+        "devenv" => Ok(vec!["devenv".to_string()]),
+        other => Err(format!("Unsupported editor: {other}")),
+    }
+}
+
+fn editor_args(editor: &str, target: &str) -> Result<Vec<String>, String> {
+    match editor {
+        "code" => Ok(vec!["-g".to_string(), target.to_string()]),
+        "rider" => Ok(vec![target.to_string()]),
+        "devenv" => Ok(vec!["/edit".to_string(), target.to_string()]),
+        _ => Err("Unsupported editor.".to_string()),
+    }
+}
+
+fn launch_editor(candidates: &[String], args: &[String]) -> Result<(), String> {
+    let mut last_error = String::new();
+
+    for candidate in candidates {
+        match Command::new(candidate).args(args).status() {
+            Ok(status) if status.success() => return Ok(()),
+            Ok(status) => {
+                last_error = format!("{candidate} exited with {status}");
+            }
+            Err(error) => {
+                last_error = format!("{candidate}: {error}");
+            }
+        }
+    }
+
+    Err(if last_error.is_empty() {
+        "Editor executable not found. Add it to PATH or configure a custom command in Settings."
+            .to_string()
+    } else {
+        last_error
+    })
+}
+
+fn launch_custom_editor(custom_command: &str, target: &str) -> Result<(), String> {
+    if custom_command.trim().is_empty() {
+        return Err("Custom IDE command is not configured.".to_string());
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        let script = format!("{custom_command} {target}");
+        let status = Command::new("cmd")
+            .args(["/C", &script])
+            .status()
+            .map_err(|error| error.to_string())?;
+
+        if status.success() {
+            return Ok(());
+        }
+
+        return Err(format!("Custom editor command failed: {script}"));
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        let status = Command::new("sh")
+            .arg("-lc")
+            .arg(format!("{custom_command} {target}"))
+            .status()
+            .map_err(|error| error.to_string())?;
+
+        if status.success() {
+            Ok(())
+        } else {
+            Err(format!(
+                "Custom editor command failed: {custom_command} {target}"
+            ))
+        }
+    }
+}
+
+#[tauri::command]
 pub fn open_in_ide(
     file: String,
     line: u32,
@@ -273,29 +420,15 @@ pub fn open_in_ide(
         file
     };
 
-    let status = match editor.as_str() {
-        "code" => Command::new("code").args(["-g", &target]).status(),
-        "rider" => Command::new("rider").arg(&target).status(),
-        "devenv" => Command::new("devenv").args(["/edit", &target]).status(),
-        "custom" => {
-            if custom_command.trim().is_empty() {
-                return Err("Custom IDE command is not configured.".to_string());
-            }
-
-            Command::new("sh")
-                .arg("-lc")
-                .arg(format!("{custom_command} {target}"))
-                .status()
-        }
-        other => return Err(format!("Unsupported editor: {other}")),
+    if editor == "custom" {
+        return launch_custom_editor(&custom_command, &target);
     }
-    .map_err(|error| error.to_string())?;
 
-    if status.success() {
-        Ok(())
-    } else {
-        Err(format!("Failed to open {target} in {editor}."))
-    }
+    let candidates = editor_candidates(&editor)?;
+    let args = editor_args(&editor, &target)?;
+    launch_editor(&candidates, &args).map_err(|error| {
+        format!("Failed to open {target} in {editor}. {error}")
+    })
 }
 
 fn quote_shell_arg(value: &str) -> String {
