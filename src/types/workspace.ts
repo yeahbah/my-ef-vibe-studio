@@ -80,7 +80,7 @@ export function connectionDisplayName(connection: WorkspaceConnection): string {
 /** Default folder for `.csx` helpers, relative to the workspace file directory. */
 export const DEFAULT_SCRIPT_SEARCH_PATH = "scripts";
 
-function resolveWorkspaceRelativePath(
+export function resolveWorkspaceRelativePath(
   value: string | undefined,
   workspaceDirectory: string,
 ): string {

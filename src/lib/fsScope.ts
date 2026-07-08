@@ -1,6 +1,10 @@
 import { invoke } from "@tauri-apps/api/core";
 import type { EfvibeWorkspace } from "../types/workspace";
-import { resolveScriptSearchPath, resolveSearchDirectory } from "../types/workspace";
+import {
+  resolveScriptSearchPath,
+  resolveSearchDirectory,
+  resolveWorkspaceRelativePath,
+} from "../types/workspace";
 
 const allowedDirectories = new Set<string>();
 
@@ -45,29 +49,43 @@ export function collectWorkspaceScopeDirectories(
   addScopeDirectory(directories, workspaceDirectory);
 
   for (const project of workspace.projects) {
-    addScopeDirectory(directories, project.path);
+    addScopeDirectory(
+      directories,
+      resolveWorkspaceRelativePath(project.path, workspaceDirectory),
+    );
   }
 
   for (const connection of workspace.connections) {
-    addScopeDirectory(directories, connection.searchDirectory);
-    addScopeDirectory(directories, connection.workspaceRoot);
-    addScopeDirectory(directories, connection.efProject);
-    addScopeDirectory(directories, connection.startupProject);
+    const resolvedEfProject = resolveWorkspaceRelativePath(
+      connection.efProject,
+      workspaceDirectory,
+    );
+    const resolvedStartupProject = resolveWorkspaceRelativePath(
+      connection.startupProject,
+      workspaceDirectory,
+    );
+
+    addScopeDirectory(
+      directories,
+      resolveWorkspaceRelativePath(connection.searchDirectory, workspaceDirectory),
+    );
+    addScopeDirectory(
+      directories,
+      resolveWorkspaceRelativePath(connection.workspaceRoot, workspaceDirectory),
+    );
+    addScopeDirectory(directories, resolvedEfProject);
+    addScopeDirectory(directories, resolvedStartupProject);
     addScopeDirectory(
       directories,
       resolveScriptSearchPath(connection, workspaceDirectory),
     );
     addScopeDirectory(
       directories,
-      resolveSearchDirectory(connection, workspaceDirectory, connection.efProject),
+      resolveSearchDirectory(connection, workspaceDirectory, resolvedEfProject),
     );
     addScopeDirectory(
       directories,
-      resolveSearchDirectory(
-        connection,
-        workspaceDirectory,
-        connection.startupProject ?? "",
-      ),
+      resolveSearchDirectory(connection, workspaceDirectory, resolvedStartupProject),
     );
   }
 
