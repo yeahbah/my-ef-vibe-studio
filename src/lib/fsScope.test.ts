@@ -29,4 +29,36 @@ describe("collectWorkspaceScopeDirectories", () => {
       ]),
     );
   });
+
+  it("resolves parent-relative project paths against the workspace directory", () => {
+    const workspace: EfvibeWorkspace = {
+      version: 1,
+      name: "AdventureWorks SQLite",
+      projects: [],
+      connections: [
+        {
+          id: "sample",
+          name: "AdventureWorks SQLite",
+          efProject:
+            "../apps/api-dotnet/src/AdventureWorks.Infrastructure.Persistence/AdventureWorks.Infrastructure.Persistence.csproj",
+          startupProject:
+            "../apps/api-dotnet/src/AdventureWorks.API/AdventureWorks.API.csproj",
+          context: "",
+        },
+      ],
+    };
+
+    expect(
+      collectWorkspaceScopeDirectories(
+        "/Users/dev/samples/AdventureWorks-sqlite/studio",
+        workspace,
+      ),
+    ).toEqual(
+      expect.arrayContaining([
+        "/Users/dev/samples/AdventureWorks-sqlite/studio/../apps/api-dotnet/src/AdventureWorks.Infrastructure.Persistence",
+        "/Users/dev/samples/AdventureWorks-sqlite/studio/../apps/api-dotnet/src/AdventureWorks.API",
+        "/Users/dev/samples/AdventureWorks-sqlite/studio/scripts",
+      ]),
+    );
+  });
 });
