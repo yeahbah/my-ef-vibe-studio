@@ -54,6 +54,7 @@ export interface StudioSession {
   queryLibrary?: QueryLibraryState;
   installedPackIds?: string[];
   explorerOpen?: boolean;
+  explorerWidth?: number;
 }
 
 export async function loadAppSettings(): Promise<AppSettings> {

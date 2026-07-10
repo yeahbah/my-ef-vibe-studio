@@ -21,6 +21,10 @@ import {
   ResizableEditorToolPanel,
   DEFAULT_EDITOR_TOOL_PANEL_WIDTH,
 } from "./components/ResizableEditorToolPanel";
+import {
+  ResizableWorkspaceLayout,
+  DEFAULT_EXPLORER_WIDTH,
+} from "./components/ResizableWorkspaceLayout";
 import { ResultsTabs } from "./components/ResultsTabs";
 import { ConnectionPanel } from "./components/ConnectionPanel";
 import { SettingsPanel } from "./components/SettingsPanel";
@@ -209,6 +213,7 @@ function App() {
     resolveExplorerExpandedNodes(),
   );
   const [explorerOpen, setExplorerOpen] = useState(true);
+  const [explorerWidth, setExplorerWidth] = useState(DEFAULT_EXPLORER_WIDTH);
   const [history, setHistory] = useState<EvaluationHistoryEntry[]>([]);
   const [mainView, setMainView] = useState<AppMainView>("query");
   const [replViewMounted, setReplViewMounted] = useState(false);
@@ -808,6 +813,9 @@ function App() {
         if (savedSession.explorerOpen !== undefined) {
           setExplorerOpen(savedSession.explorerOpen);
         }
+        if (savedSession.explorerWidth) {
+          setExplorerWidth(savedSession.explorerWidth);
+        }
       } else if (loaded.onboardingCompleted) {
         const connection = createSampleConnection();
         const tab = createQueryTab(connection.id);
@@ -945,6 +953,7 @@ function App() {
         queryLibrary,
         installedPackIds,
         explorerOpen,
+        explorerWidth,
       });
     },
     [
@@ -974,6 +983,7 @@ function App() {
       queryLibrary,
       installedPackIds,
       explorerOpen,
+      explorerWidth,
       vaultConnectionSecrets,
     ],
     800,
@@ -2371,8 +2381,11 @@ function App() {
         </div>
       </header>
 
-      <div className={explorerOpen ? "workspace" : "workspace explorer-hidden"}>
-        {explorerOpen ? (
+      <ResizableWorkspaceLayout
+        explorerOpen={explorerOpen}
+        explorerWidth={explorerWidth}
+        onExplorerWidthChange={setExplorerWidth}
+        explorer={
         <ExplorerSidebar
           workspace={document.workspace}
           documentPath={document.path}
@@ -2567,8 +2580,8 @@ function App() {
           theme={settings.theme ?? "dark"}
           onToggleTheme={handleToggleTheme}
         />
-        ) : null}
-
+        }
+      >
         <div className="main-stack">
           {mainView === "query" ? (
             <>
@@ -2930,7 +2943,7 @@ function App() {
             </div>
           ) : null}
         </div>
-      </div>
+      </ResizableWorkspaceLayout>
 
       <SettingsPanel
         open={settingsOpen}
