@@ -1,6 +1,6 @@
 [package]
 name = "my-ef-vibe-studio"
-version = "0.2.9"
+version = "0.2.10"
 description = "MyEFvibe Studio — EF Core database client and LINQ scratchpad"
 authors = ["yeahbah"]
 edition = "2021"
