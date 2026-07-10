@@ -1,4 +1,4 @@
-import { runExpressionViaDaemon } from "./daemonClient";
+import { runDaemonJson, runExpressionViaDaemon } from "./daemonClient";
 import type { ConnectionSettings } from "../types/connection";
 import { fetchSqlToLinq } from "./sqlToLinq";
 import { looksLikeRawSql } from "./sqlDetect";
@@ -559,6 +559,40 @@ export async function fetchLiveSqlPreview(
     return { sql: trimmed };
   }
 
+  if (!trimmed) {
+    return {};
+  }
+
+  try {
+    const line = await runDaemonJson(
+      settings,
+      searchDirectory,
+      searchDirectory,
+      { type: "translate", expression: trimmed },
+    );
+
+    const payload = JSON.parse(line) as { success?: boolean; sql?: string; note?: string };
+    if (payload.success && payload.sql?.trim()) {
+      return { sql: payload.sql };
+    }
+
+    return { error: payload.note ?? "SQL preview failed." };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+
+    if (message.includes("Unknown request type 'translate'")) {
+      return fetchLiveSqlPreviewLegacy(settings, searchDirectory, expression);
+    }
+
+    return { error: message };
+  }
+}
+
+async function fetchLiveSqlPreviewLegacy(
+  settings: ConnectionSettings,
+  searchDirectory: string,
+  expression: string,
+): Promise<{ sql?: string; error?: string }> {
   const probe = buildSqlProbeExpression(expression);
   if (!probe) {
     return {};

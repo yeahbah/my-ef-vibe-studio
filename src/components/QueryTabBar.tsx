@@ -167,7 +167,7 @@ export function QueryTabBar({
                 aria-selected={tab.id === activeTabId}
                 tabIndex={0}
                 className="query-tab-label"
-                title="Double-click to rename · drag to split pane"
+                title={tab.name}
                 onMouseDown={(event) => startTabDrag(event, tab.id)}
                 onClick={() => handleTabSelect(tab.id)}
                 onDoubleClick={(event) => {

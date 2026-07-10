@@ -1182,12 +1182,27 @@ function buildModelChildren(
     return [{ id: `model:${connectionId}:error`, label: schema.error, kind: "info", muted: true }];
   }
 
-  return (schema.tables?.tables ?? []).map((entry) => ({
-    id: `dbset:${connectionId}:${entry.dbSet}`,
-    label: entry.dbSet,
-    subtitle: entry.entityType,
-    kind: "dbset" as const,
-  }));
+  return (schema.tables?.tables ?? []).map((entry) => {
+    const members = entry.members ?? [];
+    return {
+      id: `dbset:${connectionId}:${entry.dbSet}`,
+      label: entry.dbSet,
+      subtitle:
+        members.length > 0
+          ? `${entry.entityType} · ${members.length} field(s)`
+          : entry.entityType,
+      kind: "dbset" as const,
+      children:
+        members.length > 0
+          ? members.map((member) => ({
+              id: `field:${connectionId}:${entry.dbSet}:${member.name}`,
+              label: member.name,
+              subtitle: member.type,
+              kind: "property" as const,
+            }))
+          : undefined,
+    };
+  });
 }
 
 function resolveConnectionSchemaContext(

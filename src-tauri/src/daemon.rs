@@ -92,6 +92,31 @@ fn wait_for_line(rx: &mpsc::Receiver<String>, timeout: Duration) -> Result<Strin
     }
 }
 
+fn wait_for_serve_handshake(
+    rx: &mpsc::Receiver<String>,
+    timeout: Duration,
+    invocation: &crate::tool::ToolInvocation,
+) -> Result<serde_json::Value, String> {
+    let deadline = std::time::Instant::now() + timeout;
+
+    loop {
+        let remaining = deadline.saturating_duration_since(std::time::Instant::now());
+        if remaining.is_zero() {
+            return Err("efvibe serve timed out during workspace load.".to_string());
+        }
+
+        let line = wait_for_line(rx, remaining)?;
+        if !line.starts_with('{') {
+            continue;
+        }
+
+        let payload: serde_json::Value = serde_json::from_str(&line)
+            .map_err(|_| format_serve_startup_error(&line, invocation))?;
+
+        return Ok(payload);
+    }
+}
+
 fn parse_serve_error(line: &str) -> Option<String> {
     let payload: serde_json::Value = serde_json::from_str(line).ok()?;
     if payload.get("type")?.as_str()? == "error" {
@@ -257,10 +282,7 @@ fn ensure_daemon_ready(
         }
     });
 
-    let ready_line = wait_for_line(&line_rx, READY_TIMEOUT)?;
-    let payload: serde_json::Value = serde_json::from_str(&ready_line).map_err(|_| {
-        format_serve_startup_error(&ready_line, &invocation)
-    })?;
+    let payload = wait_for_serve_handshake(&line_rx, READY_TIMEOUT, &invocation)?;
 
     match payload.get("type").and_then(|value| value.as_str()) {
         Some("ready") => {}
@@ -271,7 +293,12 @@ fn ensure_daemon_ready(
                 .unwrap_or("efvibe serve failed to start.");
             return Err(message.to_string());
         }
-        _ => return Err(format_serve_startup_error(&ready_line, &invocation)),
+        _ => {
+            return Err(format_serve_startup_error(
+                &payload.to_string(),
+                &invocation,
+            ))
+        }
     }
 
     let mut guard = daemon_mutex().lock().expect("daemon lock");

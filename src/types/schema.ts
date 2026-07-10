@@ -2,6 +2,7 @@ export interface TablesJsonEntry {
   dbSet: string;
   entityType: string;
   entityTypeFullName?: string;
+  members?: DescribeJsonMember[];
 }
 
 export interface TablesJsonPayload {
